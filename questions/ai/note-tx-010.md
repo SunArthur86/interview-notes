@@ -1,0 +1,434 @@
+---
+id: note-tx-010
+difficulty: L4
+category: ai
+subcategory: Agent
+tags:
+- 腾讯
+- 面经
+- 上下文管理
+- Agent
+- 架构设计
+feynman:
+  essence: 将上下文按生命周期和重要性分层管理，避免 token 爆炸同时保留关键信息。
+  analogy: 就像人脑的记忆系统——工作记忆（当前任务）→短期记忆（本次会话）→长期记忆（项目知识库）。
+  first_principle: LLM 的上下文窗口有限（128K/200K），必须用分层策略在不同层级之间做信息的保留和遗忘。
+  key_points:
+  - 即时层（当前对话）
+  - 会话层（工作区上下文）
+  - 项目层（代码库+文档）
+  - 全局层（用户偏好+历史）
+first_principle:
+  essence: 信息论视角：上下文窗口是带宽有限的信道，分层管理是信源编码
+  derivation: token 限制→必须压缩→不同层级有不同保留策略→类似 CPU 缓存 L1/L2/L3
+  conclusion: 分层上下文管理本质是一个信息缓存层级系统
+follow_up:
+- 分层管理中，如何决定哪些信息需要从低层级提升到高层级？
+- 不同层级之间的信息同步机制是怎样的？有无一致性问题？
+- 如果用户打开了多个文件，如何管理上下文优先级？
+---
+
+# 【腾讯面经】在分层上下文管理机制中，各层级分别负责什么内容？
+
+> **一句话回答**：分层上下文管理借鉴了 **CPU 多级缓存（L1/L2/L3/主存）** 和 **人脑记忆系统（工作记忆→短期记忆→长期记忆）** 的设计思想，将上下文按**生命周期**和**重要性**分为四个层级——即时层、会话层、项目层、全局层。每一层有不同的 token 预算、保留策略和淘汰机制，核心目标是**在有限的上下文窗口内，最大化任务相关信息的保留率，最小化噪声信息的干扰**。
+
+---
+
+## 一、为什么需要分层？——信息论视角
+
+LLM 的上下文窗口是一条**带宽有限的信道**（128K/200K tokens）。如果把所有信息无差别塞入窗口，会导致三个问题：
+
+```
+问题 1: Token 爆炸 → 超出窗口限制，请求失败
+问题 2: 注意力稀释 → "Lost in the Middle"现象，关键信息被淹没
+问题 3: 成本失控 → 每次请求都带大量无关 Token，推理成本线性增长
+
+解决思路: 信息分层 → 按相关性分级 → 高频信息常驻 → 低频信息按需加载
+         类比: CPU 缓存层级系统
+
+  ┌──────┐   ┌──────┐   ┌──────┐   ┌──────┐
+  │ L1   │   │ 即时层 │   │ 当前对话     │  ← 最快，最小
+  │ Cache│ ≈ │      │ = │              │
+  └──────┘   └──────┘   └──────┘   └──────┘
+  ┌──────┐   ┌──────┐   ┌──────┐   ┌──────┐
+  │ L2   │   │ 会话层 │   │ 本次工作会话 │  ← 较快，较小
+  │ Cache│ ≈ │      │ = │              │
+  └──────┘   └──────┘   └──────┘   └──────┘
+  ┌──────┐   ┌──────┐   ┌──────┐   ┌──────┐
+  │ L3   │   │ 项目层 │   │ 代码库+文档  │  ← 较慢，较大
+  │ Cache│ ≈ │      │ = │              │
+  └──────┘   └──────┘   └──────┘   └──────┘
+  ┌──────┐   ┌──────┐   ┌──────┐   ┌──────┐
+  │ DRAM │   │ 全局层 │   │ 用户偏好+历史 │  ← 最慢，最大
+  │      │ ≈ │      │ = │              │
+  └──────┘   └──────┘   └──────┘   └──────┘
+```
+
+---
+
+## 二、四层架构总览图
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     分层上下文管理架构                                │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  L1: 即时层 (Immediate Layer)                    ~2-4K tok  │   │
+│  │  ┌───────────┐  ┌──────────┐  ┌───────────────────────┐    │   │
+│  │  │ 当前用户   │  │ 系统提示  │  │ 当前光标上下文          │    │   │
+│  │  │ 指令       │  │ 词 System │  │ (光标前后50行)         │    │   │
+│  │  │ Prompt    │  │ Prompt   │  │ Cursor Context        │    │   │
+│  │  └───────────┘  └──────────┘  └───────────────────────┘    │   │
+│  │  生命周期: 单次请求    保留: 100%    淘汰: 请求结束即清空     │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                               ▲ 溢出时触发摘要压缩                   │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  L2: 会话层 (Session Layer)                     ~8-16K tok  │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐  │   │
+│  │  │ 最近 N 轮对话 │  │ 已打开的文件  │  │ 工具调用历史     │  │   │
+│  │  │ (Recent Turns)│  │ (Open Tabs)  │  │ (Tool History)  │  │   │
+│  │  └──────────────┘  └──────────────┘  └─────────────────┘  │   │
+│  │  生命周期: 单次会话   保留: 滑动窗口+摘要  淘汰: LRU + 重要性 │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                               ▲ 按需检索（RAG）                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  L3: 项目层 (Project Layer)                    ~16-64K tok  │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐  │   │
+│  │  │ 代码库索引    │  │ 项目文档     │  │ 依赖关系图       │  │   │
+│  │  │ (Code Index) │  │ (Docs/README)│  │ (Dep Graph)    │  │   │
+│  │  │ Embedding DB │  │ Vector Store │  │ AST + Call Graph│  │   │
+│  │  └──────────────┘  └──────────────┘  └─────────────────┘  │   │
+│  │  生命周期: 项目级     保留: 持久化存储    淘汰: 按相关性检索    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                               ▲ 启动时加载 / 偏好变更时更新          │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  L4: 全局层 (Global Layer)                       ~2-4K tok  │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐  │   │
+│  │  │ 用户编码偏好  │  │ 企业代码规范  │  │ 历史交互摘要     │  │   │
+│  │  │ (User Prefs) │  │ (Corp Std)  │  │ (History Sum)  │  │   │
+│  │  └──────────────┘  └──────────────┘  └─────────────────┘  │   │
+│  │  生命周期: 跨项目     保留: 永久存储       淘汰: 手动管理      │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  总预算: ~32-80K tokens（根据模型窗口动态调整）                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 三、各层级详细解析
+
+### L1: 即时层（Immediate Layer）—— 当前任务的"工作记忆"
+
+| 属性 | 说明 |
+|------|------|
+| **职责** | 承载当前用户指令、系统提示词、光标所在位置的代码上下文 |
+| **Token 预算** | 2K-4K（占窗口 2-3%） |
+| **信息内容** | 用户 Prompt、System Prompt、光标前后 50 行代码、当前错误信息 |
+| **保留策略** | 100% 保留，不做任何压缩 |
+| **淘汰机制** | 单次请求结束后清空，下次请求重新组装 |
+| **优先级** | 最高——任何情况下都必须完整保留 |
+
+```python
+class ImmediateLayer:
+    """即时层：每次请求动态组装，保证最高优先级"""
+
+    BUDGET = 4096  # tokens
+
+    def assemble(self, user_input: str, cursor_pos: Position,
+                 error_info: Optional[Error]) -> str:
+        parts = []
+
+        # 1. System Prompt（固定）
+        parts.append(self.system_prompt)  # ~500 tokens
+
+        # 2. 光标上下文（当前编辑位置）
+        cursor_ctx = self.extract_cursor_context(cursor_pos, lines=50)
+        parts.append(cursor_ctx)  # ~1000 tokens
+
+        # 3. 错误信息（如果有）
+        if error_info:
+            parts.append(f"## Error\n```\n{error_info.traceback}\n```")
+            # ~500 tokens
+
+        # 4. 用户指令
+        parts.append(f"## User\n{user_input}")  # ~200 tokens
+
+        context = "\n\n".join(parts)
+        assert self.count_tokens(context) <= self.BUDGET
+        return context
+```
+
+### L2: 会话层（Session Layer）—— 本次会话的"短期记忆"
+
+| 属性 | 说明 |
+|------|------|
+| **职责** | 维护当前工作会话的对话历史、已打开文件、工具调用记录 |
+| **Token 预算** | 8K-16K（占窗口 6-12%） |
+| **信息内容** | 最近 N 轮对话、已打开文件的摘要、工具调用结果摘要 |
+| **保留策略** | **滑动窗口 + 摘要压缩**——最近 3-5 轮完整保留，更早的轮次压缩为摘要 |
+| **淘汰机制** | **LRU（最近最少使用）+ 重要性评分**——低重要性信息优先淘汰 |
+| **触发条件** | 当本层 token 超过预算时，触发压缩 |
+
+```python
+class SessionLayer:
+    """会话层：滑动窗口 + 渐进式摘要"""
+
+    BUDGET = 12288  # tokens
+    FULL_RETENTION_TURNS = 5  # 最近5轮完整保留
+
+    def assemble(self, turns: List[Turn]) -> str:
+        total_tokens = sum(t.token_count for t in turns)
+
+        if total_tokens <= self.BUDGET:
+            # 预算内，全部保留
+            return self.format_turns(turns)
+
+        # 超预算，触发分层压缩
+        recent = turns[-self.FULL_RETENTION_TURNS:]      # 保留最近5轮
+        older = turns[:-self.FULL_RETENTION_TURNS]        # 更早的轮次
+
+        # 将旧轮次压缩为摘要
+        summary = self.summarize(older)
+        context = f"## Earlier Summary\n{summary}\n\n"
+        context += self.format_turns(recent)
+
+        return context
+
+    def summarize(self, turns: List[Turn]) -> str:
+        """
+        摘要压缩策略：
+        - 保留：关键决策、用户确认的方案、错误修复方案
+        - 丢弃：中间探索过程、失败的尝试、重复信息
+        """
+        important = [t for t in turns if t.importance_score > 0.5]
+        # 使用小模型生成摘要，避免占用大模型窗口
+        return self.summary_model.summarize(important, max_tokens=2000)
+```
+
+**会话层淘汰评分模型**：
+
+```
+重要性评分 = w1 × recency + w2 × relevance + w3 × action_type
+
+  recency:   时间衰减因子，越近的对话权重越高
+  relevance: 与当前任务的相关度（通过 embedding 相似度计算）
+  action_type: 工具调用 > 用户确认 > 模型推理 > 中间过程
+
+示例：
+  Turn 1: "分析 UserService.java 的错误"     → 0.9 (高相关 + 用户指令)
+  Turn 2: "搜索错误处理模式"                  → 0.4 (中间探索)
+  Turn 3: "找到3种方案"                       → 0.3 (中间结果)
+  Turn 4: "确认使用方案B"                     → 0.95 (用户确认，必须保留)
+  Turn 5: "开始重构"                          → 0.8 (关键决策)
+
+  → Turn 2, 3 会被优先压缩为摘要
+```
+
+### L3: 项目层（Project Layer）—— 代码库的"长期记忆"
+
+| 属性 | 说明 |
+|------|------|
+| **职责** | 提供代码库级别的上下文——函数签名、类型定义、依赖关系、项目文档 |
+| **Token 预算** | 16K-64K（占窗口 12-50%，最大的一层） |
+| **信息内容** | 代码索引（Embedding DB）、项目文档（README/ADR）、依赖关系图（AST + Call Graph） |
+| **保留策略** | **按需检索（RAG）**——不常驻，根据当前任务动态检索相关片段 |
+| **淘汰机制** | **相关性检索 + token 预算截断**——检索 Top-K 相关片段，按相似度排序截断 |
+| **存储形态** | 持久化 Vector Store + AST Cache |
+
+```python
+class ProjectLayer:
+    """项目层：基于 RAG 的代码库上下文检索"""
+
+    BUDGET = 32768  # tokens
+
+    def retrieve(self, query: str, current_file: str) -> str:
+        fragments = []
+
+        # 1. 语义检索：Embedding 相似度搜索
+        semantic_results = self.vector_store.search(
+            query=query, top_k=20, threshold=0.7
+        )
+
+        # 2. 结构检索：AST 依赖关系（当前文件调用的函数定义）
+        ast_results = self.ast_index.get_dependencies(
+            current_file, depth=2  # 二跳依赖
+        )
+
+        # 3. 文档检索：相关设计文档
+        doc_results = self.doc_store.search(query, top_k=3)
+
+        # 合并 + 去重 + 按相关性排序
+        all_results = self.merge_and_rank(
+            semantic_results, ast_results, doc_results
+        )
+
+        # Token 预算截断：贪心填充直到预算用完
+        context = self.greedy_fill(all_results, self.BUDGET)
+        return context
+
+    def greedy_fill(self, results: List[Fragment], budget: int) -> str:
+        """贪心策略：按 相关性/token 效率 排序，贪心填充"""
+        results.sort(key=lambda f: f.relevance / f.token_count, reverse=True)
+
+        filled = []
+        used = 0
+        for frag in results:
+            if used + frag.token_count <= budget:
+                filled.append(frag)
+                used += frag.token_count
+        return "\n\n".join(f.content for f in filled)
+```
+
+### L4: 全局层（Global Layer）—— 用户偏好的"元记忆"
+
+| 属性 | 说明 |
+|------|------|
+| **职责** | 承载跨项目、跨会话的持久信息——用户编码习惯、企业代码规范、历史交互偏好 |
+| **Token 预算** | 2K-4K（占窗口 2-3%，刻意保持精简） |
+| **信息内容** | 用户偏好（命名风格/注释习惯）、企业规范（lint规则/设计模式）、历史摘要 |
+| **保留策略** | **永久存储，手动管理**——由用户或管理员维护，不自动淘汰 |
+| **淘汰机制** | 手动管理（用户可编辑/删除偏好），或基于版本过期自动更新 |
+| **加载时机** | Agent 启动时加载，偏好变更时增量更新 |
+
+```python
+class GlobalLayer:
+    """全局层：跨会话、跨项目的持久偏好"""
+
+    BUDGET = 3072  # tokens
+
+    def load(self, user_id: str) -> str:
+        prefs = self.pref_store.get(user_id)
+
+        sections = []
+
+        # 用户编码偏好（从历史交互中学习）
+        if prefs.coding_style:
+            sections.append(
+                f"## Coding Style\n{prefs.coding_style}"
+            )  # ~500 tokens
+
+        # 企业代码规范
+        if prefs.corp_standards:
+            sections.append(
+                f"## Standards\n{prefs.corp_standards}"
+            )  # ~800 tokens
+
+        # 常用技术栈偏好
+        if prefs.tech_stack:
+            sections.append(
+                f"## Tech Stack\n{prefs.tech_stack}"
+            )  # ~300 tokens
+
+        return "\n\n".join(sections)[:self.BUDGET]
+```
+
+---
+
+## 四、层间信息流动机制
+
+### 4.1 提升（Promotion）—— 低层级 → 高层级
+
+```
+信息提升触发条件：
+
+  会话层 → 全局层:
+    当用户在会话中明确表达偏好（如"以后都用这个命名风格"）
+    → 提取为全局偏好，持久化到 L4
+
+  项目层 → 会话层:
+    当某个代码片段在当前会话中被频繁引用（>3次）
+    → 从 L3 的按需检索提升为 L2 的常驻缓存
+
+  即时层 → 会话层:
+    每一轮对话结束后，自动从 L1 流入 L2
+```
+
+### 4.2 降级（Demotion）—— 高层级 → 低层级
+
+```
+信息降级触发条件：
+
+  会话层 → 项目层:
+    当会话层超预算时，将旧轮次的代码修改结果
+    → 回写到 L3 的代码索引中（更新 Embedding）
+
+  会话层 → 全局层:
+    当会话结束时，将关键决策摘要
+    → 追加到 L4 的历史摘要中
+```
+
+### 4.3 层间一致性
+
+```
+一致性保证策略：
+  1. 写入优先: 代码修改先写入文件系统（L3源），再更新索引（L3缓存）
+  2. 版本标记: 每个片段携带 version_hash，过期则重新检索
+  3. 惰性更新: 不主动失效缓存，读取时校验版本，不一致则重新加载
+
+  示例：
+  ┌─────────┐     修改文件      ┌─────────────┐
+  │ 用户编辑 │ ──────────────▶ │ 文件系统(L3源) │
+  └─────────┘                  └──────┬──────┘
+                                      │ version_hash 更新
+                                      ▼
+  ┌─────────────┐    校验失败     ┌─────────────┐
+  │ L3 索引缓存  │ ◀──────────── │ 下次检索时    │
+  │ (可能过期)   │    重新索引    │ 自动刷新      │
+  └─────────────┘               └─────────────┘
+```
+
+---
+
+## 五、预算分配策略——动态调整
+
+```
+固定预算分配 vs 动态预算分配：
+
+固定分配（简单但低效）:
+  L1: 4K | L2: 12K | L3: 32K | L4: 3K | Total: 51K
+
+动态分配（基于任务类型）:
+  ┌──────────────┬──────┬──────┬──────┬──────┬───────┐
+  │ 任务类型      │ L1   │ L2   │ L3   │ L4   │ Total │
+  ├──────────────┼──────┼──────┼──────┼──────┼───────┤
+  │ 代码补全      │ 2K   │ 4K   │ 8K   │ 2K   │ 16K   │ ← 低延迟优先
+  │ Bug 修复     │ 3K   │ 12K  │ 20K  │ 3K   │ 38K   │ ← 需要上下文
+  │ 重构任务      │ 4K   │ 16K  │ 48K  │ 4K   │ 72K   │ ← 需要全局视图
+  │ 架构设计      │ 4K   │ 8K   │ 24K  │ 4K   │ 40K   │ ← 文档优先
+  │ 代码审查      │ 2K   │ 8K   │ 40K  │ 2K   │ 52K   │ ← 代码量最大
+  └──────────────┴──────┴──────┴──────┴──────┴───────┘
+```
+
+```python
+class BudgetAllocator:
+    """根据任务类型动态分配各层 token 预算"""
+
+    PROFILES = {
+        "completion":  {"L1": 2048,  "L2": 4096,  "L3": 8192,  "L4": 2048},
+        "bug_fix":     {"L1": 3072,  "L2": 12288, "L3": 20480, "L4": 3072},
+        "refactor":    {"L1": 4096,  "L2": 16384, "L3": 49152, "L4": 4096},
+        "architecture": {"L1": 4096, "L2": 8192,  "L3": 24576, "L4": 4096},
+        "code_review": {"L1": 2048,  "L2": 8192,  "L3": 40960, "L4": 2048},
+    }
+
+    def allocate(self, task_type: str, model_window: int) -> dict:
+        profile = self.PROFILES.get(task_type, self.PROFILES["bug_fix"])
+        total = sum(profile.values())
+
+        # 如果总预算超过模型窗口，等比缩放
+        if total > model_window * 0.8:  # 预留 20% 给模型输出
+            scale = (model_window * 0.8) / total
+            profile = {k: int(v * scale) for k, v in profile.items()}
+
+        return profile
+```
+
+---
+
+## 六、面试回答总结
+
+> **三句话总结**：
+> 1. 分层上下文管理的本质是**信息缓存层级系统**，借鉴 CPU L1/L2/L3 缓存的设计思想——越靠近"计算单元"（LLM 推理）的层级，速度越快、容量越小、保留策略越激进。
+> 2. 四层各有分工：**即时层**管"当前指令"、**会话层**管"本次对话"、**项目层**管"代码库"、**全局层**管"用户偏好"——每层有独立的 token 预算、保留策略和淘汰机制。
+> 3. 层间通过**提升/降级机制**实现信息流动，通过**版本标记 + 惰性更新**保证一致性——整个系统的设计目标是**在有限窗口内最大化任务相关信息的信噪比**。
