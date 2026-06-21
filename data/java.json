@@ -1,0 +1,23 @@
+[
+  {
+    "id": "note-java-001",
+    "category": "java",
+    "subcategory": "并发",
+    "difficulty": "L3",
+    "tags": ["synchronized", "锁", "并发"],
+    "question": "synchronized 和 ReentrantLock 的区别？",
+    "answer": "1. **实现方式**：synchronized 是 JVM 内置关键字（monitorenter/monitorexit），ReentrantLock 是 JDK API 层面（AQS 实现）\n2. **公平性**：synchronized 只有非公平锁，ReentrantLock 可选公平/非公平\n3. **中断响应**：synchronized 不可中断，ReentrantLock 支持 lockInterruptibly()\n4. **超时获取**：synchronized 不支持，ReentrantLock 支持 tryLock(timeout)\n5. **多条件变量**：synchronized 只有一个 wait/notify，ReentrantLock 可创建多个 Condition\n6. **锁释放**：synchronized 自动释放（出代码块/异常），ReentrantLock 必须手动 unlock（finally 中）\n7. **性能**：JDK 6+ synchronized 经过偏向锁/轻量级锁/重量级锁优化，性能差距很小",
+    "follow_up": ["偏向锁什么时候升级为轻量级锁？", "AQS 的原理是什么？"],
+    "feynman": {
+      "essence": "synchronized 是 JVM 内置的自动锁（简单但不够灵活），ReentrantLock 是 API 层的手动锁（灵活但需要小心释放）。",
+      "analogy": "synchronized 像自动门（进去自动关门出来自动开门），ReentrantLock 像手动门（自己锁自己开，忘开了就死锁）。",
+      "key_points": ["synchronized=JVM内置+自动释放", "ReentrantLock=API层+手动释放", "ReentrantLock支持公平/中断/超时/多Condition", "JDK6+性能差距很小"]
+    },
+    "first_principle": {
+      "problem": "并发环境下多线程竞争共享资源，需要互斥机制。JVM 内置锁和 API 层锁各自的优劣？",
+      "axioms": ["锁的本质是状态变量+CAS+队列", "简单性vs灵活性是核心tradeoff", "JVM优化可以弥补语法糖的不足"],
+      "rebuild": "从互斥需求出发：最简方案（synchronized自动管理），高级需求（超时/中断/公平用ReentrantLock），性能（JVM优化消除差距）"
+    },
+    "images": []
+  }
+]

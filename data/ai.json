@@ -1,0 +1,23 @@
+[
+  {
+    "id": "note-ai-001",
+    "category": "ai",
+    "subcategory": "LLM",
+    "difficulty": "L3",
+    "tags": ["Transformer", "Attention", "LLM"],
+    "question": "Self-Attention 为什么除以根号d_k？",
+    "answer": "核心原因：防止点积过大导致 softmax 梯度消失。\n\n当 d_k 较大时，Q*K^T 的点积值会变大（假设 Q 和 K 的分量是均值0、方差1的独立随机变量，点积的方差 = d_k）。\n\n点积值过大会使 softmax 进入饱和区：最大值的 softmax 输出接近 1，其他接近 0，梯度几乎为 0，导致训练停滞。\n\n除以根号 d_k 将方差缩放回 1，使 softmax 在合理范围内工作。\n\n数学推导：Q*K^T = 求和(q_i * k_i)，共 d_k 项。每项均值0方差1，总和均值0方差 d_k。标准差 = 根号 d_k。除以根号 d_k 后方差变为 1。",
+    "follow_up": ["为什么是根号d_k不是d_k？", "Multi-Head Attention中每个head的d_k怎么算？"],
+    "feynman": {
+      "essence": "除以根号d_k = 把点积的方差从d_k缩回1，防止softmax进饱和区导致梯度消失。",
+      "analogy": "就像考试分数标准化——100道题的总分（方差大）除以根号100=10，变成标准分（方差1），不同科目的分数才能公平比较。",
+      "key_points": ["点积方差=d_k", "除以根号d_k后方差=1", "防止softmax饱和", "保证梯度有效传播"]
+    },
+    "first_principle": {
+      "problem": "Attention计算中Q*K^T的值随维度增大而增大，导致softmax输出极端化，梯度消失。",
+      "axioms": ["点积的方差随维度线性增长", "softmax在输入值过大时梯度趋近0", "缩放因子需要让输出分布保持稳定"],
+      "rebuild": "从概率论出发：点积的统计特性是什么（方差=d_k）？大方差对softmax有什么影响（饱和/梯度消失）？如何缩放（除以标准差根号d_k）？"
+    },
+    "images": []
+  }
+]
