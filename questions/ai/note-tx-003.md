@@ -13,8 +13,8 @@ feynman:
   essence: 手动设计Skill=精确控制每个能力的行为，自动生成Skill=快但不稳定。生产环境优先手动，原型阶段可以用自动。
   analogy: 手动设计Skill像请专业厨师写菜谱（精确可控），Skill Creator像让AI生成菜谱（快但可能味道奇怪，需要试菜调整）。
   key_points:
-  - 手动:可控/安全/可维护
-  - 自动:快但不稳定/难调试
+  - '手动:可控/安全/可维护'
+  - '自动:快但不稳定/难调试'
   - 生产环境优先手动
   - Skill Creator适合原型验证
 first_principle:

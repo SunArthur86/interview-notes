@@ -13,8 +13,8 @@ feynman:
   essence: CC记忆=上下文+CLAUDE.md（简单直接，用压缩管理窗口），OpenClaw记忆=分层外部存储（功能完整，支持跨会话长期记忆）。
   analogy: CC像金鱼记忆——只记得眼前的事，但有个笔记本（CLAUDE.md）随时翻。OpenClaw像大象记忆——能记住很久以前的事，通过外部大脑（向量DB）检索。
   key_points:
-  - CC:上下文内+CLAUDE.md+Auto-Compact
-  - OpenClaw:分层记忆+外部向量DB
+  - 'CC:上下文内+CLAUDE.md+Auto-Compact'
+  - 'OpenClaw:分层记忆+外部向量DB'
   - CC简单可靠无幻觉
   - OpenClaw功能完整可跨会话
 first_principle:
