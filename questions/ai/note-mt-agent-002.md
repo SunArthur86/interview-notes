@@ -1,0 +1,331 @@
+---
+id: note-mt-agent-002
+difficulty: L4
+category: ai
+subcategory: Agent
+tags:
+- 美团
+- 面经
+- Agent架构
+feynman:
+  essence: 混合架构：主控Agent负责任务拆解和结果聚合，多个专项子Agent各负责一个垂直能力域，子Agent之间可直接通信。
+  analogy: 就像项目组——PM负责任务拆解，前端后端QA各负责专项，但前后端可以直接沟通不用事事绕回PM。
+  first_principle: 架构选型取决于任务不确定性程度。
+  key_points:
+  - 主控负责任务级调度
+  - 子Agent负责信息级同步
+  - 非纯master-slave
+  - 混合架构=主干master加枝叶P2P
+first_principle:
+  essence: 架构选型等于任务不确定性函数
+  derivation: 纯workflow流程固定不适用动态场景，纯master-slave主控瓶颈，混合架构兼顾控制力和灵活性
+  conclusion: 混合架构在不确定场景下最优
+follow_up:
+- 子Agent之间直接通信的协议是什么？
+- 如何防止子Agent间通信死锁？
+- 某个子Agent超时怎么办？
+---
+
+# 【美团面经】你的Agent项目用的是什么架构？master加sub Agent还是workflow？为什么这么选型？
+
+## 一、选型决策：不是二选一，而是混合架构
+
+面试官给的选项——master+sub 还是 workflow——本身是一个**伪二选一**。实际生产系统中，我们采用的是**混合架构**：
+
+- **任务级（Task Level）**：master+sub 模式。主控Agent负责任务拆解、子Agent调度和最终结果聚合。
+- **信息级（Information Level）**：子Agent之间可以直接P2P通信，不需要事事回传master中转。
+
+### 选型第一性原理
+
+> **架构选型 = f(任务不确定性)**
+
+| 任务特征 | 推荐架构 | 原因 |
+|---------|---------|------|
+| 流程固定、步骤确定 | **Workflow**（如LangChain Chain） | 无需动态决策，编排简单可复现 |
+| 任务开放、步骤不确定 | **Master+Sub** | 需要主控动态拆解和调度 |
+| 既有确定性骨架又有不确定性细节 | **混合架构** ✅ | 骨架用workflow保稳定，细节用master保灵活 |
+
+Agent面向的是**开放式用户请求**（如"帮我分析竞品并给建议"），步骤无法预先编排，因此不能纯workflow；但全用master+sub又会导致主控成为瓶颈——所以最终选择**混合架构**。
+
+## 二、混合架构全景图
+
+```
+                         ┌─────────────────────┐
+                         │     User Request    │
+                         │  "分析竞品并给建议"   │
+                         └──────────┬──────────┘
+                                    │
+                         ┌──────────▼──────────┐
+                         │   Master Agent       │
+                         │  (任务拆解/聚合)      │
+                         │  ┌───────────────┐   │
+                         │  │  Planner LLM  │   │
+                         │  │  任务分解+排序  │   │
+                         │  └───────────────┘   │
+                         └──┬───────┬───────┬───┘
+                  ┌─────────┘       │       └─────────┐
+            分配任务          分配任务           分配任务
+                  │                │                  │
+     ┌────────────▼──┐  ┌──────────▼──────┐  ┌───────▼────────┐
+     │ Search Agent  │  │  Analyst Agent  │  │  Writer Agent  │
+     │ (信息检索)     │  │  (数据分析)     │  │  (内容生成)    │
+     │ ┌───────────┐ │  │ ┌─────────────┐ │  │ ┌────────────┐ │
+     │ │Web/KB工具 │ │  │ │代码执行工具 │ │  │ │LLM生成工具 │ │
+     │ └───────────┘ │  │ └─────────────┘ │  │ └────────────┘ │
+     └───────┬───────┘  └───────┬─────────┘  └───────┬────────┘
+             │                  │                     │
+             │  ◄── P2P信息同步 ──►  ◄── P2P数据交换 ──►
+             │   (Search→Analyst)    (Analyst→Writer)  │
+             │                                        │
+             └────────────────┬───────────────────────┘
+                              │ 结果回传
+                   ┌──────────▼──────────┐
+                   │   Master Agent       │
+                   │   结果聚合 + 质检     │
+                   │   → 最终输出          │
+                   └─────────────────────┘
+```
+
+**两层通信**：
+- **实线箭头（任务级）**：Master ↔ Sub，控制流（分配任务、回收结果）
+- **虚线箭头（信息级）**：Sub ↔ Sub，数据流（直接传递中间结果，不经Master）
+
+## 三、为什么子Agent之间要P2P？
+
+| 通信路径 | 纯Master中转 | P2P直连 |
+|---------|-------------|--------|
+| Search→Analyst | Search回传Master→Master转发给Analyst（2跳+2次LLM调用） | Search直接发给Analyst（1跳，0次额外LLM调用） |
+| 延迟 | 高（Master成为瓶颈） | 低 |
+| Master负载 | 每条消息都要LLM处理 | 只处理任务级控制消息 |
+| 可扩展性 | Agent越多Master越堵 | Agent越多P2P越自然 |
+
+**类比**：项目组里PM负责任务分配和结果汇报（master+sub），但前端需要后端的API定义时，直接找后端对接口（P2P），而不是把请求提给PM再由PM转达给后端。
+
+## 四、Python代码实现
+
+```python
+from __future__ import annotations
+import asyncio
+from dataclasses import dataclass, field
+from typing import Any, Optional
+
+# ============================================================
+# 基础通信：Agent间消息总线（支持Master→Sub 和 Sub→Sub）
+# ============================================================
+@dataclass
+class Message:
+    sender: str
+    receiver: str          # "master" / agent_name / "broadcast"
+    msg_type: str          # "task" / "result" / "sync" / "error"
+    payload: Any
+    trace_id: str = ""     # 任务追踪ID
+
+class MessageBus:
+    """轻量级异步消息总线，支持点对点和广播"""
+    def __init__(self):
+        self._queues: dict[str, asyncio.Queue] = {}
+
+    def register(self, name: str):
+        self._queues[name] = asyncio.Queue()
+
+    async def send(self, msg: Message):
+        if msg.receiver == "broadcast":
+            for name, q in self._queues.items():
+                if name != msg.sender:
+                    await q.put(msg)
+        else:
+            await self._queues[msg.receiver].put(msg)
+
+    async def recv(self, name: str) -> Message:
+        return await self._queues[name].get()
+
+
+# ============================================================
+# Agent基类
+# ============================================================
+class BaseAgent:
+    def __init__(self, name: str, bus: MessageBus):
+        self.name = name
+        self.bus = bus
+        self.bus.register(name)
+
+    async def _send(self, receiver: str, msg_type: str, payload: Any, trace_id: str = ""):
+        await self.bus.send(Message(self.name, receiver, msg_type, payload, trace_id))
+
+    async def _recv(self) -> Message:
+        return await self.bus.recv(self.name)
+
+    async def run(self):
+        raise NotImplementedError
+
+
+# ============================================================
+# Master Agent：任务拆解 + 调度 + 聚合
+# ============================================================
+class MasterAgent(BaseAgent):
+    def __init__(self, bus: MessageBus, sub_agents: list[str]):
+        super().__init__("master", bus)
+        self.sub_agents = sub_agents
+
+    async def _plan(self, user_request: str) -> list[dict]:
+        """调用LLM进行任务拆解（简化示例）"""
+        # 实际用LLM: prompt = f"将以下任务拆解为子任务: {user_request}"
+        return [
+            {"id": "t1", "agent": "search",  "action": "search_competitors", "params": {"domain": "外卖"}},
+            {"id": "t2", "agent": "analyst", "action": "analyze_data",       "params": {}, "depends_on": "t1"},
+            {"id": "t3", "agent": "writer",  "action": "write_report",       "params": {}, "depends_on": "t2"},
+        ]
+
+    async def run(self):
+        # 1. 接收用户请求
+        user_msg = await self._recv()
+        print(f"[Master] 收到请求: {user_msg.payload}")
+
+        # 2. 任务拆解
+        tasks = await self._plan(user_msg.payload)
+        print(f"[Master] 拆解为 {len(tasks)} 个子任务")
+
+        # 3. 调度执行（按依赖顺序）
+        results = {}
+        for task in tasks:
+            dep = task.get("depends_on")
+            if dep and dep in results:
+                # 把上游结果作为参数传给当前子Agent
+                task["params"]["upstream_result"] = results[dep]
+
+            # 分配任务给子Agent
+            await self._send(task["agent"], "task", task, trace_id=user_msg.trace_id)
+
+            # 等待子Agent完成回传
+            result_msg = await self._recv()
+            results[result_msg.payload["task_id"]] = result_msg.payload["data"]
+            print(f"[Master] 收到 {result_msg.sender} 的结果")
+
+        # 4. 聚合输出
+        final_output = self._aggregate(results)
+        print(f"[Master] 最终输出: {final_output[:100]}...")
+
+    def _aggregate(self, results: dict) -> str:
+        return str(results)
+
+
+# ============================================================
+# Search Agent（子Agent，可与Analyst P2P通信）
+# ============================================================
+class SearchAgent(BaseAgent):
+    def __init__(self, bus: MessageBus):
+        super().__init__("search", bus)
+
+    async def run(self):
+        while True:
+            msg = await self._recv()
+            if msg.msg_type == "task":
+                task = msg.payload
+                print(f"[Search] 执行搜索: {task['action']}")
+
+                # 执行搜索（简化）
+                search_result = {"competitors": ["美团", "饿了么"], "data": "搜索结果..."}
+
+                # ===== P2P信息级通信 =====
+                # 搜索结果直接发给Analyst，不等Master中转
+                await self._send("analyst", "sync",
+                                 {"from_task": task["id"], "search_data": search_result},
+                                 trace_id=msg.trace_id)
+                print(f"[Search] → P2P直接发送数据给 Analyst")
+
+                # 任务级结果回传给Master
+                await self._send("master", "result",
+                                 {"task_id": task["id"], "data": search_result})
+
+
+# ============================================================
+# Analyst Agent（子Agent，接收P2P数据 + P2P转发给Writer）
+# ============================================================
+class AnalystAgent(BaseAgent):
+    def __init__(self, bus: MessageBus):
+        super().__init__("analyst", bus)
+
+    async def run(self):
+        p2p_cache = {}  # 缓存P2P收到的数据
+        while True:
+            msg = await self._recv()
+
+            if msg.msg_type == "sync":
+                # 接收P2P数据（来自Search）
+                p2p_cache[msg.sender] = msg.payload
+                print(f"[Analyst] ← P2P收到来自 {msg.sender} 的数据")
+
+            elif msg.msg_type == "task":
+                task = msg.payload
+                print(f"[Analyst] 执行分析: {task['action']}")
+
+                analysis = {"insights": "竞品分析结论...", "data": p2p_cache}
+
+                # P2P发给Writer
+                await self._send("writer", "sync",
+                                 {"analysis": analysis}, trace_id=msg.trace_id)
+                print(f"[Analyst] → P2P直接发送分析结果给 Writer")
+
+                # 任务级回传
+                await self._send("master", "result",
+                                 {"task_id": task["id"], "data": analysis})
+
+
+# ============================================================
+# Writer Agent
+# ============================================================
+class WriterAgent(BaseAgent):
+    def __init__(self, bus: MessageBus):
+        super().__init__("writer", bus)
+
+    async def run(self):
+        p2p_cache = {}
+        while True:
+            msg = await self._recv()
+            if msg.msg_type == "sync":
+                p2p_cache[msg.sender] = msg.payload
+                print(f"[Writer] ← P2P收到来自 {msg.sender} 的数据")
+            elif msg.msg_type == "task":
+                report = f"基于{p2p_cache}生成报告..."
+                await self._send("master", "result",
+                                 {"task_id": msg.payload["id"], "data": report})
+
+
+# ============================================================
+# 启动
+# ============================================================
+async def main():
+    bus = MessageBus()
+    master  = MasterAgent(bus, ["search", "analyst", "writer"])
+    search  = SearchAgent(bus)
+    analyst = AnalystAgent(bus)
+    writer  = WriterAgent(bus)
+
+    # 启动所有子Agent（持续监听）
+    sub_tasks = [
+        asyncio.create_task(search.run()),
+        asyncio.create_task(analyst.run()),
+        asyncio.create_task(writer.run()),
+    ]
+    # 启动Master
+    master_task = asyncio.create_task(master.run())
+
+    # 模拟用户发消息
+    await bus.send(Message("user", "master", "task",
+                           "分析竞品并给出策略建议", "trace-001"))
+
+    # 等待Master完成
+    await master_task
+
+asyncio.run(main())
+```
+
+## 五、关键设计要点总结
+
+1. **任务级走Master**：任务分配、结果回收、错误处理由Master统一管理，保证控制流清晰
+2. **信息级走P2P**：Search→Analyst→Writer的数据传递直接P2P，减少Master的LLM调用次数（省Token省延迟）
+3. **消息总线解耦**：所有通信通过MessageBus，Agent之间无直接引用，方便替换和扩展
+4. **trace_id贯穿全链路**：每个任务有唯一追踪ID，便于调试和日志关联
+5. **容错设计**：子Agent超时 → Master降级重试或切换备用Agent
+
+> **一句话总结**：混合架构 = 任务级master+sub保证控制力 + 信息级P2P保证效率。既不是纯workflow的死板，也不是纯master-slave的瓶颈，而是根据通信层级选择最合适的拓扑。
