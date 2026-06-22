@@ -1,0 +1,371 @@
+---
+id: note-bd-llm-001
+difficulty: L3
+category: ai
+subcategory: RAG
+tags:
+- 字节
+- 面经
+- RAG
+- 检索增强生成
+feynman:
+  essence: RAG = 检索增强生成，先用检索找到相关知识，再用LLM生成回答。索引阶段构建可检索的知识库，检索阶段实时召回相关知识。
+  analogy: 就像开卷考试——索引阶段是提前做好目录和书签，检索阶段是考试时快速翻到对应页面，生成阶段是看着书上的内容写答案。
+  first_principle: LLM的参数化知识是静态的且有限的，RAG通过外挂非参数化知识库来扩展LLM的知识边界。
+  key_points:
+  - '索引阶段: 文档解析-切片-Embedding-入库'
+  - '检索阶段: Query向量化-相似度搜索-重排序'
+  - '生成阶段: 检索结果注入Prompt-LLM生成'
+first_principle:
+  essence: 参数化知识 vs 非参数化知识的互补
+  derivation: LLM预训练知识有截止日期且不可更新→外挂向量数据库→实时检索最新知识→注入上下文
+  conclusion: RAG本质是给LLM外挂了一个可实时更新的知识库
+follow_up:
+- 索引阶段如何选择切片策略？
+- 检索阶段如何提升召回率？
+- RAG和微调什么时候用哪个？
+---
+
+# 【字节面经】RAG 系统的整体流程是什么？索引阶段和检索阶段分别承担哪些职责？
+
+## 一、核心概念
+
+RAG（Retrieval-Augmented Generation，检索增强生成）的核心思想是：**在不改变LLM参数的前提下，通过外挂知识库为模型提供实时、可控的外部知识**。LLM的参数化知识存在三个固有缺陷——知识截止日期、无法实时更新、容易产生幻觉。RAG通过将"检索"和"生成"解耦，让LLM基于检索到的真实文档片段作答，显著降低幻觉率。
+
+一个完整的RAG系统由三大阶段构成：**索引阶段（离线）→ 检索阶段（在线）→ 生成阶段（在线）**。索引阶段负责将原始文档转化为可高效检索的向量知识库，是一次性的离线构建过程；检索阶段负责在用户查询时实时召回最相关的知识片段；生成阶段将检索结果注入Prompt上下文，由LLM生成最终回答。
+
+## 二、全流程架构图
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        RAG 系统全流程                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ╔═══════════════════════╗     ╔════════════════════════╗          │
+│  ║   索引阶段 (离线)      ║     ║   检索阶段 (在线)       ║          │
+│  ║   ─────────────        ║     ║   ─────────────        ║          │
+│  ║                       ║     ║                        ║          │
+│  ║  ① 文档加载            ║     ║  ⑥ Query 预处理         ║          │
+│  ║    (PDF/Word/HTML)     ║     ║    (改写/扩展/HyDE)     ║          │
+│  ║         ↓              ║     ║         ↓              ║          │
+│  ║  ② 文档解析            ║     ║  ⑦ Query Embedding     ║          │
+│  ║    (提取纯文本+表格)    ║     ║    (同索引阶段模型)      ║          │
+│  ║         ↓              ║     ║         ↓              ║          │
+│  ║  ③ 文本切片            ║     ║  ⑧ 向量相似度检索       ║          │
+│  ║    (语义/固定/递归)     ║     ║    (Top-K 召回)        ║          │
+│  ║         ↓              ║     ║         ↓              ║          │
+│  ║  ④ Embedding 向量化    ║     ║  ⑨ 重排序 (Rerank)     ║          │
+│  ║    (bge-m3/te3等)      ║     ║    (Cross-Encoder)     ║          │
+│  ║         ↓              ║     ║         ↓              ║          │
+│  ║  ⑤ 向量入库            ║     ║  ⑩ 上下文组装          ║          │
+│  ║    (Milvus/Qdrant)     ║     ║    (去重/压缩/排序)     ║          │
+│  ╚══════════╤════════════╝     ╚════════╤═══════════════╝          │
+│             │                            │                          │
+│             └──────────┬─────────────────┘                          │
+│                        ↓                                            │
+│              ╔════════════════════════╗                             │
+│              ║   生成阶段 (在线)       ║                             │
+│              ║   ─────────────        ║                             │
+│              ║                        ║                             │
+│              ║  ⑪ Prompt 模板组装     ║                             │
+│              ║    (System+Context+Q)  ║                             │
+│              ║         ↓              ║                             │
+│              ║  ⑫ LLM 生成回答        ║                             │
+│              ║    (GPT-4/Claude/Qwen) ║                             │
+│              ║         ↓              ║                             │
+│              ║  ⑬ 后处理 & 引用标注    ║                             │
+│              ║    (溯源/格式化)        ║                             │
+│              ╚════════════════════════╝                             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## 三、索引阶段详解（离线构建）
+
+索引阶段是RAG的地基，其质量直接决定检索上限。核心Pipeline包含四步：
+
+### 3.1 文档解析
+
+将多格式文档（PDF、Word、HTML、Markdown）统一提取为结构化文本。关键挑战在于表格、图片、公式等非纯文本内容的保留。生产环境中通常使用 `unstructured`、`PyMuPDF`、`marker` 等工具。
+
+### 3.2 文本切片（Chunking）
+
+将长文档切分为适合Embedding的语义单元。常见策略：
+
+| 策略 | 原理 | 适用场景 |
+|------|------|----------|
+| 固定长度 | 按 Token 数切割 + Overlap | 简单文本、快速原型 |
+| 递归字符 | 按段落→句子→字符递归切分 | 通用场景（LangChain默认） |
+| 语义切片 | 按 Markdown 标题/主题边界 | 结构化文档 |
+| 文档感知 | 表格整表保留、代码按函数 | 复杂混合文档 |
+
+切片大小的经验值：**通用QA场景 256\~512 tokens**，长文档摘要场景 1024\~2048 tokens，需配合 10\~20% 的Overlap保证上下文连续性。
+
+### 3.3 Embedding 向量化
+
+使用Embedding模型将每个文本块映射为高维稠密向量。选型需考虑：语言支持（中英双语）、维度（768/1024/1536/3072）、推理速度、MTEB榜单表现。详见 [note-bd-llm-002](./note-bd-llm-002.md)。
+
+### 3.4 向量入库
+
+将向量 + 原文 + 元数据写入向量数据库。主流选择：**Milvus**（分布式、高性能）、**Qdrant**（Rust编写、轻量高效）、**Weaviate**（支持混合检索）、**Chroma**（轻量原型）。入库时需建立HNSW索引以支撑近似最近邻搜索（ANN），通常 `M=16, efConstruction=200` 即可满足大多数场景。
+
+## 四、检索阶段详解（在线实时）
+
+### 4.1 Query 预处理
+
+原始用户Query往往口语化、信息不足。常用增强手段：
+
+- **Query Rewriting**：用LLM改写为更清晰的检索语句
+- **Query Expansion**：扩展同义词/相关词增加召回
+- **HyDE**（Hypothetical Document Embeddings）：先让LLM生成一个假设性答案，用该答案的Embedding去检索，缩小Query-Document之间的语义鸿沟
+- **Multi-Query**：将一个Query拆分为多个子Query并行检索
+
+### 4.2 向量相似度搜索
+
+使用与索引阶段**相同的Embedding模型**将Query向量化，在向量数据库中执行Top-K检索（通常K=10\~50）。距离度量常用**余弦相似度**或**内积（IP）**。对于MTEB排名前列的bge模型，官方推荐使用Cosine。
+
+### 4.3 重排序（Rerank）
+
+向量检索是**双塔模型（Bi-Encoder）**，速度快但精度有限。Rerank阶段使用**交叉编码器（Cross-Encoder）**对Top-K候选逐个打分精排，大幅提升精度：
+
+- **原理**：Cross-Encoder将Query和Document拼接后联合编码，捕获细粒度交互特征
+- **模型**：`bge-reranker-v2-m3`、`cohere-rerank-3`、`jina-reranker-v2`
+- **策略**：从Top-50中精排出Top-5注入Prompt
+
+### 4.4 上下文组装与Prompt注入
+
+将重排后的Top-N文档片段按相关性排序，注入到Prompt模板中。关键技巧：
+
+- **Lost in the Middle 问题**：LLM对长上下文中间位置的信息容易忽略，需将最相关的内容放在Prompt首尾
+- **上下文压缩**：对过长的文档块做摘要/抽取关键句
+- **元数据过滤**：利用文档元数据（时间、来源、作者）做预过滤，缩小检索范围
+
+## 五、完整 Python 代码实现
+
+```python
+"""
+RAG 系统完整 Pipeline（索引 + 检索 + 生成）
+依赖: pip install llama-index qdrant-client sentence-transformers openai
+"""
+import os
+from dataclasses import dataclass
+from typing import Optional
+
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
+from sentence_transformers import SentenceTransformer
+from openai import OpenAI
+
+
+# ============================================================
+# 配置
+# ============================================================
+EMBEDDING_MODEL = "BAAI/bge-m3"
+RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
+LLM_MODEL = "gpt-4o-mini"
+COLLECTION_NAME = "knowledge_base"
+VECTOR_DIM = 1024
+
+
+# ============================================================
+# 索引阶段
+# ============================================================
+class IndexingPipeline:
+    """索引阶段：文档 → 切片 → Embedding → 入库"""
+
+    def __init__(self):
+        self.embedder = SentenceTransformer(EMBEDDING_MODEL)
+        self.qdrant = QdrantClient(host="localhost", port=6333)
+        self._init_collection()
+
+    def _init_collection(self):
+        """初始化向量集合"""
+        collections = self.qdrant.get_collections().collections
+        if COLLECTION_NAME not in [c.name for c in collections]:
+            self.qdrant.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config=VectorParams(
+                    size=VECTOR_DIM,
+                    distance=Distance.COSINE,
+                ),
+            )
+
+    def load_and_chunk(self, text: str, chunk_size: int = 512,
+                       overlap: int = 64) -> list[str]:
+        """
+        递归字符切片：按段落 → 句子 → 字符 层级递归
+        """
+        chunks = []
+        sentences = text.replace("\n\n", "\n").split("。")
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        current_chunk = ""
+        for sent in sentences:
+            sent_with_period = sent + "。"
+            if len(current_chunk) + len(sent_with_period) <= chunk_size:
+                current_chunk += sent_with_period
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                # overlap: 保留上一块尾部
+                if chunks and overlap > 0:
+                    current_chunk = chunks[-1][-overlap:] + sent_with_period
+                else:
+                    current_chunk = sent_with_period
+        if current_chunk:
+            chunks.append(current_chunk)
+        return chunks
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        """批量向量化（bge-m3 推荐 query 前加 prompt 但通用检索可省略）"""
+        vectors = self.embedder.encode(
+            texts, normalize_embeddings=True, batch_size=32
+        )
+        return vectors.tolist()
+
+    def index(self, text: str, metadata: Optional[dict] = None):
+        """完整索引流程"""
+        # Step 1: 切片
+        chunks = self.load_and_chunk(text)
+        print(f"[Index] 切片完成: {len(chunks)} 个chunk")
+
+        # Step 2: 向量化
+        vectors = self.embed(chunks)
+        print(f"[Index] Embedding完成: {len(vectors)} 个向量")
+
+        # Step 3: 入库（向量 + 原文 + 元数据）
+        points = [
+            PointStruct(
+                id=i,
+                vector=vectors[i],
+                payload={
+                    "text": chunks[i],
+                    "chunk_index": i,
+                    **(metadata or {}),
+                },
+            )
+            for i in range(len(chunks))
+        ]
+        self.qdrant.upsert(collection_name=COLLECTION_NAME, points=points)
+        print(f"[Index] 入库完成: {len(points)} 条记录")
+
+
+# ============================================================
+# 检索阶段
+# ============================================================
+class RetrievalPipeline:
+    """检索阶段：Query → 向量化 → 检索 → 重排 → 组装"""
+
+    def __init__(self):
+        self.embedder = SentenceTransformer(EMBEDDING_MODEL)
+        self.reranker = SentenceTransformer(RERANKER_MODEL)
+        self.qdrant = QdrantClient(host="localhost", port=6333)
+
+    def retrieve(self, query: str, top_k: int = 20) -> list[dict]:
+        """向量检索 Top-K"""
+        query_vec = self.embedder.encode(
+            [query], normalize_embeddings=True
+        )[0].tolist()
+
+        results = self.qdrant.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_vec,
+            limit=top_k,
+            with_payload=True,
+        )
+        return [
+            {"text": hit.payload["text"], "score": hit.score}
+            for hit in results
+        ]
+
+    def rerank(self, query: str, candidates: list[dict],
+               top_n: int = 5) -> list[dict]:
+        """Cross-Encoder 重排序"""
+        pairs = [[query, c["text"]] for c in candidates]
+        scores = self.reranker.predict(pairs)
+
+        ranked = sorted(
+            zip(candidates, scores), key=lambda x: x[1], reverse=True
+        )[:top_n]
+        return [{**c, "rerank_score": float(s)} for c, s in ranked]
+
+    def search(self, query: str, top_k: int = 20, top_n: int = 5):
+        """检索 + 重排完整流程"""
+        candidates = self.retrieve(query, top_k)
+        reranked = self.rerank(query, candidates, top_n)
+        return reranked
+
+
+# ============================================================
+# 生成阶段
+# ============================================================
+PROMPT_TEMPLATE = """你是一个专业的知识库问答助手。请根据以下检索到的上下文回答用户问题。
+如果上下文中没有相关信息，请明确说"根据现有知识库无法回答"，不要编造。
+
+## 上下文
+{context}
+
+## 用户问题
+{question}
+
+## 回答（请在回答中标注引用来源编号 [1] [2] 等）"""
+
+
+class GenerationPipeline:
+    """生成阶段：组装Prompt → LLM生成"""
+
+    def __init__(self):
+        self.llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    def generate(self, query: str, retrieved_docs: list[dict]) -> str:
+        # 组装上下文（按重排分数降序，最相关的放前面）
+        context = "\n\n".join(
+            f"[{i+1}] (score={d['rerank_score']:.4f}) {d['text']}"
+            for i, d in enumerate(retrieved_docs)
+        )
+        prompt = PROMPT_TEMPLATE.format(context=context, question=query)
+
+        response = self.llm.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,  # 低温度保证事实性
+            max_tokens=1024,
+        )
+        return response.choices[0].message.content
+
+
+# ============================================================
+# 端到端调用
+# ============================================================
+if __name__ == "__main__":
+    # --- 索引阶段（离线执行一次） ---
+    indexer = IndexingPipeline()
+    sample_doc = """
+    向量数据库是一种专门用于存储和检索高维向量的数据库系统。
+    它通过近似最近邻（ANN）算法实现高效的相似度搜索。
+    主流向量数据库包括Milvus、Qdrant、Weaviate和Chroma。
+    Milvus是开源的分布式向量数据库，支持十亿级向量检索。
+    Qdrant使用Rust编写，在性能和资源消耗方面表现优秀。
+    """.strip()
+    indexer.index(sample_doc, metadata={"source": "vector-db-intro.pdf"})
+
+    # --- 检索 + 生成（在线实时） ---
+    retriever = RetrievalPipeline()
+    generator = GenerationPipeline()
+
+    query = "有哪些主流的向量数据库？"
+    retrieved = retriever.search(query, top_k=10, top_n=3)
+    answer = generator.generate(query, retrieved)
+
+    print(f"\n用户问题: {query}")
+    print(f"检索到 {len(retrieved)} 条相关知识")
+    print(f"LLM回答:\n{answer}")
+```
+
+## 六、面试加分点
+
+1. **索引和检索阶段可以独立优化**：索引阶段关注切片质量和Embedding效果，检索阶段关注召回率和重排精度，两者解耦便于A/B实验。
+2. **混合检索（Hybrid Search）**：纯向量检索对精确匹配（如产品型号、人名）较弱，实际生产中常结合**BM25关键词检索 + 向量检索**做融合排序（RRF算法）。
+3. **Self-RAG / Corrective RAG**：前沿方向——让LLM自主判断是否需要检索、检索结果是否相关，对低质量检索结果做二次检索或拒绝回答。
+4. **索引更新策略**：增量索引（新增文档实时入库）+ 全量重建（定期重建保证一致性）相结合；注意Embedding模型升级时需要全量重新向量化。
+5. **可观测性**：生产RAG系统必须监控检索命中率、上下文利用率、答案引用准确率等指标，建议接入LangSmith / Phoenix等RAG可观测平台。
+6. **成本控制**：Rerank阶段是计算瓶颈，可通过先向量粗筛→轻量Reranker精排→重量Reranker终排的级联策略平衡延迟与精度。
