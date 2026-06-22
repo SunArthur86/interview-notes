@@ -30,7 +30,7 @@ const APP_CONFIG = {
   categories: {
     'all':          { label: '全部', icon: '📚', color: '#34C759', files: null },
     'java':         { label: 'Java', icon: '☕', color: '#f89820', files: ['data/java.json'] },
-    'ai':           { label: 'AI/大模型', icon: '🧠', color: '#5856d6', files: ['data/ai.json'] },
+    'ai':           { label: 'AI/大模型', icon: '🤖', color: '#5856d6', files: ['data/ai.json'] },
     'algorithm':    { label: '算法', icon: '🧮', color: '#ff9500', files: ['data/algorithm.json'] },
     'system-design':{ label: '系统设计', icon: '🏗️', color: '#ff3b30', files: ['data/system-design.json'] },
     'database':     { label: '数据库', icon: '🗄️', color: '#007aff', files: ['data/database.json'] },

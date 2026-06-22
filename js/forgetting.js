@@ -668,7 +668,7 @@ ReviewEngine.getBoxLabel = function(item) {
   }
   // SM-2
   const ease = item.ease || 2.5;
-  return `🧠 SM-2 E${ease.toFixed(1)}`;
+  return `SM-2 E${ease.toFixed(1)}`;
 };
 
 // ============ Review Dashboard (on main page) ============

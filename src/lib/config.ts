@@ -18,7 +18,7 @@ export const APP_CONFIG = {
   categories: {
     'all': { label: '全部', icon: '📚', color: '#34C759' },
     'java': { label: 'Java', icon: '☕', color: '#f89820' },
-    'ai': { label: 'AI/大模型', icon: '🧠', color: '#5856d6' },
+    'ai': { label: 'AI/大模型', icon: '🤖', color: '#5856d6' },
     'algorithm': { label: '算法', icon: '🧮', color: '#ff9500' },
     'system-design': { label: '系统设计', icon: '🏗️', color: '#ff3b30' },
     'database': { label: '数据库', icon: '🗄️', color: '#007aff' },

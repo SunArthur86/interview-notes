@@ -356,7 +356,7 @@ function openModal(id) {
     <div class="modal__body">
       ${q.feynman ? `
       <div class="modal__section feynman-card">
-        <div class="modal__label feynman-label">🧠 费曼快学</div>
+        <div class="modal__label feynman-label">📖 费曼快学</div>
         <div class="feynman-item">
           <span class="feynman-icon">🎯</span>
           <div class="feynman-content">

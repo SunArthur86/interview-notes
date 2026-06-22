@@ -106,5 +106,5 @@ export function formatInterval(days: number): string {
 export function getBoxLabel(it: ReviewItem): string {
   if (it.algo === 'leitner') return `📦 L${it.box + 1}`;
   if (it.algo === 'ebbinghaus') return `📈 第${it.phase + 1}轮`;
-  return `🧠 E${it.ease.toFixed(1)}`;
+  return `E${it.ease.toFixed(1)}`;
 }
