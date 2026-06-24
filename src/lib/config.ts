@@ -28,11 +28,11 @@ export const APP_CONFIG = {
   subcatGroups: {
     'Java核心': ['Java基础', '集合', '并发', 'JVM', 'Spring', 'MyBatis'],
     'AI大模型': ['LLM', 'Agent', 'RAG', 'Prompt', '微调', '推理优化'],
-    '算法': ['数组', '链表', '树', '图', 'DP', '贪心', '回溯', '排序'],
+    '算法': ['数组', '链表', '树', '图', 'DP', '贪心', '回溯', '排序', '设计'],
     '系统设计': ['高并发', '分布式', '微服务', '缓存', '消息队列', '限流'],
     '数据库': ['MySQL', 'Redis', 'MongoDB', 'ES', 'SQL优化'],
     '前端': ['HTML/CSS', 'JavaScript', 'React', 'Vue', '浏览器', '性能'],
-    '其他': ['网络', '操作系统', 'Linux', 'Git', 'Docker', 'K8s', 'HR面'],
+    '其他': ['网络', '操作系统', 'Linux', 'Git', 'Docker', 'K8s', 'HR面', 'Python'],
   } as Record<string, string[]>,
   aboutText: '面试随手记 — 随手记录网上搜索的面试题，涵盖 Java、AI、算法、系统设计等全方向。每题含费曼学习法 + 第一性原理 + 遗忘曲线复习。',
 } as const;
