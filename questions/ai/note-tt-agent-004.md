@@ -1,0 +1,198 @@
+---
+id: note-tt-agent-004
+difficulty: L4
+category: ai
+subcategory: Agent
+tags:
+  - 淘天
+  - 面经
+  - 二面
+  - 状态机
+  - Planner
+  - Executor
+  - Reflector
+  - 容错
+feynman:
+  essence: Planner-Executor-Reflector闭环 = 规划任务→执行→反思校验→修复，用状态机管控重试/超时/异常兜底，实现Agent自我纠错
+  analogy: 就像装修工程——设计师出图（Planner）→工人施工（Executor）→质检员验收（Reflector）→不合格返工（回到Planner调整）→验收通过交付
+  first_principle: 单次LLM执行错误率随步骤数指数增长。闭环+反思将错误率从指数级降为多项式级——每步独立校验+修复阻断错误传播
+  key_points:
+    - Planner拆分任务为子步骤，输出结构化执行计划
+    - Executor按计划逐步执行，调用工具/API
+    - Reflector检查结果质量，决定通过/修复/放弃
+    - 状态机管控：重试上限、超时熔断、异常兜底
+    - 每步独立校验阻断错误传播
+first_principle:
+  essence: 串行执行n步的错误率为1-(1-p)^n，加入反思修复后变为1-(1-p·r)^n，其中r为修复成功率
+  derivation: '设单步错误率p=0.15，5步串行准确率=(0.85)^5=44%。加入Reflector（检出率0.9）+Repair（修复率0.8）后，等效错误率=0.15×0.1+0.15×0.9×0.2=0.042，5步准确率=(0.958)^5=81%'
+  conclusion: 闭环架构的核心价值不是让每步更准，而是阻断错误传播链
+follow_up:
+  - Reflector用什么模型？需要和Executor不同吗？
+  - 状态机中"放弃"后怎么兜底？降级策略有哪些？
+  - 闭环增加的延迟和成本如何控制？
+---
+
+# 简述Agent的Planner-Executor-Reflector闭环实现，工程如何用状态机管控？
+
+## 闭环架构
+
+```
+用户意图
+    │
+    ▼
+┌──────────┐
+│ Planner  │──── 输出执行计划 [step1, step2, step3...]
+│ 规划节点  │     每步含：目标、工具、参数、验收标准
+└────┬─────┘
+     │
+     ▼
+┌──────────┐     ┌──────────┐
+│ Executor │────→│  结果     │
+│ 执行节点  │     │  输出     │
+└────┬─────┘     └────┬─────┘
+     │                │
+     │                ▼
+     │          ┌──────────┐
+     │          │ Reflector│──── pass? ────→ ✅ 完成
+     │          │ 反思校验  │
+     │          └────┬─────┘
+     │               │ fail
+     │               ▼
+     │          ┌──────────┐
+     │          │ Repair   │──── 修复后重新执行
+     │          │ 修复节点  │
+     │          └──────────┘
+     │
+     ▼ (retry_count >= 3)
+┌──────────┐
+│ Fallback │──── 降级处理
+│ 兜底节点  │     （人工介入/默认回答/缓存）
+└──────────┘
+```
+
+## 状态机实现
+
+```python
+from enum import Enum
+from typing import Any
+
+class AgentState(Enum):
+    PLANNING = "planning"
+    EXECUTING = "executing"
+    REFLECTING = "reflecting"
+    REPAIRING = "repairing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+class PlannerExecutorReflector:
+    def __init__(self, max_retries=3, timeout_per_step=30):
+        self.max_retries = max_retries
+        self.timeout = timeout_per_step
+
+    async def run(self, user_intent: str) -> dict:
+        state = AgentState.PLANNING
+        plan = []
+        current_step = 0
+        retry_count = 0
+
+        while state not in (AgentState.COMPLETED, AgentState.FAILED):
+            if state == AgentState.PLANNING:
+                plan = await self._plan(user_intent)
+                if not plan:
+                    return {"status": "failed", "reason": "planning_failed"}
+                state = AgentState.EXECUTING
+
+            elif state == AgentState.EXECUTING:
+                if current_step >= len(plan):
+                    state = AgentState.COMPLETED
+                    continue
+
+                step = plan[current_step]
+                try:
+                    result = await self._execute_with_timeout(step)
+                    state = AgentState.REFLECTING
+                except TimeoutError:
+                    if retry_count < self.max_retries:
+                        retry_count += 1
+                        # 超时重试：可能是API过载
+                    else:
+                        state = AgentState.FAILED
+                except Exception as e:
+                    if retry_count < self.max_retries:
+                        retry_count += 1
+                    else:
+                        state = AgentState.FAILED
+
+            elif state == AgentState.REFLECTING:
+                step = plan[current_step]
+                check_result = await self._reflect(step, result)
+                if check_result['pass']:
+                    current_step += 1
+                    retry_count = 0  # 重置重试计数
+                    state = AgentState.EXECUTING
+                elif retry_count < self.max_retries:
+                    retry_count += 1
+                    state = AgentState.REPAIRING
+                else:
+                    state = AgentState.FAILED
+
+            elif state == AgentState.REPAIRING:
+                repair_result = await self._repair(step, result, check_result['issues'])
+                result = repair_result  # 用修复后的结果替换
+                state = AgentState.REFLECTING
+
+        if state == AgentState.COMPLETED:
+            return {"status": "success", "result": result}
+        else:
+            # 兜底策略
+            return await self._fallback(user_intent, plan, current_step)
+```
+
+## 关键容错机制
+
+### 1. 重试策略
+
+```python
+async def _execute_with_timeout(self, step, timeout=None):
+    """带超时和重试的执行"""
+    timeout = timeout or self.timeout
+    for attempt in range(self.max_retries):
+        try:
+            return await asyncio.wait_for(
+                self._call_tool(step['tool'], step['params']),
+                timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            wait_time = 2 ** attempt  # 指数退避
+            await asyncio.sleep(wait_time)
+    raise TimeoutError(f"Step timed out after {self.max_retries} retries")
+```
+
+### 2. 降级兜底
+
+```python
+async def _fallback(self, intent, plan, failed_step):
+    """多级降级策略"""
+    # Level 1: 跳过失败步骤，继续后续步骤
+    if self._can_skip(plan, failed_step):
+        return await self._continue_without_step(plan, failed_step)
+
+    # Level 2: 使用缓存结果
+    cached = self._get_cached_result(intent)
+    if cached:
+        return {"status": "degraded", "result": cached}
+
+    # Level 3: 返回默认回答 + 标记需人工处理
+    return {
+        "status": "fallback",
+        "result": "抱歉，当前无法完成此任务，已转人工处理。",
+        "escalate": True,
+    }
+```
+
+## 面试加分点
+
+1. **量化对比**：单步执行准确率85%→加Reflector后等效97%（5步场景从44%→81%）
+2. **Reflector设计**：不只是"对不对"，还要检查"是否完整"、"是否一致"、"是否安全"
+3. **状态机优势**：可观测（每步有明确状态）、可恢复（崩溃后可从断点继续）、可审计（完整执行日志）
+4. **成本控制**：Repair只改有问题的步骤而非全部重做，Token消耗降低60%+
