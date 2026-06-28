@@ -1,0 +1,173 @@
+---
+id: note-zp2-001
+difficulty: L4
+category: ai
+subcategory: LLM
+tags:
+  - 智谱
+  - 面经
+  - SFT
+  - 后训练
+feynman:
+  essence: "判断SFT是否做到头不能只看loss，而要看继续训练是否还能提升hard set、OOD set和真实任务指标，以及pass@k多样性和RL probe gain"
+  analogy: "SFT像健身练基础体能——当你力量不再增长但柔韧性/爆发力还能提升时，说明基础训练够了，该转专项训练(RL)了"
+  first_principle: "SFT的目标不是训练成最终最优策略，而是获得格式稳定、能力不退化、适合继续RL优化的初始策略"
+  key_points:
+    - '不能只看train/validation loss下降'
+    - '关键信号: OOD/hard set不涨 + 输出模板化 = SFT进入低收益区'
+    - 'pass@k高但pass@1低 → 应优先RL而非继续堆SFT'
+    - '过度SFT压缩策略分布，削弱后续RL探索空间'
+    - '最终checkpoint选RL probe gain明确的版本，而非SFT分数最高的'
+first_principle:
+  essence: "SFT解决会不会按正确方式做，RL解决多个可行行为中哪个更优"
+  derivation: "SFT是模仿学习(imitation) → 能学到格式和能力 → 但只能复刻样本 → 遇到样本没覆盖的场景就退化 → 需要RL探索更优策略 → 过度SFT会压缩策略分布 → 削弱RL探索空间"
+  conclusion: "SFT的停止时机是在RL收益开始超过SFT收益的拐点"
+follow_up:
+  - "SFT数据按能力分桶怎么构建？"
+  - "pass@k中k取多少合适？"
+  - "RL probe gain具体怎么测？"
+---
+
+# 如何判断 SFT 已经做到头了？
+
+## 核心认知
+
+```
+SFT 的目标 ≠ 训练成最终最优策略
+SFT 的目标 = 获得一个适合继续RL优化的初始策略
+           = 格式稳定 + 能力不退化 + 具备泛化能力
+```
+
+## 判断维度：五个关键信号
+
+```
+┌──────────────────────────────────────────────────┐
+│           SFT 训练监控仪表盘                      │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  Signal 1: Loss曲线                              │
+│  Train Loss ████████████↓ (持续下降)             │
+│  Val Loss   ████████━━━━━ (已平台期)             │
+│  ⚠️ loss下降≠能力提升，可能只是更好拟合标注       │
+│                                                  │
+│  Signal 2: 泛化指标                              │
+│  Easy Set   ████████████ (稳定)                  │
+│  Hard Set   ██████━━━━━━ (不再提升) ← 关键!      │
+│  OOD Set    █████━━━━━━━ (开始下降) ← 危险!      │
+│                                                  │
+│  Signal 3: 输出多样性                             │
+│  pass@1     ████━━━━━━━━ (不高)                  │
+│  pass@16    ████████████ (高) ← 说明潜力在RL     │
+│  Distinct-2 ↓↓↓↓↓ (模板化严重) ← 过度SFT信号    │
+│                                                  │
+│  Signal 4: 格式稳定性                             │
+│  JSON合规率 ████████████ (99%+) ← SFT该停了      │
+│  Schema准确 ████████████ (98%+)                  │
+│                                                  │
+│  Signal 5: RL Probe Gain                         │
+│  从当前ckpt做100步RL → gain明显 → SFT该停了      │
+│  从当前ckpt做100步RL → gain微弱 → 继续SFT        │
+│                                                  │
+└──────────────────────────────────────────────────┘
+```
+
+## 五个关键信号详解
+
+### Signal 1：Loss下降但泛化不涨
+
+```python
+# 每轮SFT后评估
+for checkpoint in sft_checkpoints:
+    metrics = {
+        'train_loss': eval_loss(train_set, checkpoint),
+        'val_loss': eval_loss(val_set, checkpoint),
+        'hard_acc': eval_accuracy(hard_set, checkpoint),  # 困难题
+        'ood_acc': eval_accuracy(ood_set, checkpoint),    # 分布外
+    }
+
+    # 判定: loss还在降，但hard/ood不涨 → SFT进入低收益区
+    if metrics['train_loss'] < prev_train_loss and \
+       metrics['hard_acc'] <= prev_hard_acc:
+        print("⚠️ SFT收益递减，考虑停止")
+```
+
+### Signal 2：pass@k 分析
+
+```
+pass@k 的含义: 采样k次，至少1次正确的概率
+
+pass@1 = 0.45 (单次生成准确率不高)
+pass@16 = 0.82 (多次采样有较高覆盖)
+
+这说明: 模型有正确答案的能力，但单次选择不够好
+结论: 应该用RL/DPO优化选择策略，而不是继续SFT
+```
+
+### Signal 3：输出模板化
+
+```python
+# 计算输出多样性
+def distinct_n(generations, n=2):
+    """n-gram多样性指标"""
+    all_ngrams = []
+    for gen in generations:
+        tokens = gen.split()
+        ngrams = list(zip(*[tokens[i:] for i in range(n)]))
+        all_ngrams.extend(ngrams)
+    return len(set(all_ngrams)) / len(all_ngrams)
+
+# distinct_2从0.85降到0.45 → 严重模板化
+# 意味着SFT让模型输出趋于单一模板，丧失了多样性
+```
+
+### Signal 4：协议类能力已稳定
+
+```
+SFT最擅长解决的:
+- Chat template格式
+- JSON Schema输出
+- 工具调用格式
+- Role consistency
+- 拒答格式
+
+当这些指标达到99%+ → 协议类SFT使命完成
+```
+
+### Signal 5：RL Probe Gain
+
+```python
+def rl_probe(sft_checkpoint, steps=100):
+    """从SFT checkpoint做少量RL，测试收益"""
+    # 方案A: 从当前SFT checkpoint做100步RL
+    model = load(sft_checkpoint)
+    rl_result = rl_train(model, steps=steps)
+
+    # 方案B: 继续SFT 100步
+    sft_result = sft_train(model, steps=steps)
+
+    # 比较
+    if rl_result.gain > sft_result.gain * 2:
+        return "SFT应该停止，转入RL"
+    else:
+        return "SFT还有收益，继续训练"
+```
+
+## SFT vs RL 边界
+
+| 维度 | SFT | RL |
+|------|-----|-----|
+| **解决的问题** | 会不会按正确方式做 | 多个可行方案中哪个更优 |
+| **训练信号** | 标准答案(模仿) | 偏好/奖励(探索) |
+| **效果** | 格式稳定、基础能力注入 | 优化决策质量、提升pass@1 |
+| **何时停止** | 格式稳定+泛化不涨+模板化 | pass@1和RL reward收敛 |
+
+## Checkpoint选择策略
+
+```
+❌ 错误: 选SFT分数最高的checkpoint
+✅ 正确: 选满足以下条件的checkpoint
+  - 协议稳定性: JSON格式合规率 > 99%
+  - OOD不退化: OOD accuracy ≥ SFT前的80%
+  - pass@k保持: pass@16没有显著下降
+  - RL probe gain: 做100步RL后reward有明显提升
+```
