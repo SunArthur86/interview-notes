@@ -13,7 +13,7 @@ const APP_CONFIG = {
   appIcon: '📝',
   appVersion: '1.0',
   appDescription: '面试随手记 — 随时收集网上搜索的面试题，涵盖 Java、AI、算法、系统设计等全方向，支持快速录入、智能搜索、遗忘曲线复习。',
-  keywords: '面试题,面经,随手记,Java,AI,算法,系统设计,八股文,大模型,Spring,并发,JVM',
+  keywords: '面试题,面经,随手记,Java,AI,算法,系统设计,八股文,大模型,Spring,并发,JVM,Netty,网络编程,NIO',
 
   // ===== Storage =====
   storagePrefix: 'interview-notes',
@@ -35,6 +35,7 @@ const APP_CONFIG = {
     'system-design':{ label: '系统设计', icon: '🏗️', color: '#ff3b30', files: ['data/system-design.json'] },
     'database':     { label: '数据库', icon: '🗄️', color: '#007aff', files: ['data/database.json'] },
     'frontend':     { label: '前端', icon: '🎨', color: '#af52de', files: ['data/frontend.json'] },
+    'network':      { label: '网络/Netty', icon: '🌐', color: '#30b0c0', files: ['data/network.json'] },
     'other':        { label: '其他', icon: '📌', color: '#8e8e93', files: ['data/other.json'] },
   },
 
@@ -46,10 +47,11 @@ const APP_CONFIG = {
     '系统设计': ['高并发', '分布式', '微服务', '缓存', '消息队列', '限流'],
     '数据库': ['MySQL', 'Redis', 'MongoDB', 'ES', 'SQL优化'],
     '前端': ['HTML/CSS', 'JavaScript', 'React', 'Vue', '浏览器', '性能'],
-    '其他': ['网络', '操作系统', 'Linux', 'Git', 'Docker', 'K8s', 'HR面'],
+    '网络/Netty': ['Netty', '网络', 'IO模型', '协议'],
+    '其他': ['操作系统', 'Linux', 'Git', 'Docker', 'K8s', 'HR面'],
   },
 
   // ===== About Text =====
-  aboutText: '面试随手记 v1.0\n随手记录网上搜索的面试题 · 快速积累你的专属题库\n覆盖 Java · AI/大模型 · 算法 · 系统设计 · 数据库 · 前端\n费曼学习法 + 第一性原理 + 遗忘曲线复习',
+  aboutText: '面试随手记 v1.0\n随手记录网上搜索的面试题 · 快速积累你的专属题库\n覆盖 Java · AI/大模型 · 算法 · 系统设计 · 数据库 · 前端 · 网络/Netty\n费曼学习法 + 第一性原理 + 遗忘曲线复习',
   aboutTarget: '对标阿里 P7 / 字节 2-2 / 腾讯 T9',
 };

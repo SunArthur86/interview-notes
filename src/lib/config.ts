@@ -23,6 +23,7 @@ export const APP_CONFIG = {
     'system-design': { label: '系统设计', icon: '🏗️', color: '#ff3b30' },
     'database': { label: '数据库', icon: '🗄️', color: '#007aff' },
     'frontend': { label: '前端', icon: '🎨', color: '#af52de' },
+    'network': { label: '网络/Netty', icon: '🌐', color: '#30b0c0' },
     'other': { label: '其他', icon: '📌', color: '#8e8e93' },
   } as Record<string, CategoryConfig>,
   subcatGroups: {
@@ -32,7 +33,8 @@ export const APP_CONFIG = {
     '系统设计': ['高并发', '分布式', '分布式锁', '微服务', '缓存', '消息队列', '限流', '实时计算', 'Feed流'],
     '数据库': ['MySQL', 'Redis', 'MongoDB', 'ES', 'SQL优化', 'Kafka'],
     '前端': ['HTML/CSS', 'JavaScript', 'React', 'Vue', '浏览器', '性能'],
-    '其他': ['网络', '操作系统', 'Linux', 'Git', 'Docker', 'K8s', 'HR面', 'Python'],
+    '网络/Netty': ['Netty', '网络', 'IO模型', '协议'],
+    '其他': ['操作系统', 'Linux', 'Git', 'Docker', 'K8s', 'HR面', 'Python'],
   } as Record<string, string[]>,
   aboutText: '面试随手记 — 随手记录网上搜索的面试题，涵盖 Java、AI、算法、系统设计等全方向。每题含费曼学习法 + 第一性原理 + 遗忘曲线复习。',
 } as const;
