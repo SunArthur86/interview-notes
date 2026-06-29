@@ -1,1 +1,46 @@
-[]
+[
+  {
+    "id": "note-uk-behavioral-001",
+    "category": "other",
+    "subcategory": "行为面试",
+    "difficulty": "L2",
+    "tags": [
+      "英国",
+      "UK",
+      "行为面试",
+      "Behavioral",
+      "英文面试",
+      "面经"
+    ],
+    "question": "UK求职高频行为面试题（Walk me through your experience / Why this position / Teamwork / Pressure / Strengths）",
+    "answer": "## UK 行为面试高频题及回答框架\n\n### 1. Walk me through your work experience.\n**框架: Present → Past → Future**\n- Present: I'm currently [role] at [company], where I [key achievement]\n- Past: Before that, I worked at [company] doing [role], where I learned [skill]\n- Future: Now I'm looking to [goal] because [reason]\n- 控制在90秒内，突出与目标岗位相关的经历\n\n### 2. What made you apply for this position?\n**框架: 公司研究 + 角色匹配 + 职业目标**\n- 公司层面: I've been following [company]'s work in [area], especially [specific project]\n- 角色匹配: This role aligns with my experience in [skill] and my interest in [area]\n- 职业目标: I see this as an opportunity to [growth goal] while contributing to [company goal]\n\n### 3. What skills make you a good fit for this job?\n**框架: STAR + 技能映射**\n- Technical skill: [Skill] - demonstrated when I [STAR example]\n- Soft skill: [Skill] - shown when I [STAR example]\n- Mapping: These directly relate to the job requirements of [specific duties]\n\n### 4. Tell me about a time you worked as part of a team.\n**STAR框架**\n- Situation: We were facing [challenge] with [constraint]\n- Task: My role was to [responsibility]\n- Action: I [specific action] and collaborated with [team members] to [outcome]\n- Result: We achieved [quantified result] and I learned [takeaway]\n\n### 5. How do you deal with heavy workload under pressure?\n**框架: 方法论 + 示例 + 反思**\n- Prioritization: I use [Eisenhower Matrix / MoSCoW method] to prioritize tasks\n- Communication: I proactively communicate with stakeholders about timelines\n- Example: When [situation], I [action] and delivered [result]\n- Self-care: I also ensure [boundary] to maintain sustainable performance\n\n## UK面试vs中国面试的区别\n- UK更注重Behavioural/Cultural Fit，技术问题相对简单\n- 用STAR(Centered) Framework回答所有行为题\n- 控制回答时长：单题1-2分钟\n- 展示Authenticity（真实性），不要死背模板",
+    "follow_up": [
+      "如何用 STAR 框架准备行为面试？每个要素怎么写？",
+      "UK技术面试和中国大厂技术面试有什么区别？",
+      "英文面试中如何避免中式英语的常见问题？",
+      "如何在行为面试中展示Leadership（即使不是管理岗位）？"
+    ],
+    "feynman": {
+      "essence": "UK行为面试的核心是「用真实故事证明你的能力」——不是说你有多好，而是用具体的Situation→Task→Action→Result来展示。",
+      "analogy": "就像写推荐信。你不能只说「这个人很优秀」，你要写「在我负责的XX项目中，他做了XX，用了XX方法，取得了XX成果」。UK面试官就是想听这种具体的、有数据支撑的故事。",
+      "key_points": [
+        "5个高频题: 自我介绍/动机/技能匹配/团队合作/抗压",
+        "核心框架: STAR(Situation-Task-Action-Result)",
+        "Present→Past→Future做自我介绍",
+        "UK重Behavioral Fit,中国重技术深度"
+      ]
+    },
+    "first_principle": {
+      "problem": "雇主需要评估候选人是否具备岗位所需的软技能和文化匹配度，但软技能难以直接量化。如何通过面试高效评估？",
+      "axioms": [
+        "过去行为是未来行为的最佳预测器",
+        "具体案例比抽象描述更有说服力",
+        "结构化回答比即兴发挥更清晰",
+        "文化匹配度决定长期留任率"
+      ],
+      "rebuild": "从「评估软技能」出发：(1) 用过去案例预测未来表现 → 行为面试 (2) 标准化回答结构 → STAR框架 (3) 设计高频问题覆盖核心能力 → 5类经典题 (4) 评估文化匹配 → 动机/价值观/团队合作问题。"
+    },
+    "images": [],
+    "source": "小红书帖子《背完这些再去面试，一路绿灯！英国求职高频经典问题》"
+  }
+]

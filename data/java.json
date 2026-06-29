@@ -127,5 +127,356 @@
     },
     "images": [],
     "source": "小红书帖子《字节面试后端有多卷？标准公开》- 一面考核点"
+  },
+  {
+    "id": "note-bd-java-004",
+    "category": "java",
+    "subcategory": "设计模式",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "设计模式",
+      "单例模式",
+      "线程安全",
+      "Spring",
+      "面经"
+    ],
+    "question": "手写线程安全的单例模式（多种实现方式），并结合Spring源码说明Bean的作用域？",
+    "answer": "## 一、线程安全单例模式的 5 种实现\n\n### 1. 双重检查锁（DCL，推荐）\n```java\npublic class Singleton {\n    // volatile 防止指令重排序！\n    private static volatile Singleton instance;\n    \n    private Singleton() {}\n    \n    public static Singleton getInstance() {\n        if (instance == null) {                    // 第一次检查（无锁）\n            synchronized (Singleton.class) {\n                if (instance == null) {             // 第二次检查（有锁）\n                    instance = new Singleton();\n                }\n            }\n        }\n        return instance;\n    }\n}\n```\n**为什么需要 volatile？**\n`instance = new Singleton()` 不是原子操作，JVM 分三步：\n1. 分配内存空间\n2. 初始化对象（调用构造方法）\n3. 将引用指向内存地址\n\n如果没有 volatile，JVM 可能重排序为 1→3→2。线程 A 执行到 3（还没初始化），线程 B 在第一次检查时 instance != null，直接返回了一个**未初始化完成的对象**。\n\n### 2. 静态内部类（最优雅）\n```java\npublic class Singleton {\n    private Singleton() {}\n    \n    // 利用类加载机制保证线程安全\n    private static class Holder {\n        private static final Singleton INSTANCE = new Singleton();\n    }\n    \n    public static Singleton getInstance() {\n        return Holder.INSTANCE;\n    }\n}\n```\n- JVM 类加载时由 ClassLoader 保证线程安全\n- 懒加载：只有调用 getInstance() 才会加载 Holder 类\n- 无锁，性能最优\n\n### 3. 枚举（最安全）\n```java\npublic enum Singleton {\n    INSTANCE;\n    \n    public void doSomething() {}\n}\n// 使用：Singleton.INSTANCE.doSomething();\n```\n- 天然线程安全（JVM 保证）\n- **防反射攻击**（枚举的构造方法反射不可用）\n- **防反序列化破坏**（枚举的序列化机制特殊）\n- Effective Java 作者 Josh Bloch 推荐的方式\n\n### 4. synchronized 方法（最简单但性能差）\n```java\npublic class Singleton {\n    private static Singleton instance;\n    private Singleton() {}\n    \n    // 每次调用都加锁\n    public static synchronized Singleton getInstance() {\n        if (instance == null) {\n            instance = new Singleton();\n        }\n        return instance;\n    }\n}\n```\n\n### 5. ThreadLocal（线程隔离）\n```java\npublic class Singleton {\n    private Singleton() {}\n    \n    private static final ThreadLocal<Singleton> threadLocal = \n        ThreadLocal.withInitial(Singleton::new);\n    \n    public static Singleton getInstance() {\n        return threadLocal.get();\n    }\n}\n// 注意：这不是全局单例，而是每个线程一个实例\n```\n\n---\n\n## 二、对比总结\n\n| 方式 | 线程安全 | 懒加载 | 性能 | 防反射 | 防序列化 |\n|------|---------|--------|------|--------|---------|\n| DCL+volatile | ✅ | ✅ | 高 | ❌ | ❌ |\n| 静态内部类 | ✅ | ✅ | 最高 | ❌ | ❌ |\n| 枚举 | ✅ | ❌ | 最高 | ✅ | ✅ |\n| synchronized | ✅ | ✅ | 低 | ❌ | ❌ |\n\n---\n\n## 三、Spring 中的单例\n\nSpring Bean 默认作用域是 **singleton**，但与 GoF 单例模式**不同**：\n\n| 维度 | GoF 单例 | Spring singleton |\n|------|---------|-----------------|\n| 范围 | 每个 ClassLoader 一个 | 每个 Spring 容器（ApplicationContext）一个 |\n| 实现 | 自行管理 | Spring 容器管理（ConcurrentHashMap） |\n| 可测试性 | 差（全局状态） | 好（可替换 Bean） |\n| 可配置 | 否 | 是（@Scope 注解可改） |\n\n### Spring singleton 的底层实现\n```java\n// DefaultSingletonBeanRegistry.java（Spring 源码）\nprivate final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);\n\npublic Object getSingleton(String beanName) {\n    Object singletonObject = this.singletonObjects.get(beanName);\n    if (singletonObject == null) {\n        // 加锁 → 创建 → 放入缓存\n        synchronized (this.singletonObjects) {\n            singletonObject = this.singletonObjects.get(beanName);\n            if (singletonObject == null) {\n                singletonObject = createBean(beanName);\n                this.singletonObjects.put(beanName, singletonObject);\n            }\n        }\n    }\n    return singletonObject;\n}\n```\n- 本质就是 DCL 模式的应用\n- 使用三级缓存解决循环依赖",
+    "follow_up": [
+      "为什么 volatile 能防止指令重排序？底层原理是什么（内存屏障）？",
+      "Spring 三级缓存如何解决循环依赖？为什么要三级？",
+      "枚举单例为什么能防反射攻击？",
+      "如果需要在分布式环境下实现单例，怎么做？"
+    ],
+    "feynman": {
+      "essence": "线程安全单例 = 保证全局只有一个实例 + 多线程下不出错。核心挑战是「创建过程中的竞态条件」。",
+      "analogy": "想象一个国家只能有一个总统。选举过程（创建实例）中，如果两个人同时投票选出两个总统，就出问题了。DCL 就像先看一眼总统办公室有没有人（第一次检查），如果没有再锁门进去仔细看（第二次检查），确认没有才任命。volatile 保证任命公告不被乱序贴出。",
+      "key_points": [
+        "DCL: volatile防止指令重排序，双重检查减少锁竞争",
+        "静态内部类: 利用JVM类加载机制天然线程安全+懒加载",
+        "枚举: 最安全，防反射+防序列化，Effective Java推荐",
+        "Spring singleton: 容器级别（非ClassLoader级别），用DCL+ConcurrentHashMap实现"
+      ]
+    },
+    "first_principle": {
+      "problem": "多线程环境下，对象的创建不是原子的（分配内存→初始化→赋引用），可能出现竞态条件导致创建多个实例或获取到未初始化的对象。",
+      "axioms": [
+        "对象创建不是原子操作（new = 分配+初始化+赋值）",
+        "多线程下竞态条件会导致状态不一致",
+        "JVM 类加载是线程安全的（ClassLoader 保证）",
+        "性能与安全需要平衡（锁有开销）"
+      ],
+      "rebuild": "从「保证唯一+线程安全」出发：(1) 加锁 → synchronized 方法（性能差）(2) 减少锁范围 → DCL（但指令重排序问题）(3) 加 volatile 防重排序 → 完美DCL (4) 利用JVM类加载 → 静态内部类/枚举（零锁）。每一步都是在上一步基础上优化。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端二面面经 设计模式+Spring源码拔高+架构设计》"
+  },
+  {
+    "id": "note-bd-java-005",
+    "category": "java",
+    "subcategory": "设计模式",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "设计模式",
+      "策略模式",
+      "工厂模式",
+      "观察者模式",
+      "Spring",
+      "面经"
+    ],
+    "question": "策略模式、工厂模式、观察者模式在业务中的落地场景？如何用设计模式解耦代码？",
+    "answer": "## 一、策略模式（Strategy）\n\n### 本质：将算法族封装，使它们可以互换\n\n### 业务场景：多种支付方式\n```java\n// 策略接口\npublic interface PaymentStrategy {\n    void pay(BigDecimal amount);\n}\n\n// 具体策略\n@Component(\"alipay\")\npublic class AlipayStrategy implements PaymentStrategy {\n    public void pay(BigDecimal amount) { /* 支付宝支付 */ }\n}\n\n@Component(\"wechat\")\npublic class WechatPayStrategy implements PaymentStrategy {\n    public void pay(BigDecimal amount) { /* 微信支付 */ }\n}\n\n// 工厂 + 策略（消除 if-else）\n@Service\npublic class PaymentService {\n    @Autowired\n    private Map<String, PaymentStrategy> strategyMap; // Spring 自动注入\n    \n    public void pay(String type, BigDecimal amount) {\n        PaymentStrategy strategy = strategyMap.get(type);\n        strategy.pay(amount);\n    }\n}\n```\n\n### Spring 源码中的应用\n- `Resource` 接口：ClassPathResource / FileSystemResource / UrlResource\n- `InstantiationStrategy`：SimpleInstantiationStrategy / CglibSubclassingInstantiationStrategy\n\n---\n\n## 二、工厂模式（Factory）\n\n### 本质：将对象创建过程封装，调用方不关心具体类\n\n### 业务场景：日志记录器\n```java\npublic interface LoggerFactory {\n    Logger createLogger();\n}\n\npublic class FileLoggerFactory implements LoggerFactory {\n    public Logger createLogger() { return new FileLogger(); }\n}\n\npublic class DBLoggerFactory implements LoggerFactory {\n    public Logger createLogger() { return new DBLogger(); }\n}\n```\n\n### Spring 源码中的应用\n- **BeanFactory**：Spring 的核心工厂，负责创建和管理 Bean\n- **FactoryBean**：自定义 Bean 创建逻辑\n```java\n// Spring FactoryBean 示例\npublic class SqlSessionFactoryBean implements FactoryBean<SqlSessionFactory> {\n    @Override\n    public SqlSessionFactory getObject() {\n        // 自定义创建逻辑\n        return new SqlSessionFactoryBuilder().build(configuration);\n    }\n}\n```\n\n---\n\n## 三、观察者模式（Observer）\n\n### 本质：定义对象间一对多依赖，当一个对象状态变化时，所有依赖者收到通知\n\n### 业务场景：订单状态变更通知\n```java\n// Spring 事件机制 = 观察者模式的封装\n@Service\npublic class OrderService {\n    @Autowired\n    private ApplicationEventPublisher eventPublisher;\n    \n    public void completeOrder(Order order) {\n        // 业务逻辑\n        order.setStatus(\"COMPLETED\");\n        // 发布事件\n        eventPublisher.publishEvent(new OrderCompletedEvent(order));\n    }\n}\n\n// 监听者1：发送短信\n@EventListener\npublic void sendSMS(OrderCompletedEvent event) {\n    smsService.send(event.getOrder().getPhone());\n}\n\n// 监听者2：增加积分\n@EventListener\npublic void addPoints(OrderCompletedEvent event) {\n    pointsService.add(event.getOrder().getUserId());\n}\n// 加 @Async 可异步执行\n```\n\n### Spring 源码中的应用\n- **ApplicationListener / ApplicationEvent**：Spring 事件机制\n- **Listener**：Spring Boot 的 ApplicationStartedEvent 等\n\n---\n\n## 四、三种模式的协作：解耦实战\n\n```\n用户下单 → PaymentService（策略模式选支付方式）\n                          ↓\n                   PaymentFactory（工厂模式创建策略实例）\n                          ↓\n                   支付完成 → 发布事件（观察者模式通知下游）\n                          ↓\n              短信通知、积分增加、库存扣减（各自独立，互不影响）\n```\n\n### 解耦效果\n- **不使用模式**：一个方法 500 行，包含支付+短信+积分+库存逻辑\n- **使用模式后**：每个组件独立，新增支付方式只需加一个类，新增通知只需加一个 @EventListener",
+    "follow_up": [
+      "策略模式和状态模式有什么区别？",
+      "Spring 的事件机制（ApplicationEvent）和消息队列（如 Kafka）有什么区别？",
+      "工厂模式和依赖注入（DI）的关系是什么？",
+      "如何避免设计模式的过度使用（Over-engineering）？"
+    ],
+    "feynman": {
+      "essence": "设计模式的本质是「封装变化」——把变化的部分抽出来，让稳定的部分不受影响。",
+      "analogy": "策略模式就像餐厅点餐：菜单（策略接口）上列了炒饭、面条（具体策略），你选哪个厨师就做哪个，不需要你自己动手。工厂模式就像自动售货机：你按按钮（传入类型），机器（工厂）自动给你对应的饮料（对象）。观察者模式就像 YouTube 订阅：你订阅了频道（注册观察者），UP 主发视频时（状态变化）你自动收到通知。",
+      "key_points": [
+        "策略模式：封装算法族，用Map+Spring注入消除if-else",
+        "工厂模式：封装对象创建，Spring BeanFactory/FactoryBean是最佳实践",
+        "观察者模式：一对多通知，Spring @EventListener/@Async是封装",
+        "核心目标：解耦（单一职责+开闭原则）"
+      ]
+    },
+    "first_principle": {
+      "problem": "随着业务复杂度增长，代码中出现大量 if-else 分支、紧耦合、硬编码，导致难以维护和扩展。如何设计灵活的代码结构？",
+      "axioms": [
+        "变化是不可避免的，但变化的方向可以预测",
+        "封装变化 → 分离不变和可变部分（开闭原则）",
+        "针对接口编程，不针对实现编程",
+        "组合优于继承"
+      ],
+      "rebuild": "从「管理变化」出发：(1) 算法/策略可替换 → 策略模式 (2) 对象创建过程复杂 → 工厂模式 (3) 状态变化需要多方响应 → 观察者模式。三种模式解决三种不同的「变化方向」，组合使用可以构建高度解耦的系统。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端二面面经 设计模式+Spring源码拔高+架构设计》"
+  },
+  {
+    "id": "note-bd-java-006",
+    "category": "java",
+    "subcategory": "Spring",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "Spring",
+      "Bean生命周期",
+      "BeanPostProcessor",
+      "面经"
+    ],
+    "question": "Spring Bean 完整生命周期？后置处理器（BeanPostProcessor）的扩展机制？项目中如何自定义扩展 Spring？",
+    "answer": "## Spring Bean 完整生命周期（9 个阶段）\n\n```\n1. 实例化（Instantiation）\n   → BeanDefinitionReader 读取配置\n   → 反射调用构造方法创建对象\n   → 此时对象已创建但属性为 null\n\n2. 属性赋值（Populate Properties）\n   → @Autowired / @Value 注入依赖\n   → 调用 setter 方法\n\n3. Aware 接口回调\n   → BeanNameAware.setBeanName()\n   → BeanFactoryAware.setBeanFactory()\n   → ApplicationContextAware.setApplicationContext()\n\n4. BeanPostProcessor.postProcessBeforeInitialization\n   → 所有 BeanPostProcessor 的前置处理\n   → 返回值可以是原始 bean 或代理对象\n\n5. 初始化方法\n   → @PostConstruct（JSR-250）\n   → InitializingBean.afterPropertiesSet()\n   → 自定义 init-method\n\n6. BeanPostProcessor.postProcessAfterInitialization ★\n   → 最重要的一步！AOP 代理就是在这里创建的\n   → 返回值替换原始 bean\n\n7. Bean 完全就绪（Ready for Use）\n   → 存入 Spring 容器的 singletonObjects 缓存\n\n8. 销毁回调（当容器关闭时）\n   → @PreDestroy\n   → DisposableBean.destroy()\n   → 自定义 destroy-method\n\n9. GC 回收\n```\n\n---\n\n## 核心扩展点详解\n\n### BeanPostProcessor（最重要的扩展点）\n\n```java\npublic interface BeanPostProcessor {\n    // 初始化前：可以修改 bean 或返回代理\n    default Object postProcessBeforeInitialization(Object bean, String beanName) {\n        return bean;\n    }\n    // 初始化后：AOP 代理就在这里创建！\n    default Object postProcessAfterInitialization(Object bean, String beanName) {\n        return bean;\n    }\n}\n```\n\n### Spring 内置的 BeanPostProcessor\n\n| Processor | 功能 |\n|-----------|------|\n| **AutowiredAnnotationBeanPostProcessor** | 处理 @Autowired / @Value 注入 |\n| **CommonAnnotationBeanPostProcessor** | 处理 @PostConstruct / @PreDestroy |\n| **AbstractAutoProxyCreator** | AOP 代理创建（@Transactional/@Async 的底层）|\n| **ConfigurationClassPostProcessor** | 处理 @Configuration / @Bean |\n| **AsyncAnnotationBeanPostProcessor** | 处理 @Async |\n\n---\n\n## 项目中自定义扩展 Spring\n\n### 场景 1：自定义注解 + 自动代理\n```java\n// 定义注解\n@Target(ElementType.METHOD)\n@Retention(RetentionPolicy.RUNTIME)\npublic @interface RateLimit {\n    int value() default 100;\n}\n\n// 自定义 BeanPostProcessor\n@Component\npublic class RateLimitBeanPostProcessor implements BeanPostProcessor {\n    @Override\n    public Object postProcessAfterInitialization(Object bean, String beanName) {\n        // 扫描方法上的 @RateLimit\n        for (Method method : bean.getClass().getMethods()) {\n            if (method.isAnnotationPresent(RateLimit.class)) {\n                // 创建代理\n                return Proxy.newProxyInstance(\n                    bean.getClass().getClassLoader(),\n                    bean.getClass().getInterfaces(),\n                    (proxy, m, args) -> {\n                        if (m.isAnnotationPresent(RateLimit.class)) {\n                            // 限流逻辑\n                            if (!rateLimiter.tryAcquire()) {\n                                throw new RateLimitException();\n                            }\n                        }\n                        return m.invoke(bean, args);\n                    }\n                );\n            }\n        }\n        return bean;\n    }\n}\n```\n\n### 场景 2：全局配置加密\n```java\n@Component\npublic class EncryptionBeanPostProcessor implements BeanPostProcessor {\n    @Override\n    public Object postProcessBeforeInitialization(Object bean, String beanName) {\n    \t// 对带 @Encrypted 注解的字段自动解密\n        Field[] fields = bean.getClass().getDeclaredFields();\n        for (Field field : fields) {\n            if (field.isAnnotationPresent(Encrypted.class)) {\n                field.setAccessible(true);\n                String encrypted = (String) field.get(bean);\n                field.set(bean, decrypt(encrypted)); // 自动解密\n            }\n        }\n        return bean;\n    }\n}\n```\n\n### 场景 3：Spring 监听器扩展\n```java\n// 容器启动后执行\n@EventListener(ApplicationReadyEvent.class)\npublic void onReady() {\n    // 初始化缓存、预热数据\n}\n```\n\n---\n\n## 面试加分点\n\n1. **三级缓存与循环依赖**：Bean 的提前暴露在 postProcessAfterInitialization 之前\n2. **AOP 的本质**：就是在 BeanPostProcessor#postProcessAfterInitialization 中创建代理对象\n3. **@Configuration 的 full 模式**：ConfigurationClassPostProcessor 会创建 CGLIB 代理保证 @Bean 的单例语义",
+    "follow_up": [
+      "Spring 三级缓存如何解决循环依赖？BeanPostProcessor 在哪一级？",
+      "AOP 的实现原理是什么？JDK 动态代理 vs CGLIB？",
+      "@PostConstruct、InitializingBean、init-method 的执行顺序？",
+      "BeanFactoryPostProcessor 和 BeanPostProcessor 的区别？"
+    ],
+    "feynman": {
+      "essence": "Spring Bean 生命周期就像一条流水线——从原材料（BeanDefinition）到成品（可用 Bean），经过实例化→注入→初始化→代理包装，每个环节都有扩展点可以插入自定义逻辑。",
+      "analogy": "想象星巴克做咖啡。1. 实例化=拿一个空杯子 2. 属性注入=加咖啡、加牛奶 3. Aware回调=贴上杯签（名字）4. BeanPostProcessor前置=加糖浆的检查点 5. 初始化=按标准配方调制 6. BeanPostProcessor后置=包装入袋（AOP代理=加杯套） 7. 就绪=交给顾客。每个步骤你都可以定制——比如要求无糖（自定义扩展）。",
+      "key_points": [
+        "9个阶段：实例化→属性注入→Aware→BPP前→初始化→BPP后→就绪→销毁→GC",
+        "BeanPostProcessor是最核心扩展点，AOP代理在这里创建",
+        "AutowiredAnnotationBPP处理@Autowired，AbstractAutoProxyCreator做AOP",
+        "自定义扩展：自定义注解+自动代理、配置自动解密、启动预热"
+      ]
+    },
+    "first_principle": {
+      "problem": "IoC 容器需要管理大量 Bean 的创建、配置、初始化和销毁，不同 Bean 有不同的定制需求。如何设计一个既统一又可扩展的生命周期管理机制？",
+      "axioms": [
+        "Bean 的创建过程是确定的流程（实例化→注入→初始化→销毁）",
+        "不同 Bean 需要不同的定制逻辑（扩展性需求）",
+        "扩展不应该修改框架核心代码（开闭原则）",
+        "模板方法 + 后置处理器是最优解（流程固定，扩展点灵活）"
+      ],
+      "rebuild": "从「统一流程+灵活扩展」出发：(1) 定义标准流程（生命周期9步）(2) 在关键节点插入扩展点（BeanPostProcessor）(3) 用接口而非继承实现扩展（SOLID）(4) 内置常用扩展（@Autowired/@Async/AOP）。这就是 Spring 扩展性的核心设计。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端二面面经 设计模式+Spring源码拔高+架构设计》"
+  },
+  {
+    "id": "note-bd-java-007",
+    "category": "java",
+    "subcategory": "Spring",
+    "difficulty": "L5",
+    "tags": [
+      "字节",
+      "Spring",
+      "事务传播",
+      "嵌套事务",
+      "面经",
+      "底层原理"
+    ],
+    "question": "Spring 事务传播机制：嵌套事务、挂起事务的底层执行逻辑？实战踩坑复盘？",
+    "answer": "## 七种事务传播行为\n\n| 传播行为 | 外层有事务 | 外层无事务 | 说明 |\n|---------|-----------|-----------|------|\n| **REQUIRED**（默认） | 加入当前事务 | 新建事务 | 大多数场景用这个 |\n| **REQUIRES_NEW** | **挂起**当前事务，新建独立事务 | 新建事务 | 日志记录、不受外层影响 |\n| **NESTED** | 创建**保存点**（savepoint），嵌套子事务 | 新建事务 | 部分回滚 |\n| **SUPPORTS** | 加入当前事务 | 无事务执行 | 查询方法 |\n| **NOT_SUPPORTED** | **挂起**当前事务，无事务执行 | 无事务执行 | 不需要事务的操作 |\n| **MANDATORY** | 加入当前事务 | **抛异常** | 必须在事务内调用 |\n| **NEVER** | **抛异常** | 无事务执行 | 不能在事务内调用 |\n\n---\n\n## 重点详解\n\n### 1. REQUIRES_NEW（挂起+新建）\n```\n方法A（事务T1）\n    → 调用方法B（REQUIRES_NEW）\n    → 挂起 T1（ThreadLocal 暂存）\n    → 创建 T2（新数据库连接）\n    → 执行 B\n    → 提交 T2\n    → 恢复 T1\n    → 继续执行 A\n    → 提交 T1\n```\n\n**底层实现**：\n- Spring 用 ThreadLocal 存储当前事务的 ConnectionHolder\n- 挂起 = 将 ThreadLocal 中的 Connection 保存到 SuspendedResourcesHolder\n- 新建 = 获取新的 Connection，绑定到 ThreadLocal\n- 恢复 = 将保存的 Connection 重新绑定到 ThreadLocal\n\n**关键陷阱**：\n```java\n@Service\npublic class OrderService {\n    @Transactional\n    public void createOrder() {\n        orderDao.insert(order);          // 事务T1\n        logService.log();               // REQUIRES_NEW → 事务T2\n        // 如果 log() 抛异常，T2回滚但T1不受影响\n        // 如果 log() 后面抛异常，T1回滚但T2已提交\n    }\n}\n```\n\n### 2. NESTED（嵌套子事务）\n```\n方法A（事务T1）\n    → 调用方法B（NESTED）\n    → 在 T1 内创建 savepoint\n    → 执行 B\n    → B 正常：释放 savepoint（不提交）\n    → B 异常：回滚到 savepoint（只回滚B，不回滚A）\n    → A 最终提交或回滚整个 T1\n```\n\n**与 REQUIRES_NEW 的区别**：\n- NESTED：T1 和 B 共享同一个 Connection，B 只是 T1 的子事务\n- REQUIRES_NEW：T1 和 B 用不同的 Connection，完全独立\n- NESTED 的 B 提交依赖于 T1 的最终提交（T1 回滚则 B 也回滚）\n- REQUIRES_NEW 的 B 已经提交就不受 T1 影响\n\n**底层依赖**：JDBC 的 SavePoint 机制\n```java\nSavepoint savepoint = conn.setSavepoint(\"NESTED\");\ntry {\n    // 执行嵌套逻辑\n} catch (Exception e) {\n    conn.rollback(savepoint); // 只回滚到保存点\n}\n```\n\n---\n\n## 实战踩坑复盘\n\n### 坑 1：自调用导致事务失效\n```java\n@Service\npublic class UserService {\n    @Transactional\n    public void methodA() {\n        // 直接调用本类方法，不走代理！\n        this.methodB(); // @Transactional(REQUIRES_NEW) 不生效\n    }\n    \n    @Transactional(propagation = Propagation.REQUIRES_NEW)\n    public void methodB() {}\n}\n// 原因：this.methodB() 不经过 Spring AOP 代理\n// 解决：注入自身代理或使用 AopContext.currentProxy()\n```\n\n### 坑 2：REQUIRES_NEW 导致死锁\n```java\n@Transactional\npublic void updateOrder() {\n    // 持有行锁 order_id=1\n    orderDao.update(1, status);\n    // REQUIRES_NEW 使用新连接\n    // 如果 logService 也要查 order_id=1\n    // → 死锁！外层事务持有锁，新事务等待锁\n    logService.log(1);\n}\n```\n\n### 坑 3：异常被吞导致事务不回滚\n```java\n@Transactional\npublic void createOrder() {\n    try {\n        orderDao.insert(order);\n    } catch (Exception e) {\n        log.error(\"失败\", e);\n        // 异常被 catch 了！默认只回滚 RuntimeException\n        // 如果没有抛出异常，Spring 认为成功，不会回滚\n    }\n}\n// 解决：在 catch 中 throw 新异常，或设置 rollbackFor = Exception.class\n```\n\n### 坑 4：checked 异常不回滚\n```java\n@Transactional // 默认只回滚 RuntimeException 和 Error\npublic void method() throws IOException {\n    throw new IOException(); // 不会回滚！\n}\n// 解决：@Transactional(rollbackFor = Exception.class)\n```",
+    "follow_up": [
+      "Spring 事务的底层实现是 JDK 代理还是 CGLIB？有什么区别？",
+      "@Transactional 标注在 private 方法上会生效吗？为什么？",
+      "多个事务传播行为混合使用时，如何排查死锁问题？",
+      "分布式事务（如 Seata）的传播行为和 Spring 事务有什么区别？"
+    ],
+    "feynman": {
+      "essence": "事务传播机制解决的是「多个 @Transactional 方法相互调用时，事务该怎么协调」的问题——是共用一个事务、开新事务、嵌套子事务、还是不用事务。",
+      "analogy": "想象你在填表格（事务）。REQUIRED = 你在填，叫同事帮忙，同事就在你的表格上接着填（共用）。REQUIRES_NEW = 你在填，叫同事帮忙，同事拿出一张新表格填，互不干扰（挂起+新建）。NESTED = 你在填，叫同事帮忙，同事用铅笔在你表格上填（可以擦掉那部分但不影响你的钢笔部分）。",
+      "key_points": [
+        "7种传播行为，REQUIRED是默认值",
+        "REQUIRES_NEW: 挂起当前事务+新连接+独立提交",
+        "NESTED: JDBC SavePoint实现+部分回滚+依赖外层提交",
+        "三大坑: 自调用失效、REQUIRES_NEW死锁、异常被吞不回滚"
+      ]
+    },
+    "first_principle": {
+      "problem": "多个带事务的方法相互调用时，需要决定事务的边界——是共用一个事务（一起提交/回滚）还是独立事务（各自提交/回滚），以及如何处理嵌套关系。",
+      "axioms": [
+        "事务的本质是一组操作的原子性边界",
+        "一个数据库连接 = 一个事务（核心约束）",
+        "ThreadLocal 是 Spring 关联线程与事务的机制",
+        "SavePoint 是 JDBC 原生的部分回滚机制"
+      ],
+      "rebuild": "从「事务边界」出发：(1) 共用事务 → REQUIRED (2) 独立事务 → REQUIRES_NEW（需要新连接=ThreadLocal挂起+恢复）(3) 部分回滚 → NESTED（需要SavePoint）(4) 可选事务 → SUPPORTS (5) 禁止事务 → NEVER/MANDATORY。7 种行为覆盖所有事务边界组合。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端二面面经 设计模式+Spring源码拔高+架构设计》"
+  },
+  {
+    "id": "note-bd-java-008",
+    "category": "java",
+    "subcategory": "架构设计",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "架构",
+      "分层设计",
+      "DDD",
+      "面经"
+    ],
+    "question": "完整梳理核心项目的整体架构，分层设计思路，每一层的职责和边界是什么？",
+    "answer": "## 经典分层架构\n\n四层架构：Controller → Service → Domain → Infrastructure\n\n### 各层职责\n1. Controller层：参数接收与校验、协议转换（HTTP→DTO）、统一异常处理、日志记录。不写业务逻辑、不直接操作数据库\n2. Service层（应用服务）：业务流程编排、事务管理、调用领域服务、组合多个Repository\n3. Domain层（领域核心）：领域模型（Entity/Value Object）、业务规则验证、领域事件。纯业务逻辑，不依赖任何框架\n4. Infrastructure层（基础设施）：数据持久化（Repository实现）、外部服务调用（Gateway）、消息队列\n\n### DDD核心概念\n- Entity（实体）：有唯一标识，可变，如Order/User\n- Value Object（值对象）：无标识，不可变，如Money/Address\n- Aggregate（聚合根）：一组相关对象的集合，统一管理一致性，如Order包含OrderItem\n- Domain Event（领域事件）：领域中发生的重要事件，如OrderCreatedEvent\n- Repository（仓储）：聚合根的持久化接口\n\n### 分层的好处\n1. 单一职责：每层只做自己的事\n2. 可替换性：Infrastructure层可从MySQL换成MongoDB，不影响Domain\n3. 可测试性：Domain层是纯POJO，不依赖框架，方便单元测试\n4. 团队协作：不同层可以并行开发",
+    "follow_up": [
+      "DDD 中的聚合根边界如何确定？过大和过小各有什么问题？",
+      "微服务架构下，跨服务的业务一致性如何保证？Saga 模式了解吗？",
+      "Controller 层和 Service 层之间的 DTO 转换应该放在哪？用 MapStruct 有什么好处？",
+      "如何避免 Service 层变成「胖服务」（God Service）？"
+    ],
+    "feynman": {
+      "essence": "分层架构的本质是「关注点分离」——把不同关注点放在不同层，每层只做自己的事，通过接口交互。",
+      "analogy": "想象一家餐厅。Controller=服务员（接单、传菜），Service=大堂经理（安排流程、协调厨房），Domain=厨师（核心烹饪技能），Infrastructure=供应链（采购食材、提供能源）。服务员不能炒菜，厨师不能采购——各司其职，通过菜单（接口）沟通。",
+      "key_points": [
+        "四层架构: Controller→Service→Domain→Infrastructure",
+        "DDD核心: Entity/VO/Aggregate/Repository/Domain Event",
+        "Domain层纯业务逻辑，不依赖框架",
+        "分层好处: 单一职责+可替换+可测试+可协作"
+      ]
+    },
+    "first_principle": {
+      "problem": "软件系统复杂度随业务增长指数级上升。如果不做层次分离，所有逻辑混在一起（面条代码），会导致不可维护、不可测试、不可扩展。",
+      "axioms": [
+        "不同关注点的变化频率不同（业务逻辑 vs 技术实现）",
+        "高层不应该依赖低层细节（依赖倒置原则）",
+        "领域逻辑是系统的核心价值，应该独立于技术框架",
+        "接口是层间解耦的关键"
+      ],
+      "rebuild": "从「管理复杂度」出发：(1) 分离入口和业务 → Controller层 (2) 分离编排和规则 → Service层(编排)+Domain层(规则) (3) 分离业务和技术 → Infrastructure层 (4) 通过接口连接各层 → 依赖倒置。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端二面面经》(项目架构深挖+工程优化，图片OCR)"
+  },
+  {
+    "id": "note-bd-java-009",
+    "category": "java",
+    "subcategory": "Redis",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "Tiktok",
+      "Redis",
+      "GEO",
+      "Bitmap",
+      "ZSet",
+      "面经"
+    ],
+    "question": "Redis GEO 和 Bitmap 的底层原理？GEO 如何对应到 ZSet？Bitmap 如何实现连续签到？",
+    "answer": "## 一、Redis GEO 底层原理\n\n### 本质：GEO = ZSet + GeoHash 编码\n\nRedis GEO 类型底层就是 ZSet（有序集合），member存地理位置名称，score存GeoHash编码后的值。\n\n### GeoHash 编码原理\n1. 分别对经度和纬度做二分编码（[-180,180]和[-90,90]区间不断二分，左0右1）\n2. 交叉排列（偶数位放经度，奇数位放纬度），得到52位整数\n3. 这个整数就是ZSet的score\n\n### 特性\n- 相近的地理位置 → 相似的score → ZSet中相邻\n- 可以用ZRANGEBYSCORE快速查找范围内位置\n- GeoHash精度：6位约1.2km，8位约38m，Redis GEO用52位整数（精度约0.6m）\n\n### GEO精度问题\n- GeoHash是矩形网格编码，存在边界效应\n- 两个很近的点可能落在不同网格中 → 搜索附近时可能遗漏\n- 解决：搜索时扩大范围，先用GeoHash粗筛，再用Haversine公式精筛\n\n## 二、Redis Bitmap 底层原理\n\n### 本质：Bitmap = String（一串连续的二进制位）\n\nSETBIT sign:uid1000:202606 5 1 → String: 00000100...（每bit代表一天）\n\n### 连续签到实现\n- key格式: sign:userId:YYYYMM\n- bit位: dayOfMonth - 1（第几天就是第几位）\n- 记录签到: SETBIT key dayBit 1\n- 统计本月签到天数: BITCOUNT key\n- 计算连续签到: BITFIELD key GET u31 0 获取全部位，Java中位运算计算末尾连续1的个数\n- 设置过期时间: 月底自动清理\n\n## 三、对比\n- Bitmap: 底层String，存二进制位(0/1)，场景=签到/在线状态/去重，内存极低\n- GEO: 底层ZSet，存地理坐标+名称，场景=附近的人/门店",
+    "follow_up": [
+      "GeoHash 编码为什么用交叉排列经纬度？不交叉会怎样？",
+      "Bitmap 实现亿级用户在线状态统计，需要多少内存？",
+      "Redis 的 HyperLogLog 和 Bitmap 在去重场景下有什么区别？",
+      "如果签到数据量巨大（亿级用户），Bitmap 方案还有什么优化空间？"
+    ],
+    "feynman": {
+      "essence": "GEO 底层就是 ZSet（用 GeoHash 编码把经纬度变成可排序的分数）；Bitmap 底层就是 String（一串二进制位，每位代表一个布尔值）。",
+      "analogy": "GEO 就像图书馆按编号排列书——相近的地理位置编码出相近的编号（score），要找「附近的」就找编号相近的。Bitmap 就像出勤表——31 个格子代表 31 天，来了打个勾（1），没来空着（0），一统计就知道出勤情况。",
+      "key_points": [
+        "GEO=ZSet+GeoHash编码，相近位置→相近score→ZSet相邻",
+        "GeoHash: 经纬度二分编码→交叉排列→52位整数=score",
+        "Bitmap=String，SETBIT/GETBIT/BITCOUNT",
+        "签到方案: key=sign:uid:月, bit=天, BITCOUNT统计"
+      ]
+    },
+    "first_principle": {
+      "problem": "GEO 需要高效查询「附近的XX」，Bitmap 需要用最少空间记录大量布尔状态。如何用 Redis 现有数据结构解决这两个需求？",
+      "axioms": [
+        "ZSet 天然支持范围查询（ZRANGEBYSCORE）",
+        "如果能把地理位置编码成数字，就能用 ZSet 管理地理数据",
+        "String 是字节数组，一位代表一个布尔值是最省空间的方案",
+        "GeoHash 编码使相近位置有相近编码（单调性）"
+      ],
+      "rebuild": "GEO：(1) 经纬度→二分编码→交叉→52位整数 (2) 用ZSet的score存这个整数 (3) 范围查询=ZSet范围搜索。Bitmap：(1) String=字节数组 (2) SETBIT操作某一位 (3) BITCOUNT统计1的个数。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节跳动Tiktok后端开发一面面经》"
+  },
+  {
+    "id": "note-bd-java-010",
+    "category": "java",
+    "subcategory": "Spring",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "Tiktok",
+      "Spring",
+      "Bean生命周期",
+      "面经"
+    ],
+    "question": "介绍 Bean 的生命周期？（字节 Tiktok 一面精简版）",
+    "answer": "## 核心阶段（精简记忆版）\n\n4大阶段：实例化 → 属性注入 → 初始化 → 使用 → 销毁\n\n详细展开：\n1. 实例化（Instantiation）：BeanDefinition → 反射调用构造方法 → 对象创建\n2. 属性注入（Populate）：@Autowired/@Value → setter注入\n3. Aware回调：BeanNameAware → BeanFactoryAware → ApplicationContextAware\n4. BeanPostProcessor#postProcessBeforeInitialization\n5. 初始化：@PostConstruct → InitializingBean#afterPropertiesSet → init-method\n6. BeanPostProcessor#postProcessAfterInitialization ← AOP代理在这里创建！\n7. 使用（Ready）\n8. 销毁：@PreDestroy → DisposableBean#destroy → destroy-method\n\n## 关键扩展点\n- 实例化前：BeanFactoryPostProcessor → 修改BeanDefinition\n- 初始化后：BeanPostProcessor → AOP代理创建\n- @PostConstruct → InitializingBean → init-method 是初始化方法的执行顺序\n\n## 口诀\n「实属AWARE前后用销」(实=实例化，属=属性注入，AWARE=Aware回调，前=前置BPP，后=后置BPP，用=使用，销=销毁)",
+    "follow_up": [
+      "BeanFactoryPostProcessor 和 BeanPostProcessor 的区别？执行时机？",
+      "@PostConstruct、InitializingBean、init-method 的执行顺序？",
+      "AOP 代理是在 Bean 生命周期的哪个阶段创建的？",
+      "Spring 如何解决循环依赖？与生命周期有什么关系？"
+    ],
+    "feynman": {
+      "essence": "Bean 生命周期就是「从出生到死亡」的完整过程，核心是实例化→注入→初始化→销毁，每个阶段都有扩展点可以插入自定义逻辑。",
+      "analogy": "就像员工入职流程：1.实例化=签订合同 2.注入=分配工位 3.Aware=入职培训 4.初始化=正式上岗 5.使用=日常上班 6.销毁=离职手续。每个环节HR都可以插入额外流程。",
+      "key_points": [
+        "4大阶段: 实例化→注入→初始化→销毁",
+        "AOP代理在postProcessAfterInitialization创建",
+        "@PostConstruct→InitializingBean→init-method执行顺序",
+        "BeanPostProcessor是最核心扩展点"
+      ]
+    },
+    "first_principle": {
+      "problem": "IoC 容器需要管理 Bean 从创建到销毁的全过程，同时允许开发者在每个阶段插入自定义逻辑。如何设计这个流程？",
+      "axioms": [
+        "对象创建是确定流程（构造→注入→初始化→销毁）",
+        "扩展不应修改框架代码（开闭原则）",
+        "后置处理器是通用的扩展模式",
+        "AOP 需要在对象创建完成后包装代理"
+      ],
+      "rebuild": "模板方法（固定流程）+ 后置处理器（灵活扩展）= Spring Bean 生命周期。初始化后是创建代理的最佳时机。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节跳动Tiktok后端开发一面面经》"
+  },
+  {
+    "id": "note-bd-java-011",
+    "category": "java",
+    "subcategory": "分布式ID",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "Tiktok",
+      "分布式ID",
+      "雪花算法",
+      "高并发",
+      "面经"
+    ],
+    "question": "分布式 ID 怎么实现的？高并发场景下你的分布式 ID 还能用吗？",
+    "answer": "## 常见分布式 ID 方案对比\n\n- UUID：无中心、简单，但无序（B+树插入差）、占空间。适合非主键场景\n- 数据库自增：简单有序，但单点瓶颈。适合单库小项目\n- 雪花算法（Snowflake）：时间戳+机器ID+序列号，有序、高性能、无中心。主流选择\n- 号段模式（美团Leaf）：DB批量取号+内存分配，高性能有序，依赖DB\n- Redis INCR：原子自增，简单，但依赖Redis、持久化风险\n\n## 雪花算法（Snowflake）详解\n\n### 64位结构\n1 bit符号位（不用） + 41 bits时间戳（ms，约69年） + 10 bits机器ID（1024台） + 12 bits序列号（4096/ms）\n\n### 高并发问题与优化\n\n### 问题1：序列号耗尽（每毫秒4096个）\n单机每毫秒最多4096个ID = 4096万/秒。超过需等待下一毫秒。如果超过，说明应该分片了。\n\n### 问题2：时钟回拨\nNTP时间同步导致时钟倒退 → 可能生成重复ID。解决：回拨量小等待追上，回拨量大报警+拒绝服务。百度UidGenerator用未来时间环形buffer，美团Leaf用ZK+时钟监控。\n\n### 问题3：机器ID分配\n方案：ZooKeeper自动分配 / MySQL分配 / 基于MAC/IP推导。\n\n### 问题4：synchronized性能瓶颈\n优化：CAS替代synchronized，或LongAdder分段累加，或预生成+RingBuffer（百度UidGenerator方案）。\n\n### 问题5：高并发GC问题\n大量long类型ID生成→对象分配。优化：预生成ID到RingBuffer，消费者从Buffer取。\n\n## 面试加分\n单机QPS 4096万/秒基本够用。高并发核心问题三个：(1)时钟回拨——ZK监控+拒绝 (2)机器ID分配——ZK临时节点 (3)锁竞争——CAS+RingBuffer。如果QPS超过单机极限，扩容机器即可。",
+    "follow_up": [
+      "雪花算法为什么用 41 位时间戳？能用多久？",
+      "时钟回拨问题在实际生产中如何彻底解决？",
+      "百度 UidGenerator 的 RingBuffer 方案相比原版雪花有什么优势？",
+      "雪花算法生成的 ID 在 MySQL 中做主键有什么优势？"
+    ],
+    "feynman": {
+      "essence": "分布式 ID 的核心需求是「全局唯一 + 趋势递增 + 高性能」。雪花算法通过时间戳+机器ID+序列号的组合，在一个 64 位整数中编码了这三层信息。",
+      "analogy": "雪花算法就像医院的挂号系统。时间戳=挂号日期时间，机器ID=窗口编号（多个窗口并行），序列号=该窗口该秒的第几个号。组合起来：2026年6月30日10:30:15.123 + 3号窗口 + 第5个号 = 唯一编号。多个窗口同时工作也不会重复。",
+      "key_points": [
+        "64位=1符号+41时间戳+10机器ID+12序列号",
+        "单机极限: 4096万ID/秒",
+        "三大问题: 时钟回拨/机器ID分配/锁竞争",
+        "优化: CAS替代锁+RingBuffer预生成+ZK分配workerId"
+      ]
+    },
+    "first_principle": {
+      "problem": "分布式系统中多个节点同时生成 ID，需要保证全局唯一性和趋势递增性（B+树索引友好），同时生成速度要够快。",
+      "axioms": [
+        "唯一性需要「正交的维度组合」（时间×机器×序列）",
+        "趋势递增有利于数据库索引（B+树顺序插入）",
+        "无中心化 > 中心化（避免单点瓶颈）",
+        "64位整数是最优大小（long类型，DB友好）"
+      ],
+      "rebuild": "从「全局唯一+递增+高性能」出发：(1)UUID无序→不行 (2)数据库自增→单点瓶颈 (3)时间戳+序列号→基础结构 (4)机器ID保证多机唯一→完整方案 (5)优化时钟回拨/CAS/RingBuffer→生产级。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节跳动Tiktok后端开发一面面经》"
   }
 ]

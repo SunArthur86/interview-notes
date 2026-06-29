@@ -314,5 +314,183 @@
       "rebuild": "从LLM的局限性出发：缺什么（状态->记忆模块、执行->工具模块、知识->RAG模块）？怎么协调（编排引擎）？怎么保证安全（权限/监控/限流）？怎么保证稳定（循环控制/超时/重试）？"
     },
     "images": []
+  },
+  {
+    "id": "note-bd-agent-001",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "Agent",
+      "Harness",
+      "Code Agent",
+      "面经",
+      "腾讯"
+    ],
+    "question": "Agent Harness是什么？一个完整的Agent Harness需要包含哪些核心模块？",
+    "answer": "## Agent Harness 的本质\n\nAgent Harness 是**让 LLM 具备行动能力的工程框架**——它将 LLM 从「文本生成器」升级为「能感知、决策、执行的自主智能体」。类比来说，LLM 是大脑，Harness 就是神经系统+四肢+记忆系统。\n\n---\n\n## 核心模块拆解（6大组件）\n\n### 1. LLM 调用层（Brain）\n- 支持多模型路由（GPT-4o / Claude / 开源模型）\n- 流式输出处理（SSE）\n- Token 计数与成本控制\n- 重试与降级策略\n\n### 2. 工具系统（Hands）\n- 工具注册表（名称、描述、参数 schema）\n- 参数校验（JSON Schema 验证）\n- 执行沙箱（权限隔离、超时控制）\n- 结果格式化（截断超长输出）\n\n### 3. 上下文管理（Memory）\n- System Prompt（固定指令）\n- Conversation History（滑动窗口 / 压缩摘要）\n- Tool Results（截断/摘要化）\n- Token 预算分配（System: 10%, History: 60%, Tools: 20%, User: 10%）\n\n### 4. 循环控制（Loop）\n- ReAct 循环（Thought → Action → Observation）\n- 最大迭代次数限制（防死循环）\n- 中断与恢复机制\n\n### 5. 运行追踪（Trace）\n- 结构化日志记录每一步（timestamp, step, llm_input, llm_output, tool, result, token_usage, latency）\n- 支持回放（Replay）调试\n- 性能分析（每步耗时、token 消耗）\n\n### 6. 安全与权限（Guardrails）\n- 文件系统访问范围限制\n- 命令执行白名单/黑名单\n- 敏感信息脱敏\n- 用户确认机制（危险操作前请求批准）\n\n---\n\n## 业界代表产品\n\n| 产品 | 特点 |\n|------|------|\n| Claude Code | Anthropic 官方 CLI Agent，强大的工具集成 |\n| OpenClaw (OpenHands) | 开源 Agent 框架，4 大工具（file_edit, bash, browser, think）|\n| Cursor | IDE 内置 Agent，上下文管理优秀 |\n| Aider | 开源 Git-aware coding agent |\n\n---\n\n## 面试加分点\n\n1. **OpenClaw 底层 4 个工具**：file_edit（文件编辑）、bash（命令执行）、browser（浏览器交互）、think（推理思考）\n2. **Claude Code 的上下文管理**：自动压缩旧对话 + 摘要注入 + 文件级记忆\n3. **自建 Harness 的核心 trade-off**：灵活性 vs 稳定性 vs 开发成本",
+    "follow_up": [
+      "OpenClaw 和 Claude Code 的工具设计有什么本质区别？",
+      "如果 Agent 在循环中陷入死循环（反复调用同一工具），如何检测和中断？",
+      "Agent 的 Trace 数据应该用什么存储？SQLite 还是时序数据库？",
+      "如何设计 Agent 的中断恢复机制（checkpointing）？"
+    ],
+    "feynman": {
+      "essence": "Agent Harness 是让 LLM 从「只会说话」变成「能干活」的工程框架，核心就是把 LLM 包装在一个循环里：感知→决策→执行→反馈→再决策。",
+      "analogy": "LLM 就像一个超级聪明但只会说话的远程专家。Harness 就是你给他配的一套系统：电话（LLM调用）、工具箱（工具系统）、笔记本（上下文管理）、工作台（循环控制）、监控摄像头（Trace）、门禁卡（安全权限）。有了这套系统，专家才能真正帮你干活。",
+      "key_points": [
+        "6大核心模块：LLM调用、工具系统、上下文管理、循环控制、运行追踪、安全权限",
+        "本质是 ReAct 循环：Thought→Action→Observation",
+        "OpenClaw 4工具：file_edit/bash/browser/think",
+        "上下文管理是核心难题：窗口有限 vs 信息无限"
+      ]
+    },
+    "first_principle": {
+      "problem": "LLM 本身是无状态的文本生成器，不能执行代码、不能访问文件、没有记忆。要构建自主 Agent，需要一个工程层来弥合 LLM 的文本输出和真实世界的执行。",
+      "axioms": [
+        "LLM 是无状态的——每次调用独立，需要外部维护对话状态",
+        "LLM 只能输出文本——需要解析层将文本转化为可执行动作",
+        "LLM 有 token 限制——需要上下文管理策略",
+        "Agent 行为不可预测——需要安全边界和追踪能力"
+      ],
+      "rebuild": "从「LLM能做什么」出发：(1) 理解意图 → 需要Prompt工程 (2) 决策下一步 → 需要循环控制 (3) 执行动作 → 需要工具系统 (4) 记住上下文 → 需要上下文管理 (5) 调试排查 → 需要Trace (6) 防止失控 → 需要安全机制。6 个模块全部必需。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Agent开发岗二面全攻略》(腾讯Agent开发二面 + 字节Agent开发二面)"
+  },
+  {
+    "id": "note-bd-agent-002",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L5",
+    "tags": [
+      "字节",
+      "Agent",
+      "上下文管理",
+      "Claude Code",
+      "Cursor",
+      "Pico",
+      "面经"
+    ],
+    "question": "Code Agent 的上下文管理是如何实现的？历史记录如何放入上下文窗口？Claude Code / Cursor 的上下文管理有什么优缺点？为什么会有上下文长度限制？",
+    "answer": "## 核心问题：有限窗口 vs 无限对话\n\nLLM 有固定的上下文窗口（如 GPT-4o 128K、Claude 200K tokens）。随着 Agent 执行的任务变长，对话历史 + 工具输出不断累积，最终超出窗口限制。\n\n---\n\n## 一、历史记录放入策略\n\n### 策略 1：全量保留（短任务）\n- [System Prompt] + [全部历史] + [当前问题]\n- 优点：信息完整；缺点：token 快速耗尽\n\n### 策略 2：滑动窗口（Sliding Window）\n- [System Prompt] + [最近N轮对话] + [当前问题]\n- 只保留最近 N 轮交互\n- 优点：简单高效；缺点：丢失早期重要信息\n\n### 策略 3：摘要压缩（Compaction）\n- [System Prompt] + [早期对话摘要] + [最近N轮原文] + [当前问题]\n- 当 token 数超过阈值（如 70%），触发压缩\n- 用 LLM 对旧对话生成摘要\n- **Claude Code 采用此策略**\n\n### 策略 4：分层记忆（Hierarchical Memory）\n- Working Memory（当前任务，全量保留）\n- Episodic Memory（历史会话摘要，按需检索）\n- Semantic Memory（项目知识库，RAG检索）\n- 类似人脑的记忆系统\n\n### 策略 5：选择性保留（Importance-based）\n- 用户明确指令 → 高重要性（保留原文）\n- 工具输出 → 中等重要性（可截断/摘要）\n- Agent 推理过程 → 低重要性（可删除）\n\n---\n\n## 二、Claude Code 的上下文管理\n\n### 核心机制\n1. **自动压缩**：token 接近上限时，自动用 LLM 生成前序对话摘要\n2. **文件级记忆**：通过 @file 引用文件，内容按需注入\n3. **CLAUDE.md**：项目级持久化记忆，每次会话自动加载\n4. **Tool Output 截断**：长输出自动截断，只保留关键部分\n\n### 优缺点\n- 优点：用户无需手动管理、支持大型代码库、持久化记忆\n- 缺点：压缩可能丢失关键细节、摘要质量依赖 LLM、无法精确控制保留内容\n\n---\n\n## 三、Cursor 的上下文管理\n\n### 核心机制\n1. **Codebase Indexing**：用 embedding 对整个代码库建索引\n2. **语义检索**：用户提问时，RAG 检索相关代码片段\n3. **@file/@symbol**：精确引用特定文件或符号\n\n### 优缺点\n- 优点：代码理解能力强（语义索引）、精确控制引用范围\n- 缺点：索引构建有延迟、对非代码上下文管理较弱\n\n---\n\n## 四、为什么有上下文长度限制？\n\n### 1. 计算复杂度\nSelf-Attention 计算量 = O(n² × d)，上下文翻倍 → 计算量 4 倍\n\n### 2. 显存占用\nKV Cache = O(n × layers × hidden_dim × 2)，128K 上下文 KV Cache 可占用数十 GB\n\n### 3. 注意力稀释（Lost in the Middle）\nLLM 对上下文中间位置信息利用效果差，超长上下文增加成本还降低质量\n\n### 4. 长上下文优化前沿\nRing Attention（无限上下文）、KV Cache 压缩（H2O、StreamingLLM）、稀疏注意力\n\n---\n\n## 五、自研 Code Agent 的改进空间\n\n| 维度 | 现有方案 | 改进方向 |\n|------|---------|--------|\n| 压缩触发 | 固定阈值 | 自适应（根据任务复杂度动态调整）|\n| 记忆粒度 | 消息级 | 语义级（按代码逻辑块压缩）|\n| 跨文件 | 全量/不加载 | AST 级别索引 |\n| 持久化 | 无/简单 | 向量数据库 + 项目知识图谱 |",
+    "follow_up": [
+      "如何评估上下文压缩后的信息损失率？",
+      "KV Cache 压缩技术（如 StreamingLLM）的原理是什么？",
+      "Lost in the Middle 问题如何缓解？",
+      "如何设计 Agent 的断点恢复（Checkpoint）机制？"
+    ],
+    "feynman": {
+      "essence": "上下文管理就是「在有限的窗口里放最有价值的信息」——核心矛盾是信息无限但窗口有限，需要聪明的策略来取舍。",
+      "analogy": "想象你是一个外科医生在做 10 小时手术。你不能记住每一秒细节，但你会：(1) 记住手术方案（System Prompt）(2) 记住最近几分钟操作（滑动窗口）(3) 对早些时候操作做笔记摘要（压缩）(4) 遇到不确定查病历（RAG检索）。Agent 的上下文管理就是模拟这个过程。",
+      "key_points": [
+        "5种策略：全量→滑动窗口→摘要压缩→分层记忆→选择性保留",
+        "Claude Code：自动压缩+文件引用+CLAUDE.md持久记忆",
+        "Cursor：Codebase Indexing+RAG语义检索+精确@引用",
+        "上下文限制根因：O(n²)计算+KV Cache显存+注意力稀释"
+      ]
+    },
+    "first_principle": {
+      "problem": "LLM 的上下文窗口是有限的物理约束（计算 O(n²)、显存 KV Cache、注意力稀释），但 Agent 执行复杂任务产生的信息量是无限的。如何找到最优解？",
+      "axioms": [
+        "Attention 计算复杂度 O(n²) — 序列越长计算量平方增长",
+        "KV Cache 显存 = O(n × L × d) — 线性增长但常数极大",
+        "Lost in the Middle — 超长上下文中间信息利用率低",
+        "信息有不同重要性 — 用户指令 > 工具结果 > 中间推理"
+      ],
+      "rebuild": "从「窗口有限」出发：(1) 直接截断 → 滑动窗口 (2) 压缩旧内容 → 摘要策略 (3) 分层存储 → 工作记忆+长期记忆+知识库 (4) 按需检索 → RAG (5) 精确引用 → @file/@symbol。最优解是分层记忆+自适应压缩+语义检索的组合。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Agent开发岗二面全攻略》(字节Agent开发二面)"
+  },
+  {
+    "id": "note-bd-agent-003",
+    "category": "ai",
+    "subcategory": "Transformer",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "Agent",
+      "Transformer",
+      "面经",
+      "架构"
+    ],
+    "question": "介绍一下 Transformer 架构？（Agent 开发岗面试视角）",
+    "answer": "## 一句话概括\n\nTransformer 是一种基于 **Self-Attention（自注意力机制）** 的序列建模架构，通过并行计算和全局信息交互，彻底解决了 RNN 的长距离依赖和串行计算问题。\n\n---\n\n## 整体架构\n\n原始 Transformer 是 Encoder-Decoder 结构：\n- **Encoder Block × N**：Multi-Head Self-Attention + Add&Norm → Feed Forward + Add&Norm\n- **Decoder Block × N**：Masked Self-Attention + Add&Norm → Cross-Attention (Q来自Decoder, KV来自Encoder) + Add&Norm → Feed Forward + Add&Norm\n- 输出：Linear + Softmax → Output\n\n现代 LLM（GPT/Llama/Claude）几乎都是 **Decoder-Only** 架构。\n\n---\n\n## 核心组件详解\n\n### 1. Self-Attention（核心中的核心）\n\n公式：Attention(Q, K, V) = softmax(QK^T / √d_k) × V\n- Q = X × W_Q（Query: 我在找什么）\n- K = X × W_K（Key: 我有什么可提供）\n- V = X × W_V（Value: 实际提供的内容）\n- 每个位置同时关注所有其他位置\n- √d_k 缩放防止 softmax 饱和\n- **复杂度 O(n²)** — 上下文长度限制的根本原因\n\n### 2. Multi-Head Attention\n- 不同 head 学习不同的注意力模式（类似 CNN 多通道）\n- head 数量 × 每个 head 维度 = 总维度\n- Concat(head_1, ..., head_h) × W_O\n\n### 3. Positional Encoding\n- Self-Attention 本身没有位置感知\n- 原始论文用 sin/cos 编码\n- **RoPE（旋转位置编码）** 是现代 LLM 主流选择（Llama/GPT-4）\n\n### 4. Feed Forward Network (FFN)\n- 两层 MLP + ReLU 激活\n- 现代 LLM 用 SwiGLU（Llama 系列）\n- 每个 token 独立处理\n\n### 5. Add & Norm（残差连接 + Layer Normalization）\n- 残差连接：解决梯度消失，允许深层网络\n- LayerNorm：稳定训练\n\n---\n\n## 三种 Transformer 变体\n\n| 架构 | 代表模型 | 特点 |\n|------|---------|------|\n| Encoder-Only | BERT | 双向注意力，适合理解任务 |\n| Decoder-Only | GPT/Llama/Claude | 单向注意力（causal mask），适合生成 |\n| Encoder-Decoder | T5/BART | 适合 seq2seq（翻译/摘要）|\n\nDecoder-Only 成为主流因为：自回归生成能力强、预训练效率高（next token prediction）、Scaling Law 友好。\n\n---\n\n## 面试加分点（Agent 开发视角）\n\n1. **KV Cache**：推理时缓存历史 K/V，避免重复计算 → 解释上下文越长推理越慢\n2. **Flash Attention**：IO-aware 优化，减少 HBM 读写\n3. **MoE（Mixture of Experts）**：每个 token 只激活部分 FFN，参数量大但计算量小\n4. **对 Agent 的影响**：上下文窗口=Attention 覆盖范围；Lost in the Middle→Agent长对话信息丢失；O(n²)→超长对话推理成本",
+    "follow_up": [
+      "为什么现代 LLM 都用 Decoder-Only 而不是 Encoder-Decoder？",
+      "KV Cache 的原理是什么？为什么能加速推理？",
+      "RoPE 旋转位置编码相比绝对位置编码有什么优势？",
+      "MoE 架构如何实现「参数量大但计算量小」？",
+      "Flash Attention 如何优化 Attention 的计算？"
+    ],
+    "feynman": {
+      "essence": "Transformer 的核心就是 Self-Attention——让序列中每个位置都能同时「看到」所有其他位置，通过注意力权重决定该关注谁，从而实现全局信息交互。",
+      "analogy": "想象一个会议室里有 N 个人。RNN 是传话游戏——第 1 个人告诉第 2 个，第 2 个告诉第 3 个，传到最后信息早就失真了。Transformer 是全员会议——每个人同时看到所有人的发言，通过「注意力」决定重点听谁的。这就是为什么 Transformer 能处理长文本而 RNN 不行。",
+      "key_points": [
+        "核心公式：Attention(Q,K,V) = softmax(QK^T/√d_k)V",
+        "Encoder-Decoder架构，现代LLM只用Decoder-Only",
+        "Multi-Head = 多组Q/K/V并行，学不同模式",
+        "O(n²)复杂度是上下文长度的根本限制",
+        "位置编码注入序列顺序信息(RoPE为主流)"
+      ]
+    },
+    "first_principle": {
+      "problem": "RNN 的两个根本缺陷：(1) 串行计算无法并行化 (2) 长距离信息通过隐藏状态传递会逐层衰减。如何设计一个既支持并行计算又能建模长距离依赖的序列模型？",
+      "axioms": [
+        "并行计算需要消除序列依赖（每步不能依赖前一步的结果）",
+        "长距离依赖需要直接的全局信息通路",
+        "注意力机制是最自然的全局信息交互方式",
+        "位置信息需要额外注入（Self-Attention本身位置无关）"
+      ],
+      "rebuild": "从「全局直接交互」出发：(1) 每个位置直接与所有位置计算相似度 → Self-Attention (2) 多种相似度模式 → Multi-Head (3) 注入位置 → Positional Encoding (4) 增加非线性 → FFN (5) 稳定深层训练 → Add&Norm。这就是 Transformer 的完整推导。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Agent开发岗二面全攻略》(字节Agent开发二面)"
+  },
+  {
+    "id": "note-bd-agent-004",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "Agent",
+      "自研",
+      "开源",
+      "工程决策",
+      "面经"
+    ],
+    "question": "为什么不使用 GitHub 上开源的 Agent 框架（如 OpenClaw/OpenHands），而要自己写一个 Code Agent？",
+    "answer": "## 核心矛盾：用开源 vs 自研\n\n这不是非此即彼的选择，而是**工程决策**问题。面试官想考察的是你对 trade-off 的理解能力。\n\n---\n\n## 一、选择自研的合理理由\n\n### 1. 深度学习\n- 使用开源框架只是「调 API」，学不到底层原理\n- 自建 Harness 才能真正理解 Agent 的每个环节\n- 面试加分话术：「我用过 OpenClaw，但发现不理解内部机制就无法有效 debug 和优化，所以决定从零实现」\n\n### 2. 定制化需求\n- 特定领域工具集成（如金融分析、法律检索）\n- 自定义上下文管理策略（如基于 AST 的代码压缩）\n- 特定模型适配（如本地部署的开源模型）\n- 特殊安全需求（如内网隔离、数据不出域）\n\n### 3. 性能优化\n- 开源框架追求通用性，特定场景下有冗余\n- 自研可针对特定任务做极致优化（减少不必要的 LLM 调用、优化 prompt 结构）\n\n### 4. 面试项目差异化\n- 每个人都能跑 OpenClaw，自研才能体现技术深度\n\n---\n\n## 二、选择开源的合理理由\n\n1. **快速验证**：用开源快速验证 MVP，站在巨人肩膀上\n2. **社区生态**：活跃社区、丰富插件、文档支持\n3. **标准化**：遵循行业最佳实践，新人入职容易上手\n\n---\n\n## 三、最佳实践：Hybrid 策略\n\n| 模块 | 开源 | 自研 |\n|------|------|------|\n| LLM 调用 | LiteLLM / 直接 API | - |\n| 工具系统 | - | 核心差异化 |\n| 上下文管理 | - | 核心差异化 |\n| 追踪日志 | LangSmith / Phoenix | - |\n| 框架骨架 | 参考但不直接依赖 | 自研 |\n\n---\n\n## 四、面试回答模板\n\n> 「我调研了 OpenClaw、Aider 等开源框架，发现它们的通用设计在特定场景下有优化空间。比如 OpenClaw 的上下文管理使用简单的滑动窗口，而我的 Pico 项目实现了基于代码 AST 的语义级压缩，在代码修改任务上信息保留率更高。选择自研的核心目的是深度理解 Agent 的每个组件，并能针对特定场景做极致优化。在生产环境中，我会采用 Hybrid 策略——核心差异化模块自研，基础设施模块使用成熟开源。」\n\n---\n\n## 五、对比行业 SOTA\n\n| 维度 | Claude Code | OpenClaw/OpenHands | Cursor | Aider |\n|------|------------|---------------------|--------|-------|\n| 工具系统 | 内置丰富工具 | 4个基础工具 | IDE集成 | Git-aware |\n| 上下文管理 | 自动压缩+CLAUDE.md | 滑动窗口 | Codebase Indexing | Repo Map |\n| 模型支持 | 仅Claude | 多模型 | 多模型 | 多模型 |\n| 开源 | 否 | 是 | 否 | 是 |",
+    "follow_up": [
+      "如果团队有 10 个工程师，你会建议自研还是用开源？",
+      "自研 Agent 的最大风险是什么？如何规避？",
+      "如何衡量自研 Agent 与开源框架的性能差异？",
+      "你认为未来 Agent 框架会标准化还是继续碎片化？"
+    ],
+    "feynman": {
+      "essence": "自研 vs 开源不是技术问题，而是工程决策问题——核心是在「学习深度」「定制化能力」「开发效率」「维护成本」之间找到最优 trade-off。",
+      "analogy": "就像开车：你可以买现成的车（开源框架），省事但改不了发动机。你也可以自己造车（自研），费时费力但每个零件都可控。最聪明的做法是先自己造一辆理解原理，然后日常开买来的车，但关键零件（如发动机调校）自己定制。",
+      "key_points": [
+        "自研理由：深度学习+定制化+性能优化+面试差异化",
+        "开源优势：快速验证+社区生态+标准化",
+        "最佳实践：核心自研+基础设施开源(Hybrid)",
+        "面试关键：展示对trade-off的理解而非一味自研"
+      ]
+    },
+    "first_principle": {
+      "problem": "Agent 框架是复杂的系统工程，既需要通用基础设施（LLM调用、日志、安全），又需要领域特定定制（工具、上下文策略、业务逻辑）。如何在自研和开源之间做最优决策？",
+      "axioms": [
+        "工程决策的核心是 ROI = 收益 / 成本",
+        "自研收益=深度理解+定制化+差异化；自研成本=时间+维护+风险",
+        "开源收益=效率+稳定性+生态；开源成本=黑盒+依赖+定制受限",
+        "不同阶段最优解不同（学习期→自研，生产期→Hybrid）"
+      ],
+      "rebuild": "从 ROI 出发：(1) 学习阶段：自研收益（理解原理）>> 成本 → 自研 (2) 验证阶段：开源收益（快速MVP）>> 成本 → 二开 (3) 生产阶段：核心模块自研收益（差异化竞争力）> 成本，非核心开源收益（稳定性）> 成本 → Hybrid。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Agent开发岗二面全攻略》(字节Agent开发二面)"
   }
 ]

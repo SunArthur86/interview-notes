@@ -4,20 +4,123 @@
     "category": "algorithm",
     "subcategory": "DP",
     "difficulty": "L3",
-    "tags": ["动态规划", "DP", "LeetCode"],
+    "tags": [
+      "动态规划",
+      "DP",
+      "LeetCode"
+    ],
     "question": "动态规划解题框架？怎么判断一道题该用DP？",
     "answer": "判断该用DP的三个信号：\n1. 最优子结构 — 问题的最优解包含子问题的最优解\n2. 重叠子问题 — 子问题会被重复计算\n3. 无后效性 — 当前状态只依赖之前的状态\n\nDP解题五步法：\n1. 定义状态 — dp[i] 代表什么？（最关键！）\n2. 推导转移方程 — dp[i] 和 dp[i-1] 的关系\n3. 确定初始值 — dp[0]=? dp[1]=?\n4. 确定遍历顺序 — 从小到大？\n5. 空间优化 — 能否用滚动数组替代？\n\n常见DP模型：\n- 一维DP: dp[i]=前i个的最优（爬楼梯/打家劫舍）\n- 二维DP: dp[i][j]=区间/匹配（LCS/编辑距离）\n- 背包DP: dp[i][j]=容量j前i物品（0-1背包）\n- 区间DP: dp[i][j]=区间[i,j]（戳气球）\n- 树形DP: dp[node]=以node为根（打家劫舍III）",
-    "follow_up": ["DP和贪心的区别？", "记忆化搜索和递推哪个好？"],
+    "follow_up": [
+      "DP和贪心的区别？",
+      "记忆化搜索和递推哪个好？"
+    ],
     "feynman": {
       "essence": "DP = 从小问题开始记录答案，大问题直接查表不重复算。关键是定义好状态（dp[i]代表什么）。",
       "analogy": "DP像做数学题写过程——先算小步骤（1+1=2），把结果写在草稿纸上（dp数组），后面的大步骤直接看草稿纸不用重算。",
-      "key_points": ["三个信号：最优子结构+重叠子问题+无后效性", "五步法：状态到转移到初始值到遍历到优化", "状态定义是最关键的", "先写出暴力递归再加备忘录"]
+      "key_points": [
+        "三个信号：最优子结构+重叠子问题+无后效性",
+        "五步法：状态到转移到初始值到遍历到优化",
+        "状态定义是最关键的",
+        "先写出暴力递归再加备忘录"
+      ]
     },
     "first_principle": {
       "problem": "递归解法中大量子问题被重复计算，如何避免重复计算同时保证正确性？",
-      "axioms": ["最优子结构保证分解的正确性", "重叠子问题保证记忆化的收益", "无后效性保证状态转移的完整性"],
+      "axioms": [
+        "最优子结构保证分解的正确性",
+        "重叠子问题保证记忆化的收益",
+        "无后效性保证状态转移的完整性"
+      ],
       "rebuild": "从暴力递归出发：哪些子问题被重复计算了？能否缓存结果（备忘录）？能否自底向上递推（DP数组）？状态怎么定义最简洁？"
     },
     "images": []
+  },
+  {
+    "id": "note-algo-bd-002",
+    "category": "algorithm",
+    "subcategory": "数组",
+    "difficulty": "L2",
+    "tags": [
+      "字节",
+      "数组",
+      "滑动窗口",
+      "哈希表",
+      "面经"
+    ],
+    "question": "最长无重复子串（LeetCode 3）",
+    "answer": "## 题目\n给定一个字符串，找出其中不含有重复字符的最长子串的长度。\n\n## 解法：滑动窗口 + 哈希表\n\n### 思路\n维护一个滑动窗口 [left, right]，保证窗口内无重复字符。用 HashMap 记录每个字符最后出现的位置。当遇到重复字符时，移动 left 到重复字符上次出现位置 + 1。\n\n### 代码\n```java\npublic int lengthOfLongestSubstring(String s) {\n    Map<Character, Integer> map = new HashMap<>();\n    int left = 0, maxLen = 0;\n    for (int right = 0; right < s.length(); right++) {\n        char c = s.charAt(right);\n        if (map.containsKey(c) && map.get(c) >= left) {\n            left = map.get(c) + 1; // 移动左边界\n        }\n        map.put(c, right);\n        maxLen = Math.max(maxLen, right - left + 1);\n    }\n    return maxLen;\n}\n```\n\n### 复杂度\n- 时间 O(n)：每个字符最多访问两次（left和right各一次）\n- 空间 O(min(m,n))：m为字符集大小\n\n### 示例\n输入: \"abcabcbb\"\n过程: \n- right=0(a): 窗口[a], len=1\n- right=1(b): 窗口[ab], len=2\n- right=2(c): 窗口[abc], len=3\n- right=3(a): 重复！left移到1, 窗口[bca], len=3\n- right=4(b): 重复！left移到2, 窗口[cab], len=3\n- right=5(c): 重复！left移到3, 窗口[abc], len=3\n- right=6(b): 重复！left移到5, 窗口[cb], len=2\n- right=7(b): 重复！left移到7, 窗口[b], len=1\n输出: 3",
+    "follow_up": [
+      "如果要求返回最长无重复子串本身（而不是长度），怎么改？",
+      "如果有多个等长的最长子串，如何全部返回？",
+      "滑动窗口的 left 移动逻辑为什么是 map.get(c)+1 而不是直接跳到 right？",
+      "如果字符集已知（如只有小写字母），可以用什么优化？"
+    ],
+    "feynman": {
+      "essence": "滑动窗口维护一个无重复字符的区间，遇到重复就把窗口左边界跳过重复位置。本质是「双指针+哈希表」的高效搜索。",
+      "analogy": "就像在书架上找连续不重复的书。右手不断拿新书（right++），如果拿到的书在当前架段已经有了，左手就把架段左边一直推到那本重复书之后。过程中记录最长的架段长度。",
+      "key_points": [
+        "滑动窗口: 维护[left,right]无重复区间",
+        "HashMap记录字符最后位置,遇到重复移动left",
+        "left = map.get(c)+1 跳过重复字符",
+        "时间O(n),空间O(min(m,n))"
+      ]
+    },
+    "first_principle": {
+      "problem": "在字符串中找最长的无重复子串。暴力法 O(n³) 太慢（枚举所有子串+检查重复），如何高效搜索？",
+      "axioms": [
+        "无重复子串是一个连续区间",
+        "如果区间[l,r]无重复，则[l,r-1]也无重复（单调性）",
+        "单调性使得双指针/滑动窗口适用",
+        "哈希表可以O(1)判断重复"
+      ],
+      "rebuild": "从「区间搜索」出发：(1) 双指针维护区间 → 滑动窗口 (2) HashMap记录位置 → O(1)判断重复 (3) 遇到重复跳过 → left移动 (4) 每步更新最大值。时间从O(n³)优化到O(n)。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
+  },
+  {
+    "id": "note-algo-bd-003",
+    "category": "algorithm",
+    "subcategory": "链表",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "链表",
+      "K个一组翻转",
+      "递归",
+      "迭代",
+      "面经"
+    ],
+    "question": "K个一组翻转链表（LeetCode 25，字节二面高频）",
+    "answer": "## 题目\n每 k 个节点一组进行翻转，不足 k 个的保持原样。\n\n## 解法1：迭代\n```java\npublic ListNode reverseKGroup(ListNode head, int k) {\n    ListNode dummy = new ListNode(0, head);\n    ListNode prev = dummy;\n    \n    while (head != null) {\n        // 1. 找到一组的末尾（走k-1步）\n        ListNode tail = head;\n        for (int i = 1; i < k && tail != null; i++) {\n            tail = tail.next;\n        }\n        if (tail == null) break; // 不足k个，不翻转\n        \n        // 2. 记录下一组起点\n        ListNode next = tail.next;\n        \n        // 3. 翻转[head, tail]\n        reverse(head, tail);\n        \n        // 4. 连接\n        prev.next = tail;  // prev指向翻转后的头\n        head.next = next;  // 原head变成尾，指向下一组\n        \n        // 5. 移动指针\n        prev = head;\n        head = next;\n    }\n    return dummy.next;\n}\n\n// 翻转[head, tail]区间\nprivate void reverse(ListNode head, ListNode tail) {\n    ListNode prev = null, curr = head;\n    while (prev != tail) {\n        ListNode next = curr.next;\n        curr.next = prev;\n        prev = curr;\n        curr = next;\n    }\n}\n```\n\n## 解法2：递归（更简洁）\n```java\npublic ListNode reverseKGroup(ListNode head, int k) {\n    // 1. 检查剩余是否够k个\n    ListNode curr = head;\n    for (int i = 0; i < k; i++) {\n        if (curr == null) return head; // 不足k个，不翻转\n        curr = curr.next;\n    }\n    // 2. 翻转前k个\n    ListNode newHead = reverse(head, curr);\n    // 3. head现在是这组的尾，连接下一组\n    head.next = reverseKGroup(curr, k);\n    return newHead;\n}\n\nprivate ListNode reverse(ListNode a, ListNode b) {\n    ListNode prev = null, curr = a;\n    while (curr != b) {\n        ListNode next = curr.next;\n        curr.next = prev;\n        prev = curr;\n        curr = next;\n    }\n    return prev;\n}\n```\n\n## 复杂度\n- 时间 O(n)：每个节点访问一次\n- 空间：迭代 O(1)，递归 O(n/k)",
+    "follow_up": [
+      "递归和迭代解法各自的优缺点？",
+      "如果要求从链表末尾开始K个一组翻转，怎么做？",
+      "这道题考察的核心能力是什么？",
+      "如果 k 大于链表长度，直接返回原链表吗？"
+    ],
+    "feynman": {
+      "essence": "K个一组翻转 = 把链表切成K长度的段，每段单独翻转后重新连接。递归法最直观：翻转前K个，递归处理剩下的，然后拼接。",
+      "analogy": "就像火车编组。一列火车有N节车厢，每K节一组重新排列（翻转顺序）。先拆出前K节翻转，再翻转后面的K节，最后拼接。不足K节的不动。",
+      "key_points": [
+        "核心: 分组→翻转→连接→下一组",
+        "迭代: dummy节点+prev/head/tail/next四指针",
+        "递归: 翻转前K个→递归处理剩余→拼接",
+        "不足K个不翻转（先检查再操作）"
+      ]
+    },
+    "first_principle": {
+      "problem": "链表是顺序结构，翻转需要改变指针方向。K个一组增加了分组判断和组间连接的复杂度。",
+      "axioms": [
+        "链表翻转=改变next指针方向",
+        "分组翻转需要维护组间连接",
+        "不足K个不翻转（边界条件）",
+        "翻转区间[a,b)是一个独立的子问题"
+      ],
+      "rebuild": "从「翻转链表」出发：(1) 单链表翻转 → 基础操作 (2) 分组判断 → 检查够不够K个 (3) 翻转后连接 → prev→新头, 旧头→next组 (4) 迭代/递归 → 两种思路。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端二面面经》(项目架构深挖，图片OCR)"
   }
 ]

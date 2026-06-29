@@ -92,5 +92,270 @@
     },
     "images": [],
     "source": "小红书帖子《字节面试后端有多卷？标准公开》- 一面考核点"
+  },
+  {
+    "id": "note-bd-mysql-003",
+    "category": "database",
+    "subcategory": "MySQL索引",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "InnoDB",
+      "聚簇索引",
+      "二级索引",
+      "回表",
+      "面经"
+    ],
+    "question": "InnoDB 聚簇索引、二级索引底层结构，回表查询完整流程？",
+    "answer": "## 聚簇索引（Clustered Index）\n\n聚簇索引 = B+树的叶子节点存储**完整行数据**。一张表只有一个聚簇索引（通常就是主键）。\n\n### 要点\n- 主键即数据本身：叶子节点存的是完整行，而不是行指针\n- 选择规则：显式主键 → 第一个唯一非空索引 → 隐藏ROW_ID\n- 推荐自增主键：顺序插入不触发页分裂\n\n## 二级索引（Secondary Index）\n\n二级索引 = B+树叶子节点存**主键值**（不是行数据）。\n\n## 回表流程\n\nSELECT * FROM users WHERE name = '李四';\n\n步骤1: 查二级索引 idx_name → B+树找到 name='李四' 对应的主键 ID=7\n步骤2: 回表查聚簇索引 → 在聚簇索引 B+树中用 ID=7 查到完整行数据\n总共 2 次 B+树查找\n\n## 覆盖索引优化\n\n如果 SELECT 的列都在索引中，就不需要回表：\n- SELECT * FROM users WHERE name = '李四'; → 需要回表\n- SELECT id, name FROM users WHERE name = '李四'; → 覆盖索引，不回表（idx_name包含name和主键id）",
+    "follow_up": [
+      "为什么 InnoDB 推荐用自增 ID 做主键而不是 UUID？",
+      "什么是最左前缀匹配原则？联合索引 (a,b,c) 查 WHERE b=1 能命中索引吗？",
+      "什么是页分裂？什么时候触发？对性能有什么影响？",
+      "如何通过 EXPLAIN 判断是否走了索引？"
+    ],
+    "feynman": {
+      "essence": "聚簇索引就是「数据和索引在一起」（B+树叶子存行数据），二级索引就是「索引和数据分开」（B+树叶子存主键），查二级索引找不到完整数据就需要回表去聚簇索引找。",
+      "analogy": "聚簇索引就像图书馆的「按编号排列」——书架上的书按编号排，找到编号就找到书了。二级索引就像「按书名排列的目录卡片」——卡片上写了书名和编号，你先查目录找到编号，再去书架取书（回表）。如果你只查书名和编号，看卡片就够了（覆盖索引），不用去书架。",
+      "key_points": [
+        "聚簇索引: B+树叶子存完整行数据，一张表只有一个",
+        "二级索引: B+树叶子存主键值，需要回表获取完整数据",
+        "回表=两次B+树查找: 二级索引→主键→聚簇索引→行数据",
+        "覆盖索引: 查询列都在索引中，避免回表"
+      ]
+    },
+    "first_principle": {
+      "problem": "数据库需要支持多种查询条件（不同列），但聚簇索引只能有一个。如何高效支持非主键列的查询？",
+      "axioms": [
+        "聚簇索引只有一棵B+树（主键）",
+        "其他查询条件也需要索引加速",
+        "二级索引的叶子节点不存行数据（节省空间）",
+        "通过主键关联可以实现两次查找"
+      ],
+      "rebuild": "从「多维度查询」出发：(1) 额外建B+树 → 二级索引 (2) 叶子节点存主键而非行数据 → 节省空间 (3) 需要完整数据时回表 → 聚簇索引查找 (4) 避免回表 → 覆盖索引。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
+  },
+  {
+    "id": "note-bd-mysql-004",
+    "category": "database",
+    "subcategory": "MySQL事务",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "MySQL",
+      "MVCC",
+      "undo log",
+      "read view",
+      "隔离级别",
+      "面经"
+    ],
+    "question": "MVCC 实现原理？undo log 版本链 + read view 如何实现隔离？",
+    "answer": "## MVCC（多版本并发控制）\n\nMVCC 通过保存数据的多个版本，实现「读写不互相阻塞」——读操作读取历史快照，写操作创建新版本。\n\n## 核心组件\n\n### 1. 隐藏字段（每行都有）\n- DB_TRX_ID：最后一次修改该行的事务ID\n- DB_ROLL_PTR：指向 undo log 中上一个版本的指针\n- DB_ROW_ID：隐藏主键（无显式主键时）\n\n### 2. undo log 版本链\n每次修改都生成一个旧版本快照，通过 DB_ROLL_PTR 串成链表。\n当前行 v3(trx_id=300) → undo log v2(trx_id=200) → undo log v1(trx_id=100)\n\n### 3. Read View（读视图）\n事务在执行 SELECT 时生成 Read View，包含：\n- m_ids：当前活跃（未提交）的事务ID列表\n- min_trx_id：m_ids 中的最小值\n- max_trx_id：下一个要分配的事务ID\n- creator_trx_id：当前事务的ID\n\n## 可见性判断算法\n\n对于版本链中某个版本的 trx_id：\n1. trx_id == creator_trx_id → 可见（自己修改的）\n2. trx_id < min_trx_id → 可见（修改已完成且已提交）\n3. trx_id >= max_trx_id → 不可见（修改在Read View之后）\n4. min_trx_id <= trx_id < max_trx_id:\n   - trx_id 在 m_ids 中 → 不可见（修改事务还未提交）\n   - trx_id 不在 m_ids 中 → 可见（修改事务已提交）\n不可见就沿着 DB_ROLL_PTR 找上一个版本，直到找到可见的。\n\n## 不同隔离级别的 Read View 策略\n- RC（读已提交）：每次 SELECT 都生成新的 Read View → 能读到已提交的最新数据\n- RR（可重复读）：只在第一次 SELECT 时生成 Read View → 整个事务读到的数据一致",
+    "follow_up": [
+      "RC 和 RR 隔离级别下 MVCC 的行为有什么区别？",
+      "MVCC 能完全解决幻读吗？什么场景下还会出现幻读？",
+      "undo log 版本链什么时候清理？什么是 purge 线程？",
+      "MVCC 和乐观锁（OCC）有什么关系和区别？"
+    ],
+    "feynman": {
+      "essence": "MVCC 就是「给每行数据拍照存档，读的时候看旧照片」，这样正在写的人不会挡住读的人。Read View 就是决定你能看到哪张照片的规则。",
+      "analogy": "想象 Wikipedia 的编辑系统。有人正在编辑某词条（写操作），但读者看到的仍然是旧版本（历史快照）。每条修改记录通过「查看历史」链接串联起来（undo log 版本链）。Read View 就像「你在这个时间点打开页面，看到的就是当时的版本」，不管之后别人怎么改。",
+      "key_points": [
+        "三要素: 隐藏字段(trx_id/roll_ptr) + undo log版本链 + Read View",
+        "可见性: trx_id < min可见, 在m_ids中不可见, 沿指针回溯",
+        "RC: 每次SELECT新建Read View; RR: 只第一次创建",
+        "效果: 读写不阻塞(读快照写新版本)"
+      ]
+    },
+    "first_principle": {
+      "problem": "传统锁机制下读写互相阻塞（读阻塞写、写阻塞读），高并发场景性能差。如何让读操作不阻塞写操作？",
+      "axioms": [
+        "同一数据可以存在多个版本（快照）",
+        "读操作可以读历史版本，写操作创建新版本",
+        "事务隔离需要知道「哪些版本对自己可见」",
+        "Read View 是可见性的判定依据"
+      ],
+      "rebuild": "从「读写分离」出发：(1) 每次修改保存旧版本 → undo log版本链 (2) 标记每个版本的修改者 → 隐藏字段trx_id (3) 判定可见性 → Read View算法 (4) RC/RR用不同Read View策略 → 实现不同隔离级别。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
+  },
+  {
+    "id": "note-bd-mysql-005",
+    "category": "database",
+    "subcategory": "MySQL锁",
+    "difficulty": "L4",
+    "tags": [
+      "字节",
+      "MySQL",
+      "幻读",
+      "间隙锁",
+      "临键锁",
+      "Next-Key Lock",
+      "面经"
+    ],
+    "question": "MySQL RR 隔离级别如何解决幻读？间隙锁、临键锁触发场景？",
+    "answer": "## 幻读问题\n\n幻读：同一事务内两次查询，第二次出现了「新行」（不是已有行被修改）。\n\n## InnoDB 的锁类型\n\n### 1. Record Lock（记录锁）\n锁定索引上的一条记录。\n\n### 2. Gap Lock（间隙锁）\n锁定索引记录之间的「间隙」，防止插入。例如索引[5,10,15,20]，间隙锁(10,15)防止插入id=12。\n\n### 3. Next-Key Lock（临键锁 = Record + Gap）\n锁定一个左开右闭区间。例如索引[5,10,15,20]的Next-Key: (-∞,5], (5,10], (10,15], (15,20], (20,+∞)\n\n## RR 解决幻读的机制\n\n### 快照读（普通 SELECT）\n通过 MVCC Read View 解决 → 读历史快照，不受其他事务影响\n\n### 当前读（SELECT FOR UPDATE / INSERT / UPDATE / DELETE）\n通过 Next-Key Lock 解决：\n事务A: SELECT WHERE id > 10 FOR UPDATE;\n→ 加锁范围: (10,15], (15,20], (20,+∞)\n→ 事务B想 INSERT id=12 → 12在(10,15]范围内 → 被阻塞\n\n## 间隙锁触发场景\n- 等值查询命中记录：Record Lock + Gap Lock = Next-Key Lock\n- 等值查询未命中：只加 Gap Lock\n- 范围查询：锁定覆盖范围的所有Next-Key Lock\n\n## 注意事项\n1. 间隙锁只在 RR 隔离级别存在（RC没有）\n2. 唯一索引等值查询命中记录时，Next-Key Lock退化为Record Lock\n3. 间隙锁之间不冲突（两个事务可以同时持有同一间隙的Gap Lock）\n4. 间隙锁会阻止INSERT，但不阻止SELECT",
+    "follow_up": [
+      "RC 隔离级别为什么没有间隙锁？有什么影响？",
+      "死锁和间隙锁有什么关系？如何排查间隙锁导致的死锁？",
+      "如何查看当前 MySQL 的锁情况？",
+      "SELECT FOR UPDATE 在不同隔离级别下的锁行为有什么区别？"
+    ],
+    "feynman": {
+      "essence": "RR 解决幻读靠两招：快照读用 MVCC（读旧版本），当前读用 Next-Key Lock（锁住间隙防止插入）。",
+      "analogy": "想象图书馆防止「凭空多出书」。普通看书（快照读）你看到的是拍照那一刻的照片，后来别人放的新书你看不到。但如果你要「确认书架上有哪些书」（当前读），管理员会在空隙处贴封条（间隙锁），别人就不能在封条的间隙里塞新书了。",
+      "key_points": [
+        "幻读=新行出现（不同于脏读/不可重复读）",
+        "快照读: MVCC Read View 解决",
+        "当前读: Next-Key Lock = Record Lock + Gap Lock",
+        "间隙锁锁定索引间隙防INSERT，只在RR存在"
+      ]
+    },
+    "first_principle": {
+      "problem": "并发事务中，一个事务在范围查询后需要保证范围不变，但其他事务可能在该范围插入新行，导致结果不一致（幻读）。",
+      "axioms": [
+        "MVCC 解决不可重复读（已存在行的修改）",
+        "幻读是「新行出现」问题，需要阻止范围内的新插入",
+        "锁住记录之间的间隙可以防止插入",
+        "Next-Key Lock = Record Lock + Gap Lock 覆盖完整范围"
+      ],
+      "rebuild": "从「防止幻读」出发：(1) 快照读→MVCC读旧版本 (2) 当前读→需要锁住查询范围 (3) 锁记录+锁间隙→Next-Key Lock (4) 唯一索引等值命中→退化为Record Lock。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
+  },
+  {
+    "id": "note-bd-mysql-006",
+    "category": "database",
+    "subcategory": "MySQL锁",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "MySQL",
+      "死锁",
+      "排查",
+      "面经"
+    ],
+    "question": "死锁产生条件，如何定位和避免数据库死锁？",
+    "answer": "## 死锁四个必要条件\n1. 互斥：资源同一时刻只能被一个事务持有\n2. 持有并等待：事务持有资源A的同时等待资源B\n3. 不可剥夺：资源不能被强制抢占\n4. 循环等待：事务A等B的资源，B等A的资源\n\n## MySQL 死锁典型场景\n### 场景1：交叉更新\n事务A锁住id=1，事务B锁住id=2，A等id=2，B等id=1 → 死锁\n### 场景2：间隙锁冲突\n事务A的Gap Lock(10,20)和事务B的Gap Lock(15,25)互相阻塞对方的INSERT\n\n## 定位死锁\n### 方法1：SHOW ENGINE INNODB STATUS → LATEST DETECTED DEADLOCK\n### 方法2：SET GLOBAL innodb_print_all_deadlocks = ON → 写入error log\n### 方法3：SELECT * FROM performance_schema.data_locks / data_lock_waits\n\n## 避免死锁\n1. 统一加锁顺序（所有事务按相同顺序加锁）\n2. 缩短事务时间（避免事务中做RPC/文件IO）\n3. 降低隔离级别（RC没有间隙锁）\n4. 合理使用索引（无索引导致全表加锁）\n5. 设置死锁超时：SET GLOBAL innodb_lock_wait_timeout = 5\n6. InnoDB自动检测死锁并回滚代价较小的事务",
+    "follow_up": [
+      "InnoDB 的死锁检测算法是什么？有什么性能影响？",
+      "如果死锁频繁出现但无法修改代码（第三方服务），如何缓解？",
+      "分布式锁（如 Redis/ZK）的死锁和数据库死锁有什么区别？",
+      "如何监控线上死锁并自动报警？"
+    ],
+    "feynman": {
+      "essence": "死锁就是「你等我、我等你，大家都不让步」。解决方法就是打破四个必要条件之一——最实用的是统一加锁顺序（打破循环等待）。",
+      "analogy": "两个人过独木桥。A从左边走，B从右边走，走到中间谁也不让 → 死锁。解决办法：规定大家都从左往右走（统一顺序），就不会面对面卡住了。",
+      "key_points": [
+        "四条件: 互斥+持有等待+不可剥夺+循环等待",
+        "定位: SHOW ENGINE INNODB STATUS / innodb_print_all_deadlocks",
+        "避免: 统一加锁顺序+缩短事务+合理索引+设置超时",
+        "InnoDB自动检测死锁并回滚代价较小的事务"
+      ]
+    },
+    "first_principle": {
+      "problem": "并发事务竞争共享资源（锁），如果不加约束可能形成循环等待链，导致所有事务永久阻塞。",
+      "axioms": [
+        "锁是互斥资源（互斥条件）",
+        "事务持有锁后才能请求新锁（持有并等待）",
+        "死锁必须满足四个必要条件",
+        "打破任意一个条件即可防止死锁"
+      ],
+      "rebuild": "从「打破循环等待」出发：(1) 统一加锁顺序 → 破坏循环等待 (2) 缩短事务 → 减少持锁时间 (3) 超时机制 → 让系统自动恢复 (4) InnoDB 死锁检测 → 主动发现并回滚。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
+  },
+  {
+    "id": "note-bd-mysql-007",
+    "category": "database",
+    "subcategory": "MySQL索引",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "MySQL",
+      "联合索引",
+      "最左匹配",
+      "索引失效",
+      "面经"
+    ],
+    "question": "联合索引最左匹配原则，详细列举索引失效场景？",
+    "answer": "## 最左匹配原则\n\n联合索引(a,b,c)的B+树按a→b→c排序。查询必须从最左列开始：\n- WHERE a=1 → 用索引 ✅\n- WHERE a=1 AND b=2 → 用索引(a+b) ✅\n- WHERE a=1 AND b=2 AND c=3 → 用索引(a+b+c) ✅\n- WHERE b=2 → 不用索引 ❌（跳过了a）\n- WHERE a=1 AND c=3 → 只用索引(a)，c用不到 ⚠️（中间缺了b）\n\n## 范围查询中断\nWHERE a=1 AND b>5 AND c=3 → a和b用索引，但b是范围查询，c用不到（范围查询后数据在c维度无序）\n\n## 索引失效的10大场景\n1. 函数计算: WHERE YEAR(create_time)='2026' → 改为范围查询\n2. 隐式类型转换: phone字段是varchar但传int\n3. OR连接: or两边的列不全有索引\n4. LIKE前缀通配符: LIKE '%abc' 失效，LIKE 'abc%' 走索引\n5. NOT/!=/<>: 可能不走索引\n6. IS NOT NULL: 部分场景不走\n7. 联合索引不满足最左匹配\n8. ORDER BY非索引列\n9. 数据量影响: 优化器判断全表扫描更划算时放弃索引\n10. 字符集不匹配: JOIN时字符集不一致\n\n## EXPLAIN 验证\n关键字段:\n- type: ref > range > index > ALL（越左越好）\n- key: 实际使用的索引名（NULL=没用索引）\n- key_len: 使用索引的字节数（判断联合索引用了几列）\n- rows: 预估扫描行数（越小越好）\n- Extra: Using index(好) / Using filesort(差) / Using temporary(差)",
+    "follow_up": [
+      "如何通过 key_len 判断联合索引用了几列？",
+      "什么是 Index Condition Pushdown (ICP)？",
+      "ORDER BY 什么时候会触发 filesort？如何避免？",
+      "覆盖索引和 Using index 的关系是什么？"
+    ],
+    "feynman": {
+      "essence": "最左匹配 = B+树的排序规则决定了只能从左到右依次匹配。联合索引就像电话簿先按姓排再按名排，你不能跳过姓直接按名查。",
+      "analogy": "联合索引(a,b,c)就像图书馆先按大类(a)分区，再按子类(b)排列，最后按书名(c)排列。你要找书必须先确定大类，再找子类，再找书名。如果你只知道书名(c)，就得翻遍整个图书馆——索引白建了。",
+      "key_points": [
+        "最左匹配: 查询条件必须从联合索引最左列开始",
+        "范围查询中断: 范围列之后的列用不到索引",
+        "10大失效场景: 函数/隐式转换/OR/LIKE前缀/NOT等",
+        "用EXPLAIN key_len判断索引用了几列"
+      ]
+    },
+    "first_principle": {
+      "problem": "联合索引的 B+树是按多列排序的有序结构，查询利用索引的前提是能在这个有序结构上做二分查找。什么样的查询条件能利用这个有序性？",
+      "axioms": [
+        "B+树按索引列从左到右依次排序",
+        "二分查找需要确定的前缀（不能跳过中间列）",
+        "范围查询打乱后续列的有序性",
+        "索引列上的运算会破坏有序性"
+      ],
+      "rebuild": "从「有序性利用」出发：(1) 必须从最左列开始 → 最左匹配 (2) 范围查询后无序 → 范围中断 (3) 函数运算改变值 → 索引失效 (4) 隐式转换等价于函数运算 → 失效。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
+  },
+  {
+    "id": "note-bd-mysql-008",
+    "category": "database",
+    "subcategory": "MySQL优化",
+    "difficulty": "L3",
+    "tags": [
+      "字节",
+      "MySQL",
+      "慢SQL",
+      "EXPLAIN",
+      "SQL优化",
+      "面经"
+    ],
+    "question": "慢 SQL 排查完整流程，EXPLAIN 关键字各字段含义？千万级数据表优化思路？",
+    "answer": "## 慢 SQL 排查流程\n1. 开启慢查询日志: SET GLOBAL slow_query_log=ON; SET GLOBAL long_query_time=1\n2. 分析慢查询日志: mysqldumpslow -s t -t 10 slow.log\n3. EXPLAIN 分析执行计划\n4. 优化SQL/索引/表结构\n5. 验证优化效果（再次EXPLAIN）\n\n## EXPLAIN 关键字段\n- type(★): 访问类型，性能 const > eq_ref > ref > range > index > ALL\n- key(★): 实际使用的索引名，NULL表示没用索引\n- key_len(★): 索引使用长度，判断联合索引用了几列\n- rows(★): 预估扫描行数，越小越好\n- Extra(★): Using index(好，覆盖索引)/Using filesort(差)/Using temporary(差)\n\n### type 详解\n- const: 主键/唯一索引等值查询\n- eq_ref: JOIN时被驱动表用主键/唯一索引\n- ref: 非唯一索引等值查询\n- range: 索引范围查询\n- index: 全索引扫描\n- ALL: 全表扫描（最差）\n\n## 千万级数据表优化思路\n### 1. 索引优化（ROI最高）\n- 分析慢SQL加合适索引\n- 覆盖索引减少回表\n- 避免索引失效场景\n\n### 2. SQL优化\n- 避免 SELECT *，只查需要的列\n- 大分页优化: 用 WHERE id > last_id LIMIT 10 替代 LIMIT 1000000, 10\n- JOIN优化: 小表驱动大表\n\n### 3. 表结构优化\n- 合理数据类型（INT而非VARCHAR存数字）\n- 垂直拆分（冷热分离、大字段分离）\n\n### 4. 缓存\n- Redis缓存热点数据\n- 本地缓存(Caffeine/Guava)\n\n### 5. 分库分表（最终手段）\n- 垂直分表: 按字段拆分\n- 水平分表: 按行拆分（取模/范围/一致性哈希）\n\n### 字节取舍思路\n先索引优化（ROI最高）→ SQL优化 → 缓存 → 读写分离 → 最后分库分表（成本最高）。不盲目分库分表。",
+    "follow_up": [
+      "大分页深翻页性能问题的根本原因是什么？",
+      "MySQL 读写分离如何保证主从延迟下的数据一致性？",
+      "分库分表后，跨库JOIN和分布式事务怎么解决？",
+      "如何在线上安全地给千万级大表加索引？"
+    ],
+    "feynman": {
+      "essence": "慢SQL排查就是「先发现问题（慢日志）→ 分析原因（EXPLAIN）→ 对症下药（索引/SQL/架构）」。千万级优化按 ROI 排序：索引 > SQL > 缓存 > 分表。",
+      "analogy": "就像看病。慢日志=体检报告发现异常指标。EXPLAIN=X光片看内部结构。索引优化=对症吃药（效果最好成本最低）。分库分表=做大手术（效果好但成本高恢复慢），不应该第一步就做手术。",
+      "key_points": [
+        "排查: 慢日志→mysqldumpslow→EXPLAIN→优化→验证",
+        "EXPLAIN关键字段: type/key/key_len/rows/Extra",
+        "千万级优化优先级: 索引>SQL>缓存>读写分离>分库分表",
+        "不盲目分库分表，按ROI排序逐步优化"
+      ]
+    },
+    "first_principle": {
+      "problem": "千万级数据表的查询性能下降，需要系统化的方法定位瓶颈并优化。不同优化手段的投入产出比差异巨大。",
+      "axioms": [
+        "索引是最性价比的优化（加一个索引可能提升100倍）",
+        "SQL写法直接影响执行计划",
+        "缓存是最通用的加速手段",
+        "分库分表成本最高（架构复杂度激增）"
+      ],
+      "rebuild": "从ROI出发：(1) 索引优化→90%的问题 (2) SQL优化→解决N+1/深翻页/多余JOIN (3) 缓存→读多写少场景 (4) 读写分离→读压力大 (5) 分库分表→写压力大且单表超限。按需逐步升级。"
+    },
+    "images": [],
+    "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
   }
 ]
