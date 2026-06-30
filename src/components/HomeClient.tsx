@@ -205,12 +205,6 @@ export default function HomeClient({ questions }: { questions: Question[] }) {
         e.preventDefault();
         setStudyMode('sequential');
         setView('study');
-      } else if ((e.key === 'f' || e.key === 'F') && !inField && !modalId) {
-        e.preventDefault();
-        setFavOnly((v) => !v);
-      } else if ((e.key === 'd' || e.key === 'D') && !inField && !modalId) {
-        e.preventDefault();
-        store.toggleTheme();
       } else if (/^[1-7]$/.test(e.key) && !inField && !modalId) {
         e.preventDefault();
         const cats = Object.keys(APP_CONFIG.categories);
@@ -258,10 +252,10 @@ export default function HomeClient({ questions }: { questions: Question[] }) {
           onPickHistory={(h) => setSearchQuery(h)}
         />
         <button onClick={cycleSort} title="排序" style={iconBtn}>{sortLabel}</button>
-        <button onClick={() => setFavOnly((v) => !v)} title="仅看收藏 (F)" style={iconBtnActive(favOnly)}>
+        <button onClick={() => setFavOnly((v) => !v)} title="仅看收藏" style={iconBtnActive(favOnly)}>
           {favOnly ? '★' : '☆'}
         </button>
-        <button onClick={() => store.toggleTheme()} title="主题 (D)" style={iconBtn}>
+        <button onClick={() => store.toggleTheme()} title="切换主题" style={iconBtn}>
           {hydrated && store.theme === 'dark' ? '☀️' : '🌙'}
         </button>
         <button onClick={() => setShowSettings(true)} title="设置" style={iconBtn}>⚙️</button>

@@ -837,10 +837,8 @@ function toggleShortcuts() {
           <div class="shortcut-item"><kbd>/</kbd><span>聚焦搜索框</span></div>
           <div class="shortcut-item"><kbd>Esc</kbd><span>关闭弹窗</span></div>
           <div class="shortcut-item"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><kbd>5</kbd><kbd>6</kbd><span>切换分类</span></div>
-          <div class="shortcut-item"><kbd>F</kbd><span>仅看收藏</span></div>
           <div class="shortcut-item"><kbd>S</kbd><span>开始刷题</span></div>
           <div class="shortcut-item"><kbd>R</kbd><span>开始复习</span></div>
-          <div class="shortcut-item"><kbd>D</kbd><span>切换深色模式</span></div>
           <div class="shortcut-item"><kbd>?</kbd><span>显示快捷键面板</span></div>
           <div class="shortcut-item"><kbd>L</kbd><span>随机一题</span></div>
         </div>
