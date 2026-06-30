@@ -122,5 +122,85 @@
     },
     "images": [],
     "source": "小红书帖子《字节Java后端二面面经》(项目架构深挖，图片OCR)"
+  },
+  {
+    "id": "note-tt-agent-algo-001",
+    "category": "algorithm",
+    "subcategory": "滑动窗口",
+    "difficulty": "L2",
+    "tags": [
+      "阿里",
+      "淘天",
+      "滑动窗口",
+      "双指针",
+      "LeetCode3",
+      "面经"
+    ],
+    "question": "手写算法：给定一个字符串，找出其中不含有重复字符的最长子串的长度。（LeetCode 3）",
+    "answer": "## 滑动窗口解法\n\n### 思路\n维护一个滑动窗口[left, right]，窗口内无重复字符。right向右扩展，遇到重复字符时left向右收缩。\n\n### Java代码\n```java\npublic int lengthOfLongestSubstring(String s) {\n    if (s == null || s.length() == 0) return 0;\n    Map<Character, Integer> map = new HashMap<>(); // 字符 -> 最新位置\n    int maxLen = 0, left = 0;\n    for (int right = 0; right < s.length(); right++) {\n        char c = s.charAt(right);\n        if (map.containsKey(c)) {\n            left = Math.max(left, map.get(c) + 1); // 跳过重复字符\n        }\n        map.put(c, right);\n        maxLen = Math.max(maxLen, right - left + 1);\n    }\n    return maxLen;\n}\n```\n\n### 复杂度\n- 时间：O(n)，每个字符最多访问2次(left和right各一次)\n- 空间：O(min(m,n))，m为字符集大小\n\n### 示例\n输入：\"abcabcbb\"\n过程：a(1) -> ab(2) -> abc(3) -> bca(3) -> cab(3) -> abc(3) -> cb(2) -> b(1)\n输出：3 (\"abc\"或\"bca\"或\"cab\")",
+    "follow_up": [
+      "如果要求返回最长子串本身而非长度？",
+      "如果字符集已知(如仅小写字母)，如何优化空间？",
+      "扩展：至多包含K个不同字符的最长子串？"
+    ],
+    "feynman": {
+      "essence": "滑动窗口维护一个无重复字符的区间，右指针扩展找更长，左指针收缩去重复。",
+      "analogy": "就像在传送带上找连续不重复的商品。右手不断拿新商品(扩展right)，发现拿重复了就把左手往右移到重复商品之后(收缩left)，始终记录窗口最大值。",
+      "key_points": [
+        "HashMap记录字符最新位置",
+        "left=Math.max(left, map[c]+1)避免回退",
+        "时间O(n)空间O(字符集大小)",
+        "核心：left只增不减"
+      ]
+    },
+    "first_principle": {
+      "problem": "在字符串中找最长的无重复字符连续子串。暴力枚举所有子串O(n^3)太慢。",
+      "axioms": [
+        "如果[left,right]无重复，则[left,right+1]只需检查right+1是否重复",
+        "重复字符的位置可以通过哈希表O(1)查找",
+        "left指针不需要回退——之前的位置已经不可能是更优解"
+      ],
+      "rebuild": "从消除冗余比较出发：用滑动窗口维护当前无重复区间。right遇到重复时，left直接跳到重复字符之后(left只增不减)。HashMap实现O(1)查找重复位置。总复杂度O(n)。"
+    }
+  },
+  {
+    "id": "note-tt-jvm-algo-001",
+    "category": "algorithm",
+    "subcategory": "树",
+    "difficulty": "L1",
+    "tags": [
+      "阿里",
+      "二叉树",
+      "BFS",
+      "层序遍历",
+      "LeetCode102",
+      "面经"
+    ],
+    "question": "算法题：二叉树层序遍历（LeetCode 102）",
+    "answer": "## BFS解法\n\n### 思路\n使用队列实现广度优先搜索，逐层遍历。\n\n### Java代码\n```java\npublic List<List<Integer>> levelOrder(TreeNode root) {\n    List<List<Integer>> result = new ArrayList<>();\n    if (root == null) return result;\n    \n    Queue<TreeNode> queue = new LinkedList<>();\n    queue.offer(root);\n    \n    while (!queue.isEmpty()) {\n        int levelSize = queue.size(); // 当前层节点数\n        List<Integer> level = new ArrayList<>();\n        for (int i = 0; i < levelSize; i++) {\n            TreeNode node = queue.poll();\n            level.add(node.val);\n            if (node.left != null) queue.offer(node.left);\n            if (node.right != null) queue.offer(node.right);\n        }\n        result.add(level);\n    }\n    return result;\n}\n```\n\n### 复杂度\n- 时间：O(n)，每个节点入队出队各一次\n- 空间：O(n)，最坏情况(完全二叉树最后一层n/2个节点)\n\n### 变种\n- 自底向上层序：反转result列表\n- 锯齿形层序：偶数层反向(LinkedList.addFirst)\n- 右视图：每层最后一个节点",
+    "follow_up": [
+      "如何实现锯齿形(之字形)层序遍历？",
+      "如何用DFS实现层序遍历？",
+      "二叉树的最小深度如何用BFS求？"
+    ],
+    "feynman": {
+      "essence": "BFS逐层遍历，队列是实现层序遍历的核心数据结构。关键是每层开始时记录队列大小。",
+      "analogy": "就像排队买饭。第一排(根节点)先买，买完的人把孩子(左右子节点)放到队尾，第二排全买完再买第三排。每排的人就是一层。",
+      "key_points": [
+        "队列+BFS标准模板",
+        "每层开始记录queue.size()",
+        "offer子节点前先记当前层大小",
+        "变种：锯齿/右视图/自底向上"
+      ]
+    },
+    "first_principle": {
+      "problem": "需要按层级从上到下、从左到右遍历二叉树的所有节点。",
+      "axioms": [
+        "同一层的节点应该在同一批处理",
+        "FIFO队列天然适合层级处理",
+        "队列大小=当前层节点数"
+      ],
+      "rebuild": "从层级分离出发：每次处理一层时，先记录队列大小(=当前层节点数)，然后精确处理这么多个节点，它们的子节点加入队列成为下一层。"
+    }
   }
 ]
