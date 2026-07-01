@@ -4,27 +4,32 @@ difficulty: L3
 category: database
 subcategory: Redis
 tags:
-  - 字节
-  - 面经
-  - Redis
-  - 分布式锁
+- 字节
+- 面经
+- Redis
+- 分布式锁
 feynman:
   essence: 裸SetNX有三大问题——过期时间难定、无自动续期、误删他人锁，Redisson封装了这些
-  analogy: '裸SetNX像用绳子拴门——绳子的长度(过期时间)不好定、没人在门外帮你续绳子(无续期)、别人可能误拆你的绳(误删)'
-  first_principle: '分布式锁的安全要求：只有持有者能释放 + 持有期间锁不会过期 + 锁不会永远不释放'
+  analogy: 裸SetNX像用绳子拴门——绳子的长度(过期时间)不好定、没人在门外帮你续绳子(无续期)、别人可能误拆你的绳(误删)
+  first_principle: 分布式锁的安全要求：只有持有者能释放 + 持有期间锁不会过期 + 锁不会永远不释放
   key_points:
-    - 过期时间难定——业务执行时间不确定
-    - 没有自动续期——业务慢则锁过期被他人获取
-    - 误删他人锁风险——不加校验直接DEL
-    - 不可重入——同线程不能多次获取
+  - 过期时间难定——业务执行时间不确定
+  - 没有自动续期——业务慢则锁过期被他人获取
+  - 误删他人锁风险——不加校验直接DEL
+  - 不可重入——同线程不能多次获取
 first_principle:
   essence: 分布式锁需要同时满足互斥性、安全性和防死锁三个约束
-  derivation: 'SetNX只满足了互斥性(NX保证)→缺乏安全性(无owner校验)→缺乏防死锁(EX过期但业务没完)→Redisson补全了这些'
+  derivation: SetNX只满足了互斥性(NX保证)→缺乏安全性(无owner校验)→缺乏防死锁(EX过期但业务没完)→Redisson补全了这些
   conclusion: 裸SetNX是分布式锁的最简陋实现，生产环境必须用Redisson或自己补全安全措施
 follow_up:
-  - 'RedLock算法解决了什么问题？'
-  - 'Redis主从切换时锁会丢失吗？'
-  - 'ZooKeeper分布式锁和Redis锁的区别？'
+- RedLock算法解决了什么问题？
+- Redis主从切换时锁会丢失吗？
+- ZooKeeper分布式锁和Redis锁的区别？
+memory_points:
+- 三大问题：因为业务耗时不确定，所以过期时间难定；且无自动续期易致锁提前释放，存在删他人锁风险
+- 对比记忆：裸SetNX无重入无排队，Redisson开箱即用内置watchdog、Pub/Sub等待及重入机制
+- 可重入原理：因为Redisson底层用Hash结构（key+UUID+threadId+重入次数），所以同线程可多次获取锁
+- 安全释放：必须通过Lua脚本校验value唯一标识后再执行DEL，以保证释放操作的原子性
 ---
 
 # 直接用SetNX做分布式锁会有什么问题？和Redisson有什么区别？
@@ -163,3 +168,11 @@ SetNX不适用场景：
 2. **watchdog原理**：解释续期线程的生命周期与JVM绑定
 3. **选型建议**：能根据业务特点推荐合适方案，而不是盲目选Redisson
 4. **RedLock认知**：提到RedLock解决主从切换丢锁问题（但争议较大，了解即可）
+
+## 记忆要点
+
+- 三大问题：因为业务耗时不确定，所以过期时间难定；且无自动续期易致锁提前释放，存在删他人锁风险
+- 对比记忆：裸SetNX无重入无排队，Redisson开箱即用内置watchdog、Pub/Sub等待及重入机制
+- 可重入原理：因为Redisson底层用Hash结构（key+UUID+threadId+重入次数），所以同线程可多次获取锁
+- 安全释放：必须通过Lua脚本校验value唯一标识后再执行DEL，以保证释放操作的原子性
+

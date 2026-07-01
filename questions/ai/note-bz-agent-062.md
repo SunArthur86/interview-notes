@@ -4,27 +4,31 @@ difficulty: L3
 category: ai
 subcategory: RAG
 tags:
-  - B站面经
-  - LlamaIndex
-  - 框架
-  - RAG
+- B站面经
+- LlamaIndex
+- 框架
+- RAG
 feynman:
   essence: LlamaIndex是专注RAG的框架，在"数据接入/索引构建/检索优化"上比LangChain更深。如果说LangChain是"瑞士军刀"，LlamaIndex是"RAG专用手术刀"。
   analogy: LangChain像多功能瑞士军刀(啥都能干)，LlamaIndex像专业手术刀(RAG这件事做得最精)。
   first_principle: LangChain追求通用(Agent/对话/RAG都做)，LlamaIndex专注RAG(数据索引/检索/查询引擎做到极致)。
   key_points:
-    - 定位：专注数据框架/RAG
-    - 核心：数据连接/索引/查询引擎
-    - 优势：RAG相关功能更深更全
-    - 选型：重RAG用LlamaIndex，重Agent用LangChain
+  - 定位：专注数据框架/RAG
+  - 核心：数据连接/索引/查询引擎
+  - 优势：RAG相关功能更深更全
+  - 选型：重RAG用LlamaIndex，重Agent用LangChain
 first_principle:
   essence: 工具的专注度决定深度——LlamaIndex只做数据/RAG所以做得深。
-  derivation: 'LangChain要覆盖Agent/对话/RAG/工具，每项都不够深。LlamaIndex专注数据接入和检索，在这条线上做得更深（更多数据连接器/更灵活的索引/更专业的检索器）。'
+  derivation: LangChain要覆盖Agent/对话/RAG/工具，每项都不够深。LlamaIndex专注数据接入和检索，在这条线上做得更深（更多数据连接器/更灵活的索引/更专业的检索器）。
   conclusion: LlamaIndex = RAG专精框架（数据接入/索引/检索最深）
 follow_up:
-  - LlamaIndex能做Agent吗？——能，但不如LangChain/LangGraph
-  - 两个能混用吗？——能，各取所长
-  - 哪个更流行？——LangChain社区更大，LlamaIndex在RAG圈更专业
+- LlamaIndex能做Agent吗？——能，但不如LangChain/LangGraph
+- 两个能混用吗？——能，各取所长
+- 哪个更流行？——LangChain社区更大，LlamaIndex在RAG圈更专业
+memory_points:
+- 核心定位：专注“数据连接”的RAG专精框架（LangChain偏通用综合）
+- 三层核心架构：数据层(200+数据连接器) → 索引层(多结构索引) → 查询层(检索合成)
+- 五大索引结构：向量、摘要、知识图谱(多跳)、树状、关键词，满足不同检索推理需求
 ---
 
 # LlamaIndex 在 RAG 系统中的架构？
@@ -168,3 +172,10 @@ engine = SubQuestionQueryEngine.from_defaults(query_engine_tools=[
 1. **定位区别**：LangChain 通用，LlamaIndex 专注 RAG——各有所长
 2. **索引多样性**：LlamaIndex 不只是向量索引，还有图/树/摘要——这是深度优势
 3. **数据连接器**：LlamaHub 200+数据源，企业数据接入更方便
+
+## 记忆要点
+
+- 核心定位：专注“数据连接”的RAG专精框架（LangChain偏通用综合）
+- 三层核心架构：数据层(200+数据连接器) → 索引层(多结构索引) → 查询层(检索合成)
+- 五大索引结构：向量、摘要、知识图谱(多跳)、树状、关键词，满足不同检索推理需求
+

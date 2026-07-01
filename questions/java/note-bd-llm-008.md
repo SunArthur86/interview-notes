@@ -14,11 +14,11 @@ feynman:
   analogy: 就像厨房只有一个灶台——IO密集是等外卖送达(等的时候别人可以用灶台)，CPU密集是持续炒菜(别人完全没机会)。
   first_principle: GIL存在的原因是CPython的引用计数内存管理不是线程安全的。
   key_points:
-  - 'GIL保护引用计数'
-  - 'IO操作释放GIL(time.sleep/network/file)'
-  - 'CPU密集型用multiprocessing绕过'
-  - '大模型API调用是IO密集型(GIL影响小)'
-  - '本地推理是CPU密集型(需multiprocessing)'
+  - GIL保护引用计数
+  - IO操作释放GIL(time.sleep/network/file)
+  - CPU密集型用multiprocessing绕过
+  - 大模型API调用是IO密集型(GIL影响小)
+  - 本地推理是CPU密集型(需multiprocessing)
 first_principle:
   essence: GIL = 保护内存管理的互斥锁，副作用是限制了CPU并行
   derivation: 引用计数非线程安全→GIL→IO时释放(协程/多线程有效)→CPU时不释放(多线程无效)→用multiprocessing绕过
@@ -27,6 +27,11 @@ follow_up:
 - GIL会被移除吗？PEP 703？
 - asyncio和多线程在大模型场景怎么选？
 - Cython/Numba能绕过GIL吗？
+memory_points:
+- 一句话定义：GIL是CPython的互斥锁，因保护引用计数，故同一时刻仅单线程执行字节码
+- 释放时机：遇IO阻塞主动释放，或被定时抢占（默认约5ms），CPU密集型难以释放
+- IO密集（如API调用）：因多在等待网络，故多线程有效，可大幅提升并发效率
+- CPU密集（如模型推理）：因持续占用且GIL不释放，故多线程无效，改用多进程加速
 ---
 
 # 【字节面经】讲一下 Python 的 GIL 机制，在 I/O 密集和 CPU 密集的大模型任务里分别会有什么影响？
@@ -286,3 +291,11 @@ python3.13t  # free-threaded build
 ## 九、总结一句话
 
 > GIL 保护引用计数，IO 操作时释放 → 大模型 API 调用是 IO 密集型，多线程/asyncio 有效；本地推理是 CPU 密集型，需 multiprocessing 绕过 GIL。选择方案的依据是：**任务在等还是在算**——等的用线程/协程，算的用进程。
+
+## 记忆要点
+
+- 一句话定义：GIL是CPython的互斥锁，因保护引用计数，故同一时刻仅单线程执行字节码
+- 释放时机：遇IO阻塞主动释放，或被定时抢占（默认约5ms），CPU密集型难以释放
+- IO密集（如API调用）：因多在等待网络，故多线程有效，可大幅提升并发效率
+- CPU密集（如模型推理）：因持续占用且GIL不释放，故多线程无效，改用多进程加速
+

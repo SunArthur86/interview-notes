@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - 推理优化
-  - vLLM
-  - 部署
+- B站面经
+- 推理优化
+- vLLM
+- 部署
 feynman:
   essence: 大模型推理性能优化=引擎层(vLLM/TensorRT-LLM的PagedAttention+连续批处理)+算法层(KV Cache/投机解码/量化)+架构层(MoE/并行)。全栈优化。
   analogy: 像F1赛车提速——引擎升级(vLLM)、空气动力学(量化减重)、驾驶技术(批处理)、赛道策略(路由)。
   first_principle: 推理瓶颈在显存带宽和计算量。优化=减少显存占用(量化/Cache)+提高计算效率(批处理/并行)+减少计算量(MoE/投机)。
   key_points:
-    - 引擎：vLLM/TensorRT-LLM/TGI
-    - 算法：KV Cache/投机解码/量化
-    - 架构：MoE/张量并行/流水线并行
-    - 核心：PagedAttention+连续批处理
+  - 引擎：vLLM/TensorRT-LLM/TGI
+  - 算法：KV Cache/投机解码/量化
+  - 架构：MoE/张量并行/流水线并行
+  - 核心：PagedAttention+连续批处理
 first_principle:
   essence: 推理性能受限于显存带宽和GPU利用率。
-  derivation: 'LLM推理是memory-bound(显存带宽限制)。优化方向：1.减少显存占用(量化/KV Cache复用) 2.提高GPU利用率(连续批处理) 3.减少冗余计算(投机解码/MoE)。vLLM的PagedAttention同时优化了1和2。'
+  derivation: LLM推理是memory-bound(显存带宽限制)。优化方向：1.减少显存占用(量化/KV Cache复用) 2.提高GPU利用率(连续批处理) 3.减少冗余计算(投机解码/MoE)。vLLM的PagedAttention同时优化了1和2。
   conclusion: 推理优化 = 减显存(量化) + 提利用率(批处理) + 减计算(投机/MoE)
 follow_up:
-  - vLLM为什么快？——PagedAttention解决显存碎片+连续批处理
-  - 量化选INT8还是INT4？——8bit无损，4bit轻微损失
-  - 多卡怎么并行？——张量并行(单层多卡)+流水线(不同层不同卡)
+- vLLM为什么快？——PagedAttention解决显存碎片+连续批处理
+- 量化选INT8还是INT4？——8bit无损，4bit轻微损失
+- 多卡怎么并行？——张量并行(单层多卡)+流水线(不同层不同卡)
+memory_points:
+- 推理三大瓶颈：显存带宽受限、KV Cache占显存、自回归生成导致串行
+- vLLM双核心：PagedAttention像虚拟内存消除显存碎片，连续批处理动态进出防GPU等待
+- 投机解码：小模型先猜大模型验证，实现质量无损的2-3倍加速
+- 量化降显存提速：INT8无感，INT4极致压缩；MoE架构按需激活提速
 ---
 
 # 大模型推理性能优化方案？
@@ -237,3 +242,11 @@ llm = LLM(model="llama-70b", tensor_parallel_size=4)  # 4卡张量并行
 1. **vLLM 的 PagedAttention**：这是推理优化的核心突破，类比 OS 虚拟内存
 2. **连续批处理**：动态插入移除请求，GPU 不空闲——吞吐提升关键
 3. **全栈优化**：引擎+算法+架构，系统性而非单点
+
+## 记忆要点
+
+- 推理三大瓶颈：显存带宽受限、KV Cache占显存、自回归生成导致串行
+- vLLM双核心：PagedAttention像虚拟内存消除显存碎片，连续批处理动态进出防GPU等待
+- 投机解码：小模型先猜大模型验证，实现质量无损的2-3倍加速
+- 量化降显存提速：INT8无感，INT4极致压缩；MoE架构按需激活提速
+

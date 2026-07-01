@@ -4,25 +4,29 @@ difficulty: L4
 category: ai
 subcategory: 微调
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: SFT教模型"说什么"，RLHF/DPO教模型"说更好的"。DPO是RLHF的数学简化版——无需训练奖励模型，直接从偏好数据优化策略
-  analogy: 'SFT像跟读课本（模仿标准答案），RLHF像老师打分+学生改进（先训练打分器再优化），DPO像直接给学生看好作文和差作文对比（跳过打分器一步到位）'
-  first_principle: '人类偏好学习的本质是让模型输出概率偏好高分回答。RLHF通过奖励模型间接实现，DPO通过数学推导发现可以直接用偏好数据计算梯度'
+  analogy: SFT像跟读课本（模仿标准答案），RLHF像老师打分+学生改进（先训练打分器再优化），DPO像直接给学生看好作文和差作文对比（跳过打分器一步到位）
+  first_principle: 人类偏好学习的本质是让模型输出概率偏好高分回答。RLHF通过奖励模型间接实现，DPO通过数学推导发现可以直接用偏好数据计算梯度
   key_points:
-    - 'SFT: 监督学习，用标准答案做交叉熵损失'
-    - 'RLHF: 训练RM → PPO优化策略，流程复杂但效果好'
-    - 'DPO: 直接用偏好对(pair)优化，无需RM和PPO，更稳定'
+  - 'SFT: 监督学习，用标准答案做交叉熵损失'
+  - 'RLHF: 训练RM → PPO优化策略，流程复杂但效果好'
+  - 'DPO: 直接用偏好对(pair)优化，无需RM和PPO，更稳定'
 first_principle:
   essence: 人类偏好优化可以建模为最大化奖励的KL约束优化问题
-  derivation: 'RLHF的目标是max E[r(x,y)] - β·KL(π||π_ref)。DPO的数学贡献是证明这个目标可以重写为只依赖偏好数据的闭式解，无需显式的奖励模型'
+  derivation: RLHF的目标是max E[r(x,y)] - β·KL(π||π_ref)。DPO的数学贡献是证明这个目标可以重写为只依赖偏好数据的闭式解，无需显式的奖励模型
   conclusion: DPO在数学上等价于RLHF的简化，但在实践中更稳定、更易实现
 follow_up:
-  - DPO为什么在很多场景下取代PPO？
-  - RLHF的奖励模型如何训练？reward hacking问题怎么解决？
-  - KTO和ORPO等新方法与DPO有什么区别？
+- DPO为什么在很多场景下取代PPO？
+- RLHF的奖励模型如何训练？reward hacking问题怎么解决？
+- KTO和ORPO等新方法与DPO有什么区别？
+memory_points:
+- SFT打基础：指令微调学格式，算交叉熵，是所有后训练必经的第一步。
+- RLHF最复杂：训奖励模型+PPO强化学习，效果上限高但流程长、极不稳定。
+- DPO最优雅：无需RM和PPO，直接用偏好对通过交叉熵优化策略，简单稳定。
 ---
 
 # 详细说明SFT、RLHF和DPO三种后训练方法的核心流程、适用场景和优缺点
@@ -201,3 +205,10 @@ def dpo_loss(policy, ref, chosen_ids, rejected_ids, beta=0.1):
 5. **开源生态**：Zephyr、Llama-3、Qwen-2等主流模型后训练均采用DPO
 
 **面试加分点**：提到DPO的β参数控制偏离参考模型的程度；提到IPO（Identity Preference Optimization）解决DPO过拟合问题；提到KTO（Kahneman-Tversky Optimization）只需要二元反馈（好/坏）而非偏好对；提到RLHF在复杂多轮对话中仍有优势。
+
+## 记忆要点
+
+- SFT打基础：指令微调学格式，算交叉熵，是所有后训练必经的第一步。
+- RLHF最复杂：训奖励模型+PPO强化学习，效果上限高但流程长、极不稳定。
+- DPO最优雅：无需RM和PPO，直接用偏好对通过交叉熵优化策略，简单稳定。
+

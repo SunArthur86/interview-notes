@@ -4,28 +4,33 @@ difficulty: L2
 category: ai
 subcategory: Prompt
 tags:
-  - B站面经
-  - Prompt工程
-  - Temperature
-  - Top-P
-  - Top-K
+- B站面经
+- Prompt工程
+- Temperature
+- Top-P
+- Top-K
 feynman:
   essence: Temperature控制随机性(创意vs确定)、Top-P控制多样性(核采样)、Top-K限制候选词数。调优原则：事实任务低温(0-0.3)，创意任务高温(0.7-1.0)。
   analogy: 像调节水龙头——Temperature调水温(冷=确定/热=随机)，Top-P调水量(大=多样/小=集中)，Top-K限制出水口数量。
   first_principle: 这三个参数控制LLM采样的随机性。随机性高=有创意但不稳定，低=确定但可能重复。
   key_points:
-    - Temperature：控制概率分布的"陡峭度"(0确定→2随机)
-    - Top-P：核采样，只从累积概率P的词中选
-    - Top-K：只从概率最高的K个词中选
-    - 调优：事实低温，创意高温
+  - Temperature：控制概率分布的"陡峭度"(0确定→2随机)
+  - Top-P：核采样，只从累积概率P的词中选
+  - Top-K：只从概率最高的K个词中选
+  - 调优：事实低温，创意高温
 first_principle:
   essence: 三个参数本质都是控制"采样空间的大小"——空间大=多样，空间小=确定。
-  derivation: 'LLM输出下一个token时，对所有词算概率分布。Temperature调整分布形状(平坦vs尖锐)。Top-P/K截断只保留高概率词。三者共同决定"模型有多敢冒险"。'
+  derivation: LLM输出下一个token时，对所有词算概率分布。Temperature调整分布形状(平坦vs尖锐)。Top-P/K截断只保留高概率词。三者共同决定"模型有多敢冒险"。
   conclusion: 采样参数 = 控制输出随机性（Temperature调分布形状，Top-P/K调候选范围）
 follow_up:
-  - 三个参数怎么配合？——通常Temperature+Top-P，Top-K较少用
-  - 默认值是多少？——Temperature=1, Top-P=1(不限制)
-  - 怎么找到最优值？——A/B测试不同参数组合
+- 三个参数怎么配合？——通常Temperature+Top-P，Top-K较少用
+- 默认值是多少？——Temperature=1, Top-P=1(不限制)
+- 怎么找到最优值？——A/B测试不同参数组合
+memory_points:
+- Temperature调陡峭：低偏保守确定，高偏冒险随机
+- Top-P核采样：只选累积概率达P的最小词集，动态截断长尾
+- Top-K硬截断：死板只选概率最高的K个词，不及Top-P自适应
+- 业务调优：代码计算用低温(0~0.2)，而创意发散用高温(0.7+)
 ---
 
 # 生成参数 Temperature、Top-P、Top-K 在业务中如何调优？
@@ -195,3 +200,11 @@ def find_optimal_params(test_cases, param_grid):
 1. **按任务调温**：事实低温创意高温——这个原则是核心
 2. **Top-P 优于 Top-K**：核采样更智能自适应——体现前沿认知
 3. **A/B 测试**：参数调优不能拍脑袋，要数据驱动
+
+## 记忆要点
+
+- Temperature调陡峭：低偏保守确定，高偏冒险随机
+- Top-P核采样：只选累积概率达P的最小词集，动态截断长尾
+- Top-K硬截断：死板只选概率最高的K个词，不及Top-P自适应
+- 业务调优：代码计算用低温(0~0.2)，而创意发散用高温(0.7+)
+

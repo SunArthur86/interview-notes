@@ -4,28 +4,33 @@ difficulty: L3
 category: database
 subcategory: Kafka
 tags:
-  - 瓜子二手车
-  - 面经
-  - Flink
-  - Kafka
-  - Exactly-Once
+- 瓜子二手车
+- 面经
+- Flink
+- Kafka
+- Exactly-Once
 feynman:
-  essence: "Exactly-Once语义通过Kafka幂等生产者+Flink Checkpoint+两阶段提交(2PC)实现端到端精确一次处理"
-  analogy: "像寄快递有签收确认——寄出后没丢(幂等生产者)，分拣中心有登记(Checkpoint)，最终签收才确认完成(两阶段提交)，三个环节缺一不可"
-  first_principle: "Exactly-Once的核心是让数据处理的每个环节都具备幂等性和事务性，端到端组合后保证消息不丢不重"
+  essence: Exactly-Once语义通过Kafka幂等生产者+Flink Checkpoint+两阶段提交(2PC)实现端到端精确一次处理
+  analogy: 像寄快递有签收确认——寄出后没丢(幂等生产者)，分拣中心有登记(Checkpoint)，最终签收才确认完成(两阶段提交)，三个环节缺一不可
+  first_principle: Exactly-Once的核心是让数据处理的每个环节都具备幂等性和事务性，端到端组合后保证消息不丢不重
   key_points:
-    - 'Kafka端: 幂等性生产者(防重) + 事务(跨partition原子写入)'
-    - 'Flink端: Checkpoint机制(一致性快照) + Barrier对齐'
-    - 'Sink端: 两阶段提交(2PC)保证输出也精确一次'
-    - '三者缺一不可，否则退化为At-Least-Once'
+  - 'Kafka端: 幂等性生产者(防重) + 事务(跨partition原子写入)'
+  - 'Flink端: Checkpoint机制(一致性快照) + Barrier对齐'
+  - 'Sink端: 两阶段提交(2PC)保证输出也精确一次'
+  - 三者缺一不可，否则退化为At-Least-Once
 first_principle:
-  essence: "分布式流处理的Exactly-Once = Source幂等 + 处理Checkpoint + Sink事务提交"
-  derivation: "Kafka可能重发 → 需要幂等生产者 → Flink可能崩溃重启 → 需要Checkpoint恢复状态 → 输出可能重复 → 需要事务Sink → 三层组合才能保证端到端"
-  conclusion: "Exactly-Once不是单一机制，而是Source+Process+Sink三层的事务性保证"
+  essence: 分布式流处理的Exactly-Once = Source幂等 + 处理Checkpoint + Sink事务提交
+  derivation: Kafka可能重发 → 需要幂等生产者 → Flink可能崩溃重启 → 需要Checkpoint恢复状态 → 输出可能重复 → 需要事务Sink → 三层组合才能保证端到端
+  conclusion: Exactly-Once不是单一机制，而是Source+Process+Sink三层的事务性保证
 follow_up:
-  - "Flink Checkpoint的Barrier对齐有什么问题？"
-  - "两阶段提交如果协调者挂了怎么办？"
-  - "Exactly-Once和At-Least-Once的性能差异？"
+- Flink Checkpoint的Barrier对齐有什么问题？
+- 两阶段提交如果协调者挂了怎么办？
+- Exactly-Once和At-Least-Once的性能差异？
+memory_points:
+- 一句话区分：两者底层同用B+树，但MySQL主键是聚簇索引，而PgSQL全是非聚簇的Heap表
+- 聚簇差异：MySQL主键叶子存完整行（极快），而PgSQL所有索引叶子只存CTID物理指针（均需回表）
+- 二级索引差异：MySQL二级索引存主键值（需二次回表），而PgSQL均存物理CTID
+- 适用场景：MySQL适合读多写少及KV主键查询，PgSQL凭借JSONB及pgvector更适合复杂查询与AI向量检索
 ---
 
 # 如何保证 Kafka 到 Flink 的数据不丢失、不重复(Exactly-Once)？
@@ -165,3 +170,11 @@ kafka-consumer-groups --describe --group flink-consumer
 -- 实时Flink: TumblingProcessingTimeWindow
 -- → 时间语义不对齐导致数据差异!
 ```
+
+## 记忆要点
+
+- 一句话区分：两者底层同用B+树，但MySQL主键是聚簇索引，而PgSQL全是非聚簇的Heap表
+- 聚簇差异：MySQL主键叶子存完整行（极快），而PgSQL所有索引叶子只存CTID物理指针（均需回表）
+- 二级索引差异：MySQL二级索引存主键值（需二次回表），而PgSQL均存物理CTID
+- 适用场景：MySQL适合读多写少及KV主键查询，PgSQL凭借JSONB及pgvector更适合复杂查询与AI向量检索
+

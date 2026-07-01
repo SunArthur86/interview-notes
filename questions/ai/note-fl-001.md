@@ -14,11 +14,11 @@ feynman:
   analogy: 就像开一家餐厅——前厅服务员（LLM）负责理解客人需求、推荐菜品（规划），后厨流水线（Workflow）负责确定性执行（煎牛排、结账）。订单状态写在白板（Redis 短期）和流水账本（Postgres 长期）上，服务员之间不直接吵架，都对着白板沟通。
   first_principle: LLM 每多调用一次，成本、延迟、失败概率全部叠加。因此"能用 if-else 写出来的不交给 LLM"。状态机显式化（State/Node/Edge）才能调试、回放、断点。
   key_points:
-  - '意图识别 → 计划生成 → 工具执行 → 结果聚合 → 反思 五段拆分'
-  - '创造性环节交 LLM，确定性环节交 Workflow'
-  - 'Redis Hash 存短期会话状态（TTL 30min），Postgres 存 agent_steps 长期日志'
-  - '多 Agent 通信走共享 State，禁止直接对话（避免扯皮）'
-  - '硬步数上限（10-15 步）+ 去重 + 降权 防止死循环'
+  - 意图识别 → 计划生成 → 工具执行 → 结果聚合 → 反思 五段拆分
+  - 创造性环节交 LLM，确定性环节交 Workflow
+  - Redis Hash 存短期会话状态（TTL 30min），Postgres 存 agent_steps 长期日志
+  - 多 Agent 通信走共享 State，禁止直接对话（避免扯皮）
+  - 硬步数上限（10-15 步）+ 去重 + 降权 防止死循环
 first_principle:
   essence: Agent = 状态机 + LLM 决策点 + 确定性 Workflow
   derivation: 纯 LLM 不可控（成本/延迟/失败叠加）→ 把确定性逻辑剥离成 Workflow → 把"下一步做什么"抽象成状态机 → LLM 只在关键决策点介入 → 整体可调试、可回放、可熔断
@@ -27,6 +27,11 @@ follow_up:
 - 多 Agent 直接对话（如 AutoGen）vs 共享状态（LangGraph）各自什么坑？
 - agent_steps 表怎么设计才能支持完整回放？
 - 长任务中途断了，断点续传怎么实现？
+memory_points:
+- 五段式拆分原则：因为能if-else的确定性逻辑不该花Token，所以意图判断交LLM，执行全走Workflow
+- 双层状态存储：Redis Hash存短期会话（低延迟），Postgres存全量日志（可追溯审计），双写保活
+- 多Agent协作铁律：必须基于共享状态对象通信，禁止Agent直接对话扯皮引发无限死循环
+- 防死循环三上限：硬限步数（10-15步）、软限Critic连续确认、异常限连续失败次数强制熔断
 ---
 
 # 【字节飞连面经】介绍 Agent 项目整体流程：为什么这么拆？状态怎么存？多 Agent 怎么协作？
@@ -130,3 +135,11 @@ interface AgentState {
 - LangGraph 的 `CheckpointSaver` 接口可以接 Redis/Postgres，实现状态持久化和断点续传
 - 真正生产级的多 Agent 系统会用 message bus（如 NATS/Kafka）做异步通信，而非同步共享内存
 - 反思阶段如果用 LLM，反思结果要**摘要后再写回**，不留原始错误文本，否则会污染上下文
+
+## 记忆要点
+
+- 五段式拆分原则：因为能if-else的确定性逻辑不该花Token，所以意图判断交LLM，执行全走Workflow
+- 双层状态存储：Redis Hash存短期会话（低延迟），Postgres存全量日志（可追溯审计），双写保活
+- 多Agent协作铁律：必须基于共享状态对象通信，禁止Agent直接对话扯皮引发无限死循环
+- 防死循环三上限：硬限步数（10-15步）、软限Critic连续确认、异常限连续失败次数强制熔断
+

@@ -4,28 +4,32 @@ difficulty: L3
 category: ai
 subcategory: RAG
 tags:
-  - 某厂
-  - 面经
-  - RAG
-  - 评估
-  - Ragas
+- 某厂
+- 面经
+- RAG
+- 评估
+- Ragas
 feynman:
-  essence: 'Ragas通过拆解RAG的检索和生成两个阶段，用忠实度、答案相关性、上下文精确率和召回率四个维度量化幻觉'
-  analogy: '就像考试评分——不光看最终答案对不对，还要看参考书找得准不准(检索)、答题有没有超出参考书范围(忠实度)、答案跑没跑题(相关性)'
-  first_principle: 'RAG系统质量=检索质量×生成质量，必须分别评估而非只看端到端结果'
+  essence: Ragas通过拆解RAG的检索和生成两个阶段，用忠实度、答案相关性、上下文精确率和召回率四个维度量化幻觉
+  analogy: 就像考试评分——不光看最终答案对不对，还要看参考书找得准不准(检索)、答题有没有超出参考书范围(忠实度)、答案跑没跑题(相关性)
+  first_principle: RAG系统质量=检索质量×生成质量，必须分别评估而非只看端到端结果
   key_points:
-    - 'Ragas四大指标: Faithfulness, Answer Relevancy, Context Precision, Context Recall'
-    - 'Faithfulness(忠实度): 答案是否忠于检索到的上下文，直接衡量幻觉'
-    - 'Context Precision: 检索到的上下文中有多少是真正相关的'
-    - '评估依赖LLM-as-Judge，用GPT-4等强模型评判'
+  - 'Ragas四大指标: Faithfulness, Answer Relevancy, Context Precision, Context Recall'
+  - 'Faithfulness(忠实度): 答案是否忠于检索到的上下文，直接衡量幻觉'
+  - 'Context Precision: 检索到的上下文中有多少是真正相关的'
+  - 评估依赖LLM-as-Judge，用GPT-4等强模型评判
 first_principle:
-  essence: '幻觉本质是答案包含检索上下文中不存在的信息'
-  derivation: '将答案拆解为独立陈述，逐个判断是否被上下文支持。不被支持的陈述比例 = 幻觉率。Faithfulness = 1 - 幻觉率'
-  conclusion: 'Faithfulness指标直接量化幻觉程度，是RAG评估的核心指标'
+  essence: 幻觉本质是答案包含检索上下文中不存在的信息
+  derivation: 将答案拆解为独立陈述，逐个判断是否被上下文支持。不被支持的陈述比例 = 幻觉率。Faithfulness = 1 - 幻觉率
+  conclusion: Faithfulness指标直接量化幻觉程度，是RAG评估的核心指标
 follow_up:
-  - 'LLM-as-Judge的可靠性如何保证？'
-  - '除了Ragas还有哪些RAG评估框架？'
-  - '评估数据集怎么构建？需要多少条？'
+- LLM-as-Judge的可靠性如何保证？
+- 除了Ragas还有哪些RAG评估框架？
+- 评估数据集怎么构建？需要多少条？
+memory_points:
+- 四大核心指标：忠实度、答案相关性、上下文精确率和召回率。
+- 反幻觉看Faithfulness：把答案拆解为原子陈述，计算能被上下文支持的陈述比例。
+- Context Recall看信息覆盖率，Context Precision看Top-K文档中有用文档的比例。
 ---
 
 # Ragas框架如何评估RAG系统中的幻觉？
@@ -200,3 +204,10 @@ testset = generator.generate(
 | TruLens | 支持追踪和可视化 | 需要调试RAG链路 |
 | DeepEval | 类似pytest的单元测试 | CI/CD集成 |
 | 人工评估 | 最可靠 | 最终验收 |
+
+## 记忆要点
+
+- 四大核心指标：忠实度、答案相关性、上下文精确率和召回率。
+- 反幻觉看Faithfulness：把答案拆解为原子陈述，计算能被上下文支持的陈述比例。
+- Context Recall看信息覆盖率，Context Precision看Top-K文档中有用文档的比例。
+

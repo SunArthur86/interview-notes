@@ -27,6 +27,11 @@ follow_up:
 - GIL底层原理？
 - asyncio和多线程哪个好？
 - 如何绕过GIL实现真正并行？
+memory_points:
+- 核心用法：threading.Thread传target与args，调start()启动，join()阻塞等待
+- 避坑指南：因start只能调一次，所以严禁直接调run()（那仅是普通函数执行）
+- GIL限制：因GIL同一时刻只允许单线程执行，故多线程仅适合IO密集型任务
+- 线程安全：多线程操作共享变量必须加锁，推荐用 with lock 上下文管理自动释放
 ---
 
 # 【美团面经】Python怎么实现多线程？
@@ -207,3 +212,11 @@ with ThreadPoolExecutor(max_workers=5) as executor:
 3. **IO 密集型**：多线程有效（IO时释放GIL），如爬虫、网络请求
 4. **CPU 密集型**：多线程无效甚至更慢，用 `multiprocessing` 绕过 GIL
 5. **替代方案**：`asyncio`（协程，单线程并发IO）、C扩展（numpy等在C层释放GIL）、`concurrent.futures`
+
+## 记忆要点
+
+- 核心用法：threading.Thread传target与args，调start()启动，join()阻塞等待
+- 避坑指南：因start只能调一次，所以严禁直接调run()（那仅是普通函数执行）
+- GIL限制：因GIL同一时刻只允许单线程执行，故多线程仅适合IO密集型任务
+- 线程安全：多线程操作共享变量必须加锁，推荐用 with lock 上下文管理自动释放
+

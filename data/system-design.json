@@ -309,5 +309,178 @@
     },
     "images": [],
     "source": "小红书帖子《字节Java后端二面面经 设计模式+Spring源码拔高+架构设计》"
+  },
+  {
+    "id": "note-xhs-sd-007",
+    "category": "system-design",
+    "subcategory": "高并发",
+    "difficulty": "L4",
+    "tags": [
+      "SSE",
+      "流式响应",
+      "断线重连",
+      "AI流式",
+      "EventSource"
+    ],
+    "question": "AI应用中 SSE 流式响应如何设计断线重连？（入职Java复盘）",
+    "answer": "## 一、SSE（Server-Sent Events）基础\n\n```\nSSE = 服务器单向推送 + HTTP长连接\n\n客户端                    服务器\n  │                         │\n  │ ── GET /api/chat ──→    │\n  │                         │\n  │ ←─ Content-Type:        │\n  │     text/event-stream   │\n  │                         │\n  │ ←─ data: 你好           │  (逐字推送)\n  │ ←─ data: ，我           │\n  │ ←─ data: 是AI           │\n  │ ←─ data: [DONE]         │  (结束标记)\n  │                         │\n```\n\n**SSE vs WebSocket vs Streaming HTTP**：\n\n| 特性 | SSE | WebSocket | Chunked HTTP |\n|------|-----|-----------|-------------|\n| 方向 | 服务器→客户端（单向） | 双向 | 服务器→客户端 |\n| 协议 | HTTP | WebSocket | HTTP |\n| 自动重连 | ✅ 浏览器内置 | ❌ 需手动 | ❌ |\n| 适合场景 | AI流式输出 | 聊天/协同 | 大文件下载 |\n| 复杂度 | 低 | 高 | 低 |\n\n## 二、SSE 协议格式\n\n```\nHTTP/1.1 200 OK\nContent-Type: text/event-stream\nCache-Control: no-cache\nConnection: keep-alive\n\nid: 1                          ← 事件ID（用于断线重连）\nevent: message                  ← 事件类型（可选）\ndata: {\"text\": \"你好\", \"done\": false}\n\nid: 2\ndata: {\"text\": \"，我是AI\", \"done\": false}\n\nid: 3\ndata: {\"text\": \"\", \"done\": true}\n\n```\n\n**关键**：每个事件块用 `\\n\\n` 分隔。`id` 字段记录事件序号，用于断线重连时告知服务器「上次收到到哪里」。\n\n## 三、服务端实现（Spring Boot）\n\n```java\n@RestController\n@RequestMapping(\"/api/chat\")\npublic class ChatSSEController {\n    \n    @Autowired\n    private AIChatService aiChatService;\n    \n    @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)\n    public SseEmitter chat(@RequestParam String prompt,\n                          @RequestHeader(value = \"Last-Event-ID\", \n                                        required = false) String lastEventId) {\n        // 超时设置5分钟（AI生成可能很慢）\n        SseEmitter emitter = new SseEmitter(300_000L);\n        \n        // 从断点恢复\n        int startSeq = lastEventId != null ? Integer.parseInt(lastEventId) : 0;\n        \n        aiChatService.streamChat(prompt, startSeq, new ChatCallback() {\n            private int seq = startSeq;\n            \n            @Override\n            public void onChunk(String chunk) throws IOException {\n                seq++;\n                // 发送带id的SSE事件（客户端断线重连时用）\n                emitter.send(SseEmitter.event()\n                    .id(String.valueOf(seq))\n                    .data(Map.of(\"text\", chunk, \"done\", false)));\n            }\n            \n            @Override\n            public void onComplete() throws IOException {\n                seq++;\n                emitter.send(SseEmitter.event()\n                    .id(String.valueOf(seq))\n                    .data(Map.of(\"text\", \"\", \"done\", true)));\n                emitter.complete();\n            }\n            \n            @Override\n            public void onError(Throwable e) {\n                emitter.completeWithError(e);\n            }\n        });\n        \n        return emitter;\n    }\n}\n```\n\n## 四、断线重连方案（核心考点）\n\n### 浏览器原生 EventSource\n\n```javascript\n// 浏览器 EventSource 自动重连！\nconst eventSource = new EventSource('/api/chat?prompt=你好');\n\neventSource.onmessage = (event) => {\n    const data = JSON.parse(event.data);\n    if (data.done) {\n        eventSource.close();\n    } else {\n        appendToUI(data.text);  // 逐字显示\n    }\n};\n\n// ⚠️ 浏览器自动处理：\n// 1. 连接断开后自动重连（默认3秒）\n// 2. 重连时自动携带 Last-Event-ID 头\n// 3. Last-Event-ID = 最后收到的id字段值\n```\n\n### 自定义重连（fetch + ReadableStream）\n\n```javascript\nasync function streamChat(prompt, lastEventId = 0) {\n    try {\n        const response = await fetch('/api/chat', {\n            headers: { 'Last-Event-ID': lastEventId.toString() }\n        });\n        \n        const reader = response.body.getReader();\n        const decoder = new TextDecoder();\n        \n        while (true) {\n            const { done, value } = await reader.read();\n            if (done) break;\n            \n            const text = decoder.decode(value);\n            // 解析SSE格式\n            const events = parseSSE(text);\n            for (const event of events) {\n                lastEventId = event.id;\n                appendToUI(event.data);\n            }\n        }\n    } catch (error) {\n        // 断线重连（带Last-Event-ID）\n        console.log('Connection lost, reconnecting...');\n        setTimeout(() => streamChat(prompt, lastEventId), 3000);\n    }\n}\n```\n\n## 五、断线重连的完整架构\n\n```\n┌────────────────────────────────────────────────────┐\n│                    客户端                            │\n│  ┌──────────────────────────────────────────┐      │\n│  │  EventSource / Fetch                     │      │\n│  │  ┌─────────────────────┐                 │      │\n│  │  │ Last-Event-ID 缓存   │ ← 记住最后收到的id │      │\n│  │  └─────────────────────┘                 │      │\n│  └────────────────┬─────────────────────────┘      │\n└───────────────────┼────────────────────────────────┘\n                    │\n                    ▼ 断线重连（携带 Last-Event-ID: 42）\n┌────────────────────────────────────────────────────┐\n│                    服务端                            │\n│  ┌─────────────┐  ┌──────────────┐                 │\n│  │ SSE Endpoint │←→│ 事件存储(Redis)│ ← 缓存AI生成   │\n│  │              │  │ seq → content │   的历史片段    │\n│  └──────┬──────┘  └──────────────┘                 │\n│         │                                           │\n│         ▼                                           │\n│  ┌─────────────┐  ┌──────────────┐                 │\n│  │ AI网关       │→ │ LLM API      │                 │\n│  │ (流式代理)   │  │ (SSE Stream) │                 │\n│  └─────────────┘  └──────────────┘                 │\n└────────────────────────────────────────────────────┘\n\n断线重连流程：\n  1. 客户端记录最后收到的 event.id = 42\n  2. 断线后发起重连：GET /api/chat?resumeFrom=42\n  3. 服务端从Redis读取 seq > 42 的缓存片段，快速重放\n  4. 然后继续接收LLM新生成的内容\n```\n\n## 六、面试加分点\n\n```\n1. 事件缓存：用Redis缓存SSE事件（TTL 5分钟），断线重连时快速重放\n2. 幂等设计：每个chunk带唯一seq，客户端去重防止重复显示\n3. 超时处理：AI生成超过3分钟 → 转异步任务 + 通知\n4. 压缩传输：SSE支持gzip压缩，减少带宽\n5. Nginx配置：proxy_buffering off 开启流式透传\n6. 多设备同步：同一会话多设备连接，用Redis Pub/Sub广播\n```",
+    "follow_up": [
+      "SSE 在 Nginx 反向代理时需要注意什么配置？",
+      "AI流式输出如何在服务端做缓存（断线重连时不重新生成）？",
+      "SSE 和 WebSocket 在AI流式场景下各有什么优劣？",
+      "如何实现SSE的多设备同步（同一个对话在手机和电脑上看）？"
+    ],
+    "feynman": {
+      "essence": "SSE是服务器单向推送的HTTP长连接协议，浏览器原生支持自动重连。断线重连的关键是Last-Event-ID机制——客户端记住最后收到的消息序号，重连时告诉服务端从哪里继续。",
+      "analogy": "SSE像打电话时对方给你念文章（你只能听不能说）。如果电话断了，你重拨时说「我上次听到第3段了，从第4段继续念」（Last-Event-ID）。如果AI还在生成后面的内容，正好接着念。",
+      "key_points": [
+        "SSE=HTTP长连接+单向推送，浏览器EventSource自动重连",
+        "每个事件带id字段，重连时浏览器自动发Last-Event-ID头",
+        "服务端用SseEmitter(Spring)/text/event-stream实现",
+        "断线重连核心：Redis缓存事件+seq序号+从断点重放",
+        "Nginx需proxy_buffering off + 长超时配置"
+      ]
+    },
+    "first_principle": {
+      "problem": "AI大模型生成是逐token流式的，网络不稳定可能导致连接中断，如何保证用户看到完整结果？",
+      "axioms": [
+        "SSE基于HTTP，不需要特殊协议升级（比WebSocket简单）",
+        "浏览器EventSource原生支持自动重连和Last-Event-ID",
+        "断线重连需要服务端有事件历史缓存才能从断点恢复",
+        "幂等性保证：去重防止重连后重复显示"
+      ],
+      "rebuild": "从AI流式输出需求出发：LLM SSE流式→服务端SSE代理→每个chunk带seq→Redis缓存事件→客户端记录Last-Event-ID→断线自动重连→服务端从Redis重放历史+继续接收新内容"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-sd-008",
+    "category": "system-design",
+    "subcategory": "架构设计",
+    "difficulty": "L5",
+    "tags": [
+      "AI网关",
+      "适配器模式",
+      "多模型",
+      "策略模式",
+      "LLM"
+    ],
+    "question": "如何设计多 AI 厂商接口统一适配方案？（入职Java复盘）",
+    "answer": "## 一、问题背景\n\n```\n现实场景：\n  - 业务需要调用多个AI厂商（OpenAI/Claude/通义千问/文心/智谱）\n  - 每个厂商的API格式不同（请求参数、响应结构、认证方式）\n  - 厂商可能宕机/限流/涨价 → 需要快速切换\n  - 不同模型擅长不同任务 → 需要动态路由\n\nOpenAI:    POST /v1/chat/completions  {model, messages, stream}\nClaude:    POST /v1/messages           {model, messages, max_tokens}\n通义千问:   POST /api/v1/services/aigc/text-generation/generation\n文心一言:   POST /rpc/2.0/ai_custom/v1/wenxinworkshop/chat/{model}\n```\n\n## 二、架构设计：AI 网关模式\n\n```\n                    ┌─────────────────────────────┐\n                    │       业务应用层              │\n                    │   chatService.chat(prompt)   │\n                    └────────────┬────────────────┘\n                                 │\n                    ┌────────────▼────────────────┐\n                    │       AI 网关 (Gateway)       │\n                    │                              │\n                    │  ┌─────────────────────┐    │\n                    │  │  路由策略层           │    │\n                    │  │  (成本/质量/延迟/地域) │    │\n                    │  └──────────┬──────────┘    │\n                    │             │                │\n                    │  ┌──────────▼──────────┐    │\n                    │  │  统一接口适配层        │    │\n                    │  │  Adapter Pattern     │    │\n                    │  └──────────┬──────────┘    │\n                    │             │                │\n                    │  ┌─────┬────┴───┬─────┐     │\n                    │  │     │        │     │     │\n                    │  ▼     ▼        ▼     ▼     │\n                    │ OpenAI Claude 通义  文心    │\n                    └──────────────────────────────┘\n```\n\n## 三、核心代码实现\n\n### 1. 统一接口定义\n\n```java\n// 统一的请求/响应模型\n@Data\npublic class ChatRequest {\n    private String model;         // gpt-4, claude-3, qwen-max...\n    private List<Message> messages;\n    private Double temperature;\n    private Integer maxTokens;\n    private Boolean stream;       // 是否流式\n    private Map<String, Object> extra; // 厂商特有参数\n}\n\n@Data\npublic class ChatResponse {\n    private String content;\n    private String finishReason;\n    private Usage usage;          // token统计\n    private String requestId;\n}\n\n@Data\npublic class Usage {\n    private int promptTokens;\n    private int completionTokens;\n    private int totalTokens;\n}\n\n// 统一适配器接口\npublic interface AIModelAdapter {\n    ChatResponse chat(ChatRequest request);\n    Flux<String> streamChat(ChatRequest request);  // 流式\n    String getProvider();  // \"openai\" / \"claude\" / \"qwen\"\n    boolean isAvailable(); // 健康检查\n}\n```\n\n### 2. 各厂商适配器实现\n\n```java\n@Component\npublic class OpenAIAdapter implements AIModelAdapter {\n    \n    @Value(\"${ai.openai.api-key}\")\n    private String apiKey;\n    \n    @Value(\"${ai.openai.base-url}\")\n    private String baseUrl;\n    \n    @Override\n    public ChatResponse chat(ChatRequest request) {\n        // 转换为OpenAI格式\n        Map<String, Object> body = new HashMap<>();\n        body.put(\"model\", request.getModel());\n        body.put(\"messages\", request.getMessages());\n        body.put(\"temperature\", request.getTemperature());\n        body.put(\"max_tokens\", request.getMaxTokens());\n        \n        // 调用OpenAI API\n        ResponseEntity<JsonNode> resp = restTemplate.postForEntity(\n            baseUrl + \"/v1/chat/completions\",\n            createHttpEntity(body),\n            JsonNode.class\n        );\n        \n        // 转换为统一响应\n        return parseOpenAIResponse(resp.getBody());\n    }\n    \n    @Override\n    public Flux<String> streamChat(ChatRequest request) {\n        request.setStream(true);\n        return webClient.post()\n            .uri(baseUrl + \"/v1/chat/completions\")\n            .header(\"Authorization\", \"Bearer \" + apiKey)\n            .bodyValue(request)\n            .retrieve()\n            .bodyToFlux(String.class)\n            .map(this::extractContent);\n    }\n    \n    @Override\n    public String getProvider() { return \"openai\"; }\n}\n\n@Component\npublic class ClaudeAdapter implements AIModelAdapter {\n    @Override\n    public ChatResponse chat(ChatRequest request) {\n        // Claude特有：需要max_tokens（必填）、system单独传\n        Map<String, Object> body = new HashMap<>();\n        body.put(\"model\", request.getModel());\n        body.put(\"messages\", extractNonSystemMessages(request));\n        body.put(\"system\", extractSystemMessage(request));\n        body.put(\"max_tokens\", request.getMaxTokens() != null ? \n                request.getMaxTokens() : 4096);  // Claude必填\n        // ...调用 + 转换\n    }\n}\n```\n\n### 3. 路由策略层\n\n```java\n@Service\npublic class AIRouter {\n    \n    @Autowired\n    private List<AIModelAdapter> adapters; // Spring自动注入所有适配器\n    \n    private final Map<String, AIModelAdapter> adapterMap;\n    \n    // 选择最优模型\n    public AIModelAdapter select(ChatRequest request) {\n        String model = request.getModel();\n        \n        // 策略1：指定模型 → 直接路由\n        if (model != null) {\n            return findByModel(model);\n        }\n        \n        // 策略2：按任务类型路由\n        String taskType = (String) request.getExtra().get(\"task_type\");\n        switch (taskType) {\n            case \"code\": return getAdapter(\"claude\");  // Claude擅长代码\n            case \"search\": return getAdapter(\"qwen\");   // 通义擅长搜索\n            default: return getAdapter(\"openai\");        // 默认GPT\n        }\n    }\n    \n    // 带降级的调用\n    public ChatResponse chatWithFallback(ChatRequest request) {\n        List<AIModelAdapter> chain = getFailoverChain(request);\n        for (AIModelAdapter adapter : chain) {\n            try {\n                if (adapter.isAvailable()) {\n                    return adapter.chat(request);\n                }\n            } catch (Exception e) {\n                log.warn(\"{} failed: {}, trying next\", \n                        adapter.getProvider(), e.getMessage());\n            }\n        }\n        throw new AllProvidersFailedException(\"All AI providers failed\");\n    }\n}\n```\n\n## 四、面试加分：AI网关工程化\n\n```\n┌──────────────────────────────────────────────────┐\n│                 AI 网关核心能力                    │\n├──────────────────────────────────────────────────┤\n│                                                    │\n│  1. 统一接口：业务层只对接一套API                   │\n│                                                    │\n│  2. 智能路由：按成本/延迟/质量自动选模型             │\n│     • 代码任务 → Claude (质量优先)                │\n│     • 简单问答 → GPT-3.5 (成本优先)               │\n│     • 中文场景 → 通义/文心 (本地化)                │\n│                                                    │\n│  3. 降级容错：A厂商挂了自动切B厂商                  │\n│                                                    │\n│  4. 统一计费：Token统计+成本分摊                    │\n│                                                    │\n│  5. 安全审计：敏感词过滤+Prompt注入防护              │\n│                                                    │\n│  6. 缓存加速：相同请求直接返回缓存结果               │\n│                                                    │\n│  7. 限流熔断：保护下游API + 控制成本                │\n│                                                    │\n│  8. 灰度发布：新模型按比例灰度                      │\n└──────────────────────────────────────────────────┘\n```",
+    "follow_up": [
+      "AI网关如何做成本优化？Token预算管理怎么做？",
+      "多个AI厂商的流式响应格式不同，如何统一？",
+      "如何防止Prompt注入攻击？AI网关的安全策略？",
+      "OpenAI的Function Calling和Claude的Tool Use如何统一适配？"
+    ],
+    "feynman": {
+      "essence": "AI网关模式就是定义一套统一的接口（适配器模式），让业务层不关心底层调的是哪家AI厂商。各厂商API差异封装在各自的Adapter里，路由层决定用哪个厂商。",
+      "analogy": "AI网关像国际快递公司。你只需要说「寄到国外」，快递公司（网关）自动选择走空运(OpenAI快)、海运(通义便宜)还是陆运(文心)。你不用关心每家航空公司的规定，快递公司帮你处理所有差异。",
+      "key_points": [
+        "适配器模式：统一接口+各厂商Adapter实现",
+        "路由策略：按任务类型/成本/质量/延迟选模型",
+        "降级容错：failover chain自动切换厂商",
+        "工程化：计费/缓存/限流/审计/灰度",
+        "设计模式：Adapter(接口适配)+Strategy(路由)+Factory(创建)"
+      ]
+    },
+    "first_principle": {
+      "problem": "多个AI厂商API格式各异，业务代码不应与具体厂商耦合。如何设计可扩展的多模型适配架构？",
+      "axioms": [
+        "依赖倒置：业务层依赖抽象接口，不依赖具体厂商",
+        "开闭原则：新增厂商不改现有代码（加新Adapter即可）",
+        "单一职责：适配器只做格式转换，路由只做决策",
+        "故障隔离：单个厂商故障不影响其他厂商"
+      ],
+      "rebuild": "从多厂商适配需求出发：定义统一接口(AIModelAdapter)→各厂商实现(OpenAIAdapter/ClaudeAdapter)→路由层选最优(策略模式)→降级链容错→网关层加缓存/计费/限流。核心是适配器模式解耦业务与厂商"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-sd-009",
+    "category": "system-design",
+    "subcategory": "缓存",
+    "difficulty": "L4",
+    "tags": [
+      "多级缓存",
+      "Caffeine",
+      "Redis",
+      "本地缓存",
+      "缓存一致性"
+    ],
+    "question": "多级缓存方案如何设计？AI业务场景下的缓存策略？（入职Java复盘）",
+    "answer": "## 一、多级缓存架构\n\n```\n请求 → L1 本地缓存 → L2 分布式缓存 → L3 数据库\n        (Caffeine)     (Redis)         (MySQL)\n        ~1ms           ~3ms            ~10ms\n        \n命中率目标：\n  L1: 30-50%（热点数据）\n  L2: 80-90%（大部分缓存）\n  DB: <5%（仅穿透请求）\n```\n\n```\n┌────────────────────────────────────────────────────────┐\n│                    应用实例1                            │\n│  ┌──────────┐    ┌──────────┐    ┌──────────────┐     │\n│  │ L1 Caffeine│   │ L2 Redis │   │ L3 MySQL     │     │\n│  │ (堆内存)   │   │ (分布式)  │   │ (持久化)     │     │\n│  │ ~1ms      │   │ ~3ms     │   │ ~10ms        │     │\n│  │ 容量小     │   │ 容量大    │   │ 容量大       │     │\n│  └──────────┘    └──────────┘   └──────────────┘     │\n│                                                          │\n│  ┌──────────┐    ┌──────────┐    ┌──────────────┐     │\n│  │ L1 Caffeine│   │ L2 Redis │   │ L3 MySQL     │     │\n│  └──────────┘    └──────────┘   └──────────────┘     │\n│                    应用实例2                            │\n└────────────────────────────────────────────────────────┘\n```\n\n## 二、各级缓存职责\n\n| 层级 | 技术 | 特点 | 适合数据 |\n|------|------|------|---------|\n| L1 本地 | Caffeine | 最快~1ms，容量受限于JVM堆 | 配置、字典、热点数据 |\n| L2 分布式 | Redis | 快~3ms，跨实例共享，大容量 | 会话、热点列表、计算结果 |\n| L3 数据库 | MySQL | 持久可靠~10ms | 原始数据、事务数据 |\n\n## 三、Caffeine 本地缓存（L1）\n\n```java\n@Configuration\npublic class CacheConfig {\n    \n    @Bean\n    public Cache<String, AIResponse> aiResponseCache() {\n        return Caffeine.newBuilder()\n            .maximumSize(10_000)           // 最大缓存1万条\n            .expireAfterWrite(Duration.ofMinutes(5))  // 写后5分钟过期\n            .expireAfterAccess(Duration.ofMinutes(10)) // 访问后10分钟过期\n            .recordStats()                 // 开启统计\n            .build();\n    }\n}\n\n// 使用示例\n@Service\npublic class AIChatService {\n    \n    @Autowired\n    private Cache<String, AIResponse> localCache;\n    \n    @Autowired\n    private RedisTemplate<String, AIResponse> redisTemplate;\n    \n    @Autowired\n    private AIModelAdapter aiAdapter;\n    \n    public AIResponse chat(String prompt) {\n        String key = \"ai:chat:\" + DigestUtils.md5Hex(prompt);\n        \n        // L1: 本地缓存\n        AIResponse cached = localCache.getIfPresent(key);\n        if (cached != null) {\n            return cached;  // ~1ms\n        }\n        \n        // L2: Redis缓存\n        cached = redisTemplate.opsForValue().get(key);\n        if (cached != null) {\n            localCache.put(key, cached);  // 回填L1\n            return cached;  // ~3ms\n        }\n        \n        // L3: 调用AI API\n        cached = aiAdapter.chat(new ChatRequest(prompt));  // ~500ms-3s\n        \n        // 写入缓存\n        localCache.put(key, cached);\n        redisTemplate.opsForValue().set(key, cached, 5, TimeUnit.MINUTES);\n        \n        return cached;\n    }\n}\n```\n\n## 四、缓存一致性方案\n\n### 问题：多实例L1缓存不一致\n\n```\n实例1 L1: user=张三     实例2 L1: user=张三\n         ↓ 更新                    ↓ 未更新\n         user=李四                 user=张三 ← 旧数据！\n```\n\n### 方案1：Redis Pub/Sub 广播失效（推荐⭐）\n\n```java\n// 更新缓存时\npublic void updateUser(User user) {\n    // 1. 更新数据库\n    userMapper.update(user);\n    // 2. 删除Redis缓存\n    redisTemplate.delete(\"user:\" + user.getId());\n    // 3. 广播通知所有实例清L1\n    redisTemplate.convertAndSend(\"cache:invalidate\", \n        \"user:\" + user.getId());\n}\n\n// 监听失效消息\n@Component\npublic class CacheInvalidationListener implements MessageListener {\n    @Autowired\n    private Cache<String, Object> localCache;\n    \n    @Override\n    public void onMessage(Message message, byte[] pattern) {\n        String key = new String(message.getBody());\n        localCache.invalidate(key);  // 清除本地缓存\n    }\n}\n```\n\n### 方案2：短TTL（简单方案）\n\n```\nL1 Caffeine TTL = 30秒（短过期）\n即使不一致，最多30秒后自动刷新\n适合：容忍短暂不一致的非关键数据\n```\n\n### 方案3：Canal 监听 binlog（终极方案）\n\n```\nMySQL binlog → Canal → Kafka → 各应用实例清L1+L2缓存\n保证最终一致性，不侵入业务代码\n```\n\n## 五、AI业务场景缓存策略\n\n### 1. Embedding 向量缓存\n\n```java\n// 相同文本的Embedding结果缓存（省API费用）\npublic float[] getEmbedding(String text) {\n    String key = \"emb:\" + DigestUtils.md5Hex(text);\n    // 多级缓存查找\n    return cacheChain.get(key, () -> embeddingClient.embed(text));\n    // Embedding API调用$0.0001/1K tokens，缓存可省大量费用\n}\n```\n\n### 2. 常见问题缓存\n\n```\n用户高频问题（如\"你是谁\"、\"怎么使用\"）→ 缓存完整回答\n  key = \"faq:\" + md5(question)\n  TTL = 24小时\n  \n命中率可达30-50%，大幅降低API调用成本\n```\n\n### 3. Prompt 模板缓存\n\n```\nSystem Prompt + Few-shot examples → 编译后缓存\n只有User Message部分动态变化\n```\n\n### 4. 多级缓存命中率监控\n\n```java\n// Caffeine 统计\nCacheStats stats = cache.stats();\nlog.info(\"L1 Hit rate: {:.2f}%, Eviction: {}, Avg load time: {}ms\",\n    stats.hitRate() * 100,\n    stats.evictionCount(),\n    stats.averageLoadPenalty() / 1_000_000);\n```",
+    "follow_up": [
+      "Caffeine 的 W-TinyLFU 淘汰算法比传统 LRU 好在哪？",
+      "缓存击穿（热点key过期）如何用布隆过滤器解决？",
+      "如何保证多级缓存的最终一致性？Canal 方案的优缺点？",
+      "AI场景下哪些数据适合缓存？Embedding缓存如何设计？"
+    ],
+    "feynman": {
+      "essence": "多级缓存就是L1(Caffeine本地)→L2(Redis分布式)→L3(MySQL)三层逐级降速的缓存体系。本地缓存最快但各实例独立需处理一致性，分布式缓存共享但多一跳网络。",
+      "analogy": "多级缓存像快递柜系统：L1是你家门口的快递柜(最快但容量小)、L2是小区快递站(快容量大但多走几步)、L3是远郊仓库(最慢但什么都有)。大部分快递在小区快递站就找到了，不需要去远郊。",
+      "key_points": [
+        "三级缓存：Caffeine(~1ms)→Redis(~3ms)→MySQL(~10ms)",
+        "L1容量小速度快但不跨实例共享→需一致性方案",
+        "一致性：Redis Pub/Sub广播失效 > 短TTL > Canal binlog",
+        "AI场景：Embedding缓存+FAQ缓存可省大量API费用",
+        "监控命中率：L1目标30-50%，L2目标80-90%"
+      ]
+    },
+    "first_principle": {
+      "problem": "数据访问有明显的局部性（热点/重复），如何用多层级存储介质平衡速度、容量和一致性？",
+      "axioms": [
+        "存储层级越靠近CPU越快但容量越小（寄存器>L1>L2>L3>内存>磁盘）",
+        "缓存命中率决定性能：命中率每提升10%，平均延迟降低一个数量级",
+        "多实例本地缓存必然有一致性问题，需要失效广播或TTL兜底",
+        "AI场景API调用成本高，缓存的ROI（投入产出比）远高于传统场景"
+      ],
+      "rebuild": "从数据访问加速需求出发：DB→Redis(L2分布式缓存)→Caffeine(L1本地缓存)。L1解决单实例热点、L2解决跨实例共享。一致性通过Pub/Sub广播失效保证。AI场景API成本高，Embedding/FAQ缓存的ROI极高"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-sd-010",
+    "category": "system-design",
+    "subcategory": "架构设计",
+    "difficulty": "L5",
+    "tags": [
+      "Kubernetes",
+      "可观测性",
+      "Prometheus",
+      "SkyWalking",
+      "运维"
+    ],
+    "question": "K8s 环境下的配置管理与可观测性方案如何设计？（入职Java复盘）",
+    "answer": "## 一、K8s 配置管理\n\n### ConfigMap + Secret 分层管理\n\n```yaml\n# 1. 普通配置 → ConfigMap\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: ai-service-config\ndata:\n  application.yaml: |\n    ai:\n      providers:\n        openai:\n          base-url: https://api.openai.com\n          timeout: 30000\n        claude:\n          base-url: https://api.anthropic.com\n          timeout: 60000\n      cache:\n        l1-ttl: 300\n        l2-ttl: 600\n\n---\n# 2. 敏感信息 → Secret（base64编码）\napiVersion: v1\nkind: Secret\nmetadata:\n  name: ai-service-secret\ntype: Opaque\ndata:\n  openai-api-key: c2st4ByT...   # echo -n \"sk-xxx\" | base64\n  claude-api-key: c2stYW50aA...\n\n---\n# 3. Pod 挂载配置\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: ai-service\nspec:\n  template:\n    spec:\n      containers:\n      - name: app\n        image: ai-service:v1.0\n        envFrom:\n        - configMapRef:\n            name: ai-service-config\n        - secretRef:\n            name: ai-service-secret\n        # 或者挂载为文件\n        volumeMounts:\n        - name: config-volume\n          mountPath: /app/config\n      volumes:\n      - name: config-volume\n        configMap:\n          name: ai-service-config\n```\n\n### 动态配置更新（无需重启Pod）\n\n```java\n// Spring Cloud Kubernetes 动态刷新\n@RefreshScope\n@RestController\npublic class AIController {\n    \n    @Value(\"${ai.providers.openai.timeout:30000}\")\n    private int openaiTimeout;  // ConfigMap更新后自动刷新\n    \n    @Value(\"${ai.cache.l1-ttl:300}\")\n    private int l1CacheTTL;\n}\n\n// 或使用 Nacos/Apollo 做配置中心\n@NacosConfigListener(dataId = \"ai-service.yaml\")\npublic void onConfigUpdate(String config) {\n    // 配置变更时回调，热更新\n    refreshConfig(config);\n}\n```\n\n## 二、可观测性三支柱\n\n```\n┌──────────────────────────────────────────────────┐\n│              可观测性 (Observability)              │\n│                                                    │\n│  ┌──────────┐  ┌──────────┐  ┌──────────┐       │\n│  │ Metrics  │  │ Logging  │  │ Tracing  │       │\n│  │ 指标监控  │  │ 日志聚合  │  │ 链路追踪  │       │\n│  │(Prometheus│  │(ELK/LoKi)│  │(SkyWalking│       │\n│  │ +Grafana) │  │          │  │ /Jaeger) │       │\n│  └──────────┘  └──────────┘  └──────────┘       │\n│                                                    │\n│  \"系统现在什么状态\"  \"发生了什么\"  \"请求经过了哪里\"    │\n└──────────────────────────────────────────────────┘\n```\n\n## 三、Metrics 指标监控（Prometheus + Grafana）\n\n### Spring Boot Actuator + Micrometer\n\n```java\n@Service\npublic class AIChatService {\n    \n    private final MeterRegistry registry;\n    private final Counter requestCounter;\n    private final Timer responseTimer;\n    private final Gauge cacheHitGauge;\n    \n    public AIChatService(MeterRegistry registry) {\n        this.registry = registry;\n        this.requestCounter = Counter.builder(\"ai.chat.requests\")\n            .tag(\"provider\", \"openai\")\n            .register(registry);\n        this.responseTimer = Timer.builder(\"ai.chat.latency\")\n            .register(registry);\n    }\n    \n    public ChatResponse chat(String prompt) {\n        return responseTimer.record(() -> {\n            requestCounter.increment();\n            // 业务逻辑\n            return doChat(prompt);\n        });\n    }\n}\n```\n\n### 关键监控指标\n\n```\n┌────────────────────────────────────────────────┐\n│  Grafana Dashboard 核心面板                      │\n│                                                  │\n│  📊 业务指标                                      │\n│  • ai_chat_requests_total (QPS)                 │\n│  • ai_chat_latency_seconds (P50/P95/P99延迟)    │\n│  • ai_chat_tokens_total (Token消耗速率)          │\n│  • ai_chat_cost_dollars (实时成本)               │\n│  • ai_cache_hit_ratio (缓存命中率)               │\n│                                                  │\n│  📊 系统指标                                      │\n│  • jvm_memory_used_bytes (JVM内存)               │\n│  • jvm_gc_pause_seconds (GC暂停)                │\n│  • process_cpu_usage (CPU使用率)                 │\n│  • http_server_requests_seconds (HTTP延迟)       │\n│                                                  │\n│  📊 K8s指标                                      │\n│  • kube_pod_status_phase (Pod状态)               │\n│  • container_cpu_usage_seconds (容器CPU)         │\n│  • container_memory_working_set_bytes (容器内存) │\n└────────────────────────────────────────────────┘\n```\n\n### 告警规则\n\n```yaml\n# Prometheus Alert Rule\ngroups:\n- name: ai-service-alerts\n  rules:\n  # AI API延迟过高\n  - alert: HighAILatency\n    expr: histogram_quantile(0.99, ai_chat_latency_seconds_bucket) > 5\n    for: 5m\n    labels:\n      severity: warning\n    annotations:\n      summary: \"AI API P99延迟超过5秒\"\n  \n  # 错误率过高\n  - alert: HighErrorRate\n    expr: rate(ai_chat_errors_total[5m]) / rate(ai_chat_requests_total[5m]) > 0.05\n    for: 2m\n    labels:\n      severity: critical\n    annotations:\n      summary: \"AI服务错误率超过5%\"\n  \n  # Pod重启\n  - alert: PodRestart\n    expr: increase(kube_pod_container_status_restarts_total[1h]) > 3\n    labels:\n      severity: critical\n```\n\n## 四、Logging 日志聚合\n\n### 结构化日志（JSON格式）\n\n```java\n// 使用 SLF4J + Logback JSON格式\n@Slf4j\n@Service\npublic class AIChatService {\n    \n    public ChatResponse chat(ChatRequest request) {\n        // 结构化日志：方便ELK搜索和聚合\n        log.info(JSON.toJSONString(Map.of(\n            \"event\", \"ai_chat_start\",\n            \"request_id\", MDC.get(\"requestId\"),\n            \"provider\", request.getModel(),\n            \"prompt_length\", request.getPrompt().length(),\n            \"user_id\", request.getUserId()\n        )));\n        \n        ChatResponse response = doChat(request);\n        \n        log.info(JSON.toJSONString(Map.of(\n            \"event\", \"ai_chat_complete\",\n            \"request_id\", MDC.get(\"requestId\"),\n            \"tokens_used\", response.getUsage().getTotalTokens(),\n            \"latency_ms\", elapsedMs,\n            \"status\", \"success\"\n        )));\n        \n        return response;\n    }\n}\n```\n\n### EFK 日志栈（K8s环境）\n\n```\nPod → Fluent Bit(边车/DaemonSet) → Elasticsearch → Kibana\n\n日志查询示例（Kibana KQL）：\n  event: \"ai_chat_error\" AND provider: \"openai\" AND latency_ms > 3000\n```\n\n## 五、Tracing 链路追踪\n\n### SkyWalking / Jaeger\n\n```java\n// Spring Boot 自动接入（Java Agent方式）\n// 启动参数：-javaagent:/skywalking-agent.jar\n\n// 手动添加Span\n@Trace\npublic ChatResponse chat(String prompt) {\n    // 自动生成Trace Span\n    TraceContext.putCorrelation(\"user_id\", userId);\n    TraceContext.putCorrelation(\"prompt_hash\", md5(prompt));\n    \n    ChatResponse response = aiAdapter.chat(request);\n    \n    // 记录自定义标签\n    Span.current().setTag(\"tokens\", response.getUsage().getTotalTokens());\n    Span.current().setTag(\"provider\", \"openai\");\n    \n    return response;\n}\n```\n\n### 链路追踪视图\n\n```\nTrace: user_id=1001 request_id=abc123\n│\n├── [2ms] Gateway → ai-service\n│   ├── [5ms] AIChatService.chat()\n│   │   ├── [1ms] L1 Caffeine cache miss\n│   │   ├── [3ms] L2 Redis cache miss\n│   │   ├── [1500ms] OpenAI API call  ← 瓶颈！\n│   │   └── [2ms] Redis cache set\n│   └── [1ms] Response\n│\n总耗时: 1512ms\n瓶颈定位: OpenAI API调用占99%\n```",
+    "follow_up": [
+      "K8s 中如何做滚动更新和优雅停机？",
+      "Prometheus 的 Pull 和 Push 模式有什么区别？K8s 用哪个？",
+      "如何用 SkyWalking 排查慢请求？Trace 和 Span 的关系？",
+      "AI服务的 SLA 怎么定义？P99 延迟如何优化？"
+    ],
+    "feynman": {
+      "essence": "K8s配置管理用ConfigMap(普通)+Secret(敏感)分离管理。可观测性三支柱：Metrics(指标/Prometheus)+Logging(日志/ELK)+Tracing(链路/SkyWalking)，分别回答「系统状态」「发生了什么」「请求经过了哪」。",
+      "analogy": "配置管理像公司的文件柜：ConfigMap是公开的操作手册（谁都能看），Secret是保险柜（只有授权人能看密码）。可观测性像医院的监护系统：Metrics是体温血压(实时数值)，Logging是病历(详细记录)，Tracing是转诊单(记录患者经过了哪些科室)。",
+      "key_points": [
+        "配置管理：ConfigMap+Secret，支持envFrom和volumeMount",
+        "动态配置：@RefreshScope热更新或Nacos/Apollo",
+        "可观测三支柱：Metrics+Logging+Tracing",
+        "Metrics: Prometheus+Grafana+Micrometer",
+        "Logging: 结构化JSON日志→EFK栈",
+        "Tracing: SkyWalking/Jaeger+Java Agent"
+      ]
+    },
+    "first_principle": {
+      "problem": "分布式微服务环境下，系统由几十个服务组成，如何管理配置和观测系统健康状态？",
+      "axioms": [
+        "配置应与代码分离（12-Factor App原则）",
+        "可观测性是分布式系统的「免疫系统」——没有可观测性的系统无法运维",
+        "Metrics回答「what」（指标异常）、Logging回答「why」（原因）、Tracing回答「where」（位置）",
+        "K8s的声明式配置 + Secret加密 + 动态刷新 = 生产级配置管理"
+      ],
+      "rebuild": "从分布式运维需求出发：ConfigMap+Secret(配置分离)→Prometheus(指标监控+告警)→EFK(日志聚合搜索)→SkyWalking(全链路追踪)。三者互补形成完整的可观测性体系，缺一不可"
+    },
+    "images": []
   }
 ]

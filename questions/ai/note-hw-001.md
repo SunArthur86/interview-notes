@@ -23,9 +23,14 @@ first_principle:
   derivation: 如果数据量远超内存，必须放弃"全部加载到列表再处理"的模式，改为"产生一个→处理一个→丢弃一个"的流水线。迭代器协议提供了这种流水线的标准接口，生成器提供了用普通函数描述这种流水线的语法糖。
   conclusion: 生成器+迭代器是流式处理的基石，让O(n)时间复杂度和O(1)空间复杂度同时成立
 follow_up:
-  - 生成器协程（async generator）和普通生成器有什么区别？
-  - itertools.chain如何实现多个生成器的级联？
-  - 大模型训练数据预处理时如何用生成器做pipeline？
+- 生成器协程（async generator）和普通生成器有什么区别？
+- itertools.chain如何实现多个生成器的级联？
+- 大模型训练数据预处理时如何用生成器做pipeline？
+memory_points:
+- 包含关系：生成器是特殊的迭代器（Generator ⊂ Iterator），yield 关键字自动实现协议。
+- 状态管理：迭代器需手写 class 维护状态，生成器用 yield 自动冻结并恢复执行上下文。
+- 空间优势：流式处理按需 yield 逐行产出，内存恒定在 O(1)，完美解决大文件 OOM 问题。
+- 流水线模式：多个生成器可级联 chaining，数据像流水线一样穿过多个处理阶段。
 ---
 
 # 【华为面经】Python 生成器与迭代器的区别？流式处理有什么优势？
@@ -260,3 +265,11 @@ list(flatten([1, [2, [3, 4]], 5]))  # [1, 2, 3, 4, 5]
 - **async generator（async yield）**：Python 3.6+，用于异步流式处理（如流式读取网络数据）
 - **itertools标准库**：`chain`、`islice`、`groupby`、`tee` 等是生成器组合的核心工具
 - **PyTorch DataLoader**：本质就是迭代器模式——`iter(dataloader)` 逐batch产出数据，内部用多进程+生成器实现预加载
+
+## 记忆要点
+
+- 包含关系：生成器是特殊的迭代器（Generator ⊂ Iterator），yield 关键字自动实现协议。
+- 状态管理：迭代器需手写 class 维护状态，生成器用 yield 自动冻结并恢复执行上下文。
+- 空间优势：流式处理按需 yield 逐行产出，内存恒定在 O(1)，完美解决大文件 OOM 问题。
+- 流水线模式：多个生成器可级联 chaining，数据像流水线一样穿过多个处理阶段。
+

@@ -4,27 +4,32 @@ difficulty: L4
 category: ai
 subcategory: 推理优化
 tags:
-  - 群核
-  - 面经
-  - 推理加速
-  - Speculative Decoding
+- 群核
+- 面经
+- 推理加速
+- Speculative Decoding
 feynman:
-  essence: "投机解码用一个小的draft模型快速生成候选token，再用大target模型并行验证，把自回归的串行过程变成并行验证，实现2-3倍加速"
-  analogy: "写文章时先用AI生成初稿(draft模型快)，再人工审核修改(target模型准)——比逐字手写快得多，质量有保证"
-  first_principle: "大模型推理慢是因为自回归(逐token生成)，如果能预判多个token再批量验证，就能把串行变并行"
+  essence: 投机解码用一个小的draft模型快速生成候选token，再用大target模型并行验证，把自回归的串行过程变成并行验证，实现2-3倍加速
+  analogy: 写文章时先用AI生成初稿(draft模型快)，再人工审核修改(target模型准)——比逐字手写快得多，质量有保证
+  first_principle: 大模型推理慢是因为自回归(逐token生成)，如果能预判多个token再批量验证，就能把串行变并行
   key_points:
-    - 'Draft模型: 小模型，快速生成k个候选token'
-    - 'Target模型: 大模型，并行验证k个token'
-    - '接受规则: 拒绝采样，保证输出分布与target模型完全一致'
-    - '加速比: 2-3x，取决于draft模型准确率和k值'
+  - 'Draft模型: 小模型，快速生成k个候选token'
+  - 'Target模型: 大模型，并行验证k个token'
+  - '接受规则: 拒绝采样，保证输出分布与target模型完全一致'
+  - '加速比: 2-3x，取决于draft模型准确率和k值'
 first_principle:
-  essence: "自回归生成的瓶颈是每步只产生1个token，投机解码通过预判+验证实现每步产生多个token"
-  derivation: "大模型逐token生成慢 → 小模型生成快但不够准 → 用小模型预判k个token → 大模型并行验证 → 接受正确的、拒绝错误的 → 净效果: 多token并行验证"
-  conclusion: "投机解码是一种无损加速方法，输出分布与纯大模型完全一致"
+  essence: 自回归生成的瓶颈是每步只产生1个token，投机解码通过预判+验证实现每步产生多个token
+  derivation: '大模型逐token生成慢 → 小模型生成快但不够准 → 用小模型预判k个token → 大模型并行验证 → 接受正确的、拒绝错误的 → 净效果: 多token并行验证'
+  conclusion: 投机解码是一种无损加速方法，输出分布与纯大模型完全一致
 follow_up:
-  - "Draft模型怎么选？一定要小模型吗？"
-  - "k值(投机长度)怎么确定最优？"
-  - "Medusa/EAGLE和普通投机解码有什么区别？"
+- Draft模型怎么选？一定要小模型吗？
+- k值(投机长度)怎么确定最优？
+- Medusa/EAGLE和普通投机解码有什么区别？
+memory_points:
+- 一句话原理：小模型串行快速猜Draft，大模型一次并行验Target，以时间换吞吐。
+- 无损加速机制：基于拒绝采样（接受率=min(1, 目标概率/草稿概率)），绝不损失大模型生成质量。
+- 因为大模型解码是计算密集的串行访存，所以投机解码能把多次串行转化为一次并行验证。
+- 速度关键：草稿模型必须极小且与目标模型分布相近，猜对率越高，加速比越大。
 ---
 
 # 什么是投机解码(Speculative Decoding)？
@@ -156,3 +161,11 @@ Draft模型不直接生成token，而是预测target模型的隐藏状态
 | **量化** | FP16→INT8/INT4 | 2-4x | ⚠️有损 |
 | **KV Cache** | 缓存历史Key/Value | 2-5x | ✅ |
 | **Continuous Batching** | 动态拼batch | 5-10x | ✅ |
+
+## 记忆要点
+
+- 一句话原理：小模型串行快速猜Draft，大模型一次并行验Target，以时间换吞吐。
+- 无损加速机制：基于拒绝采样（接受率=min(1, 目标概率/草稿概率)），绝不损失大模型生成质量。
+- 因为大模型解码是计算密集的串行访存，所以投机解码能把多次串行转化为一次并行验证。
+- 速度关键：草稿模型必须极小且与目标模型分布相近，猜对率越高，加速比越大。
+

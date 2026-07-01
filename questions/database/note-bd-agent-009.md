@@ -4,27 +4,32 @@ difficulty: L2
 category: database
 subcategory: Redis
 tags:
-  - 字节
-  - 面经
-  - Redis
-  - 分布式锁
+- 字节
+- 面经
+- Redis
+- 分布式锁
 feynman:
   essence: 长链路用Redisson(自动续期)，短耗时用SetNX(轻量快速)，锁粒度按orderId/groupId控制
-  analogy: '长链路操作像装修(需要好几天)要签正式合同(Redisson+续期)，短操作像借充电宝(几分钟)扫码即用(SetNX)'
-  first_principle: '分布式锁的本质是在分布式系统中实现互斥访问，核心要求是原子性获取+安全释放+超时自动释放'
+  analogy: 长链路操作像装修(需要好几天)要签正式合同(Redisson+续期)，短操作像借充电宝(几分钟)扫码即用(SetNX)
+  first_principle: 分布式锁的本质是在分布式系统中实现互斥访问，核心要求是原子性获取+安全释放+超时自动释放
   key_points:
-    - Redisson适合长链路场景（有watchdog自动续期）
-    - SetNX适合短耗时场景（性能轻量）
-    - 锁粒度按orderId或groupId控制
-    - 不同场景选不同方案
+  - Redisson适合长链路场景（有watchdog自动续期）
+  - SetNX适合短耗时场景（性能轻量）
+  - 锁粒度按orderId或groupId控制
+  - 不同场景选不同方案
 first_principle:
   essence: 分布式锁需要解决三个基本问题——获取原子性、释放安全性、持有超时保护
-  derivation: '多节点竞争同一资源→需要互斥→获取必须原子→释放必须校验owner→超时必须自动释放防止死锁'
+  derivation: 多节点竞争同一资源→需要互斥→获取必须原子→释放必须校验owner→超时必须自动释放防止死锁
   conclusion: 分布式锁 = 原子获取 + 安全释放 + 超时保护 + (可选)自动续期
 follow_up:
-  - 'Redisson的watchdog机制是怎么实现的？'
-  - 'RedLock算法了解吗？有什么争议？'
-  - '锁粒度怎么设计才能兼顾安全和性能？'
+- Redisson的watchdog机制是怎么实现的？
+- RedLock算法了解吗？有什么争议？
+- 锁粒度怎么设计才能兼顾安全和性能？
+memory_points:
+- 核心结论：长链路用Redisson+watchdog（支付结算），短耗时用SetNX+过期时间（库存限流）
+- 对比记忆：Redisson内置自动续期、可重入、安全释放，而SetNX轻量但需手动写Lua防误删
+- 关键数字：watchdog底层机制是每10秒自动续期，把过期时间重置为30秒
+- 一句话原则：锁粒度按业务实体设计（如订单ID），不同实体不互斥，坚决避免全局锁
 ---
 
 # Redis里的分布式锁你们具体用了什么方案？
@@ -159,3 +164,11 @@ lock_key = f"lock:user:{user_id}:action:buy:item:{item_id}"
 2. **理解watchdog**：能解释续期机制和JVM崩溃时的自动释放
 3. **锁粒度设计**：提到按orderId/groupId控制，体现并发优化意识
 4. **安全释放**：强调Lua脚本校验value，避免误删他人锁
+
+## 记忆要点
+
+- 核心结论：长链路用Redisson+watchdog（支付结算），短耗时用SetNX+过期时间（库存限流）
+- 对比记忆：Redisson内置自动续期、可重入、安全释放，而SetNX轻量但需手动写Lua防误删
+- 关键数字：watchdog底层机制是每10秒自动续期，把过期时间重置为30秒
+- 一句话原则：锁粒度按业务实体设计（如订单ID），不同实体不互斥，坚决避免全局锁
+

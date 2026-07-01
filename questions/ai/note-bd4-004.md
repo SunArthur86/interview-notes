@@ -4,28 +4,33 @@ difficulty: L4
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Harness
-  - 工程化
+- 字节
+- 面经
+- Harness
+- 工程化
 feynman:
-  essence: "Harness是包裹在Agent核心逻辑外面的工程化层，负责调度、超时熔断、上下文注入、可观测性、错误隔离等生产级保障"
-  analogy: "Agent核心逻辑是赛车手，Harness是整辆赛车——引擎再好，没有刹车(熔断)、仪表盘(监控)、安全带(错误隔离)也不能上赛道"
-  first_principle: "LLM是非确定性的，Agent是多步执行的复杂系统，生产环境必须用工程手段保障可靠性"
+  essence: Harness是包裹在Agent核心逻辑外面的工程化层，负责调度、超时熔断、上下文注入、可观测性、错误隔离等生产级保障
+  analogy: Agent核心逻辑是赛车手，Harness是整辆赛车——引擎再好，没有刹车(熔断)、仪表盘(监控)、安全带(错误隔离)也不能上赛道
+  first_principle: LLM是非确定性的，Agent是多步执行的复杂系统，生产环境必须用工程手段保障可靠性
   key_points:
-    - '调度层：任务队列、并发控制、优先级'
-    - '超时熔断：单步超时、全局超时、失败重试'
-    - '上下文注入：System Prompt管理、动态上下文窗口'
-    - '可观测性：全链路trace、token计数、成本追踪'
-    - '错误隔离：单步失败不影响整体、降级兜底'
+  - 调度层：任务队列、并发控制、优先级
+  - 超时熔断：单步超时、全局超时、失败重试
+  - 上下文注入：System Prompt管理、动态上下文窗口
+  - 可观测性：全链路trace、token计数、成本追踪
+  - 错误隔离：单步失败不影响整体、降级兜底
 first_principle:
-  essence: "LLM应用的工程复杂度不在模型调用，而在围绕模型调用的可靠性保障"
-  derivation: "LLM输出不确定 → 单步可能失败 → 多步串联放大失败率 → 需要超时/重试/降级机制 → 需要监控发现问题 → 需要隔离避免级联失败"
-  conclusion: "Harness层是Agent从demo走向生产的必经之路"
+  essence: LLM应用的工程复杂度不在模型调用，而在围绕模型调用的可靠性保障
+  derivation: LLM输出不确定 → 单步可能失败 → 多步串联放大失败率 → 需要超时/重试/降级机制 → 需要监控发现问题 → 需要隔离避免级联失败
+  conclusion: Harness层是Agent从demo走向生产的必经之路
 follow_up:
-  - "你们Agent系统的P99延迟多少？怎么优化的？"
-  - "Agent超时后怎么处理？直接返回错误还是有兜底？"
-  - "怎么做Agent的灰度发布？"
+- 你们Agent系统的P99延迟多少？怎么优化的？
+- Agent超时后怎么处理？直接返回错误还是有兜底？
+- 怎么做Agent的灰度发布？
+memory_points:
+- 一句话定义：包裹在Agent核心逻辑(LLM)外面的工程保障层
+- 六大核心职责：调度(并发/编排)、熔断(超时/重试)、上下文管理
+- 还包含：可观测性(Tracing)、错误隔离兜底、安全审计与人机协同
+- 因为LLM API易超时打满，所以Harness层必须实现并发控制与三层超时兜底机制
 ---
 
 # 什么是 Harness Engineering？Agent Harness 层包含哪些职责？
@@ -165,3 +170,11 @@ async def step(self, input):
 - Eino：Go语言AI编排框架，类似LangGraph的Graph引擎
 - CloudWeGo：高性能RPC框架(Kitex) + HTTP框架(Hertz)
 - 结合自研LLM网关，实现统一调度、限流、监控
+
+## 记忆要点
+
+- 一句话定义：包裹在Agent核心逻辑(LLM)外面的工程保障层
+- 六大核心职责：调度(并发/编排)、熔断(超时/重试)、上下文管理
+- 还包含：可观测性(Tracing)、错误隔离兜底、安全审计与人机协同
+- 因为LLM API易超时打满，所以Harness层必须实现并发控制与三层超时兜底机制
+

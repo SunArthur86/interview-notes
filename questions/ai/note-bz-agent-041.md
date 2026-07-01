@@ -4,27 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Skill
-  - 标准化
-  - 万物皆可Skill
+- B站面经
+- Skill
+- 标准化
+- 万物皆可Skill
 feynman:
   essence: 万物皆可Skill=用统一规范把任何能力（API/脚本/知识/流程）封装成Skill。核心是标准化接口，让异构能力以统一形式被Agent调用。
   analogy: 像USB标准——不管U盘/摄像头/键盘，都用USB接口。Skill标准让不管什么能力，都以统一形式接入Agent。
   first_principle: 异构能力（API/脚本/知识）接口各异，集成成本高。统一Skill规范=统一接口，降低集成成本。
   key_points:
-    - 统一规范：元数据+工具+流程+Schema
-    - 万物：API/脚本/知识/流程/人都能封装
-    - 价值：标准化集成，降低成本
-    - 关键：接口统一，实现各异
+  - 统一规范：元数据+工具+流程+Schema
+  - 万物：API/脚本/知识/流程/人都能封装
+  - 价值：标准化集成，降低成本
+  - 关键：接口统一，实现各异
 first_principle:
   essence: 标准化是规模化的前提——统一接口才能批量管理和组合。
-  derivation: 'N种能力×M个Agent=N×M适配。统一Skill规范后，能力只需实现一次标准接口，所有Agent通用，复杂度降为N+M。'
+  derivation: N种能力×M个Agent=N×M适配。统一Skill规范后，能力只需实现一次标准接口，所有Agent通用，复杂度降为N+M。
   conclusion: 万物皆可Skill = 统一接口标准 + 异构能力适配器
 follow_up:
-  - 万物具体指什么？——API/脚本/知识库/人工流程/RPA
-  - 怎么保证封装质量？——Schema校验+测试用例+评级
-  - 有现成标准吗？——SKILL.md/MCP是实践中的标准
+- 万物具体指什么？——API/脚本/知识库/人工流程/RPA
+- 怎么保证封装质量？——Schema校验+测试用例+评级
+- 有现成标准吗？——SKILL.md/MCP是实践中的标准
+memory_points:
+- 万物指代：API、脚本、文档、SOP、外部服务等皆可封装为统一Skill。
+- 统一规范六要素：元数据(身份)、触发器(何时用)、工具依赖、输入输出Schema、执行流程、示例。
+- 核心价值：通过统一规范，让异构能力(AI/人工/数据)标准化，供Agent按需动态调度。
 ---
 
 # 如何基于统一规范实现"万物皆可 Skill"？
@@ -248,3 +252,10 @@ class SkillRegistry:
 1. **"万物"要具体**：不是空谈，要能举出 API/知识/流程/人工 都能封装的例子
 2. **核心是"标准化"**：统一接口让 N×M 变 N+M，这是软件工程经典思想
 3. **提生态价值**：标准化催生 Skill 市场（类比 App Store），这是 Agent 生态的基础
+
+## 记忆要点
+
+- 万物指代：API、脚本、文档、SOP、外部服务等皆可封装为统一Skill。
+- 统一规范六要素：元数据(身份)、触发器(何时用)、工具依赖、输入输出Schema、执行流程、示例。
+- 核心价值：通过统一规范，让异构能力(AI/人工/数据)标准化，供Agent按需动态调度。
+

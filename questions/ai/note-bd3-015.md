@@ -4,26 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: LLM Agent = LLM(大脑) + Planning(规划) + Memory(记忆) + Tools(工具) + Action(执行)，让LLM从"只会说"变成"能做事"
-  analogy: 'Agent像一个有手有脚的员工——LLM是大脑（思考），Planning是日程表（分解任务），Memory是笔记本（记住历史），Tools是工具箱（搜索/计算/API），Action是执行（真正动手干活）'
-  first_principle: 'Agent的本质是让LLM在Observation-Thinking-Action循环中与环境交互，从被动回答变成主动解决问题'
+  analogy: Agent像一个有手有脚的员工——LLM是大脑（思考），Planning是日程表（分解任务），Memory是笔记本（记住历史），Tools是工具箱（搜索/计算/API），Action是执行（真正动手干活）
+  first_principle: Agent的本质是让LLM在Observation-Thinking-Action循环中与环境交互，从被动回答变成主动解决问题
   key_points:
-    - 'Planning: 任务分解、反思、自我修正'
-    - 'Memory: 短期(对话历史) + 长期(向量检索/知识库)'
-    - 'Tools: Function Calling、代码执行、API调用'
-    - 'Action: ReAct循环 (Reason→Act→Observe)'
+  - 'Planning: 任务分解、反思、自我修正'
+  - 'Memory: 短期(对话历史) + 长期(向量检索/知识库)'
+  - 'Tools: Function Calling、代码执行、API调用'
+  - 'Action: ReAct循环 (Reason→Act→Observe)'
 first_principle:
   essence: Agent系统将LLM的推理能力与外部环境的执行能力连接起来
-  derivation: '纯LLM只能基于训练知识生成文本。Agent通过工具调用扩展LLM的感知和行动范围，通过记忆扩展时间跨度，通过规划扩展任务复杂度'
+  derivation: 纯LLM只能基于训练知识生成文本。Agent通过工具调用扩展LLM的感知和行动范围，通过记忆扩展时间跨度，通过规划扩展任务复杂度
   conclusion: 完整的Agent系统是Planning+Memory+Tools的有机组合，缺一不可
 follow_up:
-  - Agent的ReAct和Plan-and-Execute有什么区别？
-  - 如何评估Agent系统的效果？
-  - 多Agent协作系统如何设计？
+- Agent的ReAct和Plan-and-Execute有什么区别？
+- 如何评估Agent系统的效果？
+- 多Agent协作系统如何设计？
+memory_points:
+- 核心架构：LLM Core(大脑)驱动三大核心组件：Planning、Memory、Tool Use
+- 闭环系统：核心链路是任务规划→调用工具→观察反馈的循环
+- 记忆模块：区分短期记忆(上下文)和长期记忆(向量库检索)
+- 规划核心：通过任务分解与多步反思，实现从单一问答到自主行动的跨越
 ---
 
 # 一个完整的LLM Agent系统通常由哪些核心模块组成？
@@ -259,3 +264,11 @@ LLM推理:
 | **Action Loop** | 最大循环次数限制+异常处理 | 无限循环、错误传播 |
 
 **面试加分点**：提到LangChain/LangGraph的Agent框架设计；提到AutoGPT/BabyAGI展示了Agent的自主任务分解能力；提到Agent评估框架如AgentBench、τ-bench；提到多Agent系统（如CrewAI、AutoGen）的协作模式——Router/Worker/Critic架构；提到MCP(Model Context Protocol)正在标准化Agent的工具接入层。
+
+## 记忆要点
+
+- 核心架构：LLM Core(大脑)驱动三大核心组件：Planning、Memory、Tool Use
+- 闭环系统：核心链路是任务规划→调用工具→观察反馈的循环
+- 记忆模块：区分短期记忆(上下文)和长期记忆(向量库检索)
+- 规划核心：通过任务分解与多步反思，实现从单一问答到自主行动的跨越
+

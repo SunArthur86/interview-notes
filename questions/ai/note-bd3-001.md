@@ -4,25 +4,29 @@ difficulty: L4
 category: ai
 subcategory: LLM
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: Decoder-only通过因果掩码实现自回归语言建模，每个token都参与梯度计算，训练效率最高
-  analogy: '就像写作文：Encoder-Decoder像先列提纲再写正文（两阶段），Decoder-only像边想边写一气呵成（单阶段），后者更自然也更高效'
-  first_principle: '语言建模的本质是预测下一个token，Decoder-only架构天然适配这一目标，无需额外编码阶段'
+  analogy: 就像写作文：Encoder-Decoder像先列提纲再写正文（两阶段），Decoder-only像边想边写一气呵成（单阶段），后者更自然也更高效
+  first_principle: 语言建模的本质是预测下一个token，Decoder-only架构天然适配这一目标，无需额外编码阶段
   key_points:
-    - '训练效率：因果掩码让序列中每个位置都参与loss计算，样本利用率100%'
-    - '生成能力：自回归解码天然适配文本生成任务'
-    - 'Scaling Law验证：GPT系列实证表明Decoder-only在同等参数下效果最优'
+  - 训练效率：因果掩码让序列中每个位置都参与loss计算，样本利用率100%
+  - 生成能力：自回归解码天然适配文本生成任务
+  - Scaling Law验证：GPT系列实证表明Decoder-only在同等参数下效果最优
 first_principle:
   essence: 语言模型的核心目标是在给定前文的条件下预测下一个token，即建模P(x_t|x_{<t})
-  derivation: '从最大似然估计出发，训练目标是对数似然之和。Decoder-only的因果掩码让所有位置的token都能同时参与训练，不存在Encoder中被mask掉的token浪费'
+  derivation: 从最大似然估计出发，训练目标是对数似然之和。Decoder-only的因果掩码让所有位置的token都能同时参与训练，不存在Encoder中被mask掉的token浪费
   conclusion: Decoder-only在训练效率、生成能力和扩展性三个维度上全面优于其他架构
 follow_up:
-  - Encoder-only架构（如BERT）在哪些场景仍然有优势？
-  - 为什么Encoder-Decoder架构在机器翻译任务中仍然被使用？
-  - Prefix-LM和Causal-LM有什么区别？
+- Encoder-only架构（如BERT）在哪些场景仍然有优势？
+- 为什么Encoder-Decoder架构在机器翻译任务中仍然被使用？
+- Prefix-LM和Causal-LM有什么区别？
+memory_points:
+- 训练效率最高：Decoder做CLM是100%预测利用率，而Encoder的MLM仅15%参与Loss计算。
+- 生成能力最强：因果自回归天然契合next-token prediction，直接支持Few-shot。
+- Scaling Law最优：随参数规模扩大，性能提升曲线最平滑，理解能力可通过规模弥补。
 ---
 
 # 为什么当前主流生成式大模型几乎都采用Decoder-only架构？
@@ -126,3 +130,10 @@ def causal_self_attention(Q, K, V):
 | Scaling效果 | 早饱和 | 中 | **最优** |
 
 **面试加分点**：提到GPT-4技术报告确认使用Decoder-only；提到LLaMA、Qwen、DeepSeek等主流开源模型全部采用Decoder-only；提到Prefix-LM（如GLM）作为Decoder-only的变体，在理解+生成混合任务上的折中方案。
+
+## 记忆要点
+
+- 训练效率最高：Decoder做CLM是100%预测利用率，而Encoder的MLM仅15%参与Loss计算。
+- 生成能力最强：因果自回归天然契合next-token prediction，直接支持Few-shot。
+- Scaling Law最优：随参数规模扩大，性能提升曲线最平滑，理解能力可通过规模弥补。
+

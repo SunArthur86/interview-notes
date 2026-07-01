@@ -4,29 +4,33 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Agent
-  - Benchmark
-  - 评估
-  - UTBench
+- 字节
+- 面经
+- Agent
+- Benchmark
+- 评估
+- UTBench
 feynman:
-  essence: 'Benchmark通过标准化的任务集和评分规则，量化衡量Agent/模型的生成质量和综合能力'
-  analogy: '就像高考——同一套卷子、同一个评分标准，用分数横向比较不同学生的水平。Benchmark就是AI的"高考"'
-  first_principle: '模型能力是多维度的(推理、编码、对话、工具使用)，单一指标无法全面评估。Benchmark通过多任务、多维度的标准化测试提供全面的能力画像'
+  essence: Benchmark通过标准化的任务集和评分规则，量化衡量Agent/模型的生成质量和综合能力
+  analogy: 就像高考——同一套卷子、同一个评分标准，用分数横向比较不同学生的水平。Benchmark就是AI的"高考"
+  first_principle: 模型能力是多维度的(推理、编码、对话、工具使用)，单一指标无法全面评估。Benchmark通过多任务、多维度的标准化测试提供全面的能力画像
   key_points:
-    - 'UTBench: 针对工具使用能力的Benchmark，测试Agent调用工具的准确性和效率'
-    - '通用Benchmark: MMLU(知识), HumanEval(编码), GSM8K(数学), MATH(高级数学)'
-    - 'Agent Benchmark: AgentBench, GAIA, ToolBench, WebArena'
-    - '评估方法: 准确率、通过率、人工评分、LLM-as-Judge'
+  - 'UTBench: 针对工具使用能力的Benchmark，测试Agent调用工具的准确性和效率'
+  - '通用Benchmark: MMLU(知识), HumanEval(编码), GSM8K(数学), MATH(高级数学)'
+  - 'Agent Benchmark: AgentBench, GAIA, ToolBench, WebArena'
+  - '评估方法: 准确率、通过率、人工评分、LLM-as-Judge'
 first_principle:
-  essence: '评估是优化的前提——没有度量就没有改进'
-  derivation: '你无法改进一个无法衡量的东西。Benchmark提供了可比较、可复现、可追踪的量化指标，是Agent迭代的基础'
-  conclusion: '选择合适的Benchmark比盲目优化更重要——评估什么决定了改进什么'
+  essence: 评估是优化的前提——没有度量就没有改进
+  derivation: 你无法改进一个无法衡量的东西。Benchmark提供了可比较、可复现、可追踪的量化指标，是Agent迭代的基础
+  conclusion: 选择合适的Benchmark比盲目优化更重要——评估什么决定了改进什么
 follow_up:
-  - 'UTBench和AgentBench有什么区别？'
-  - '如何防止模型在Benchmark上"刷分"而不真正提升能力？'
-  - '自建评估数据集要注意什么？'
+- UTBench和AgentBench有什么区别？
+- 如何防止模型在Benchmark上"刷分"而不真正提升能力？
+- 自建评估数据集要注意什么？
+memory_points:
+- Benchmark分类记三点：基础能力(MMLU/HumanEval)、Agent能力(GAIA/ToolBench)、安全对齐。
+- UTBench核心评估：工具选对没、参数对没、调用时机对没、结果解析对没。
+- 主流工具评测：ToolBench看API调用，GAIA考多步推理，WebArena测网页操作。
 ---
 
 # UTBench等Benchmark如何衡量模型生成效果？
@@ -205,3 +209,10 @@ class CustomBenchmark:
 2. **怎么评**: 精确匹配(客观题)、单元测试(代码题)、LLM-as-Judge(主观题)、人工抽查
 3. **局限**: Benchmark可能被针对性优化(刷分)，真实场景分布可能偏离测试集
 4. **实践**: 自建领域评估集 > 通用Benchmark，持续更新测试用例"
+
+## 记忆要点
+
+- Benchmark分类记三点：基础能力(MMLU/HumanEval)、Agent能力(GAIA/ToolBench)、安全对齐。
+- UTBench核心评估：工具选对没、参数对没、调用时机对没、结果解析对没。
+- 主流工具评测：ToolBench看API调用，GAIA考多步推理，WebArena测网页操作。
+

@@ -4,26 +4,31 @@ difficulty: L3
 category: ai
 subcategory: RAG
 tags:
-  - B站面经
-  - Rerank
-  - 重排序
+- B站面经
+- Rerank
+- 重排序
 feynman:
   essence: Rerank=用更精确(但更慢)的模型对召回结果重新排序。召回阶段用快的向量检索找top-20，Rerank用Cross-Encoder精选top-5，兼顾速度和精度。
   analogy: 像招聘——HR快速筛简历召回top-20(快但粗)，技术面试精挑top-5(慢但准)。
   first_principle: 向量检索(Bi-Encoder)快但粗，Cross-Encoder慢但准。两阶段=先用快的广召回，再用慢的精选。
   key_points:
-    - 两阶段：召回(Bi-Encoder快)→重排(Cross-Encoder准)
-    - Bi-Encoder是query和doc分别编码
-    - Cross-Encoder是query和doc拼接后一起编码
-    - 提升精度5-15%
+  - 两阶段：召回(Bi-Encoder快)→重排(Cross-Encoder准)
+  - Bi-Encoder是query和doc分别编码
+  - Cross-Encoder是query和doc拼接后一起编码
+  - 提升精度5-15%
 first_principle:
   essence: 精度和速度的权衡——Bi-Encoder快但精度低，Cross-Encoder准但慢。
-  derivation: 'Bi-Encoder：query和doc分别编码成向量比相似度（可预计算，快）。Cross-Encoder：query+doc拼接输入模型，交互式计算（无法预计算，慢但准）。两阶段结合取长补短。'
+  derivation: Bi-Encoder：query和doc分别编码成向量比相似度（可预计算，快）。Cross-Encoder：query+doc拼接输入模型，交互式计算（无法预计算，慢但准）。两阶段结合取长补短。
   conclusion: Rerank = 召回用快的(Bi-Encoder)，精排用准的(Cross-Encoder)
 follow_up:
-  - Rerank用什么模型？——Cross-Encoder(如bge-reranker)
-  - Rerank多少个合适？——召回top-20，重排选top-5
-  - Rerank延迟高怎么办？——并行+缓存+异步
+- Rerank用什么模型？——Cross-Encoder(如bge-reranker)
+- Rerank多少个合适？——召回top-20，重排选top-5
+- Rerank延迟高怎么办？——并行+缓存+异步
+memory_points:
+- 根本原因：Bi-Encoder各自编码无交互，Cross-Encoder拼接输入有Attention交互。
+- 性能对比：向量召回快但粗，Rerank极准但慢（无法预计算）。
+- 标准流程：两阶段Pipeline（先Bi召回Top20，再Cross精排选Top5）。
+- 模型推荐：开源首选bge-reranker，商业可用Cohere。
 ---
 
 # 重排算法（Rerank）如何提升检索匹配精度？
@@ -164,3 +169,11 @@ Rerank对RAG效果提升（经验值）：
 1. **两阶段是经典模式**：召回(快/广)→重排(慢/准)，这是信息检索的标准做法
 2. **解释 Bi vs Cross**：Bi-Encoder 无交互快但不准，Cross-Encoder 有交互准但慢
 3. **效果显著**：Rerank 通常能提升 10%+ 准确率，是 RAG 优化性价比最高的手段
+
+## 记忆要点
+
+- 根本原因：Bi-Encoder各自编码无交互，Cross-Encoder拼接输入有Attention交互。
+- 性能对比：向量召回快但粗，Rerank极准但慢（无法预计算）。
+- 标准流程：两阶段Pipeline（先Bi召回Top20，再Cross精排选Top5）。
+- 模型推荐：开源首选bge-reranker，商业可用Cohere。
+

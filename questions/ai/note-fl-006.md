@@ -14,11 +14,11 @@ feynman:
   analogy: 传统 RAG 像一次性外卖——下单（检索）→ 收餐（生成）→ 结束。Agentic RAG 像跟研究员合作——你说需求，他先查一轮，觉得不够再查一轮，边查边反思，直到凑齐证据才给报告。
   first_principle: 简单事实查询用一步检索就够；但多跳推理、跨文档对比、深度研究需要"边查边想"。决策点的引入让系统从"固定流程"升级为"自适应流程"，代价是成本和复杂度上升。
   key_points:
-  - '传统RAG检索1次固定流程；AgenticRAG检索N次LLM决策'
-  - 'Query Rewrite 严格说不算 Agentic（无决策回路）'
-  - '多轮检索用 Self-Ask / ReAct-RAG / Plan-and-Execute'
-  - '检索失败：改写query / 切数据源 / 降难度 / 兜底转人工'
-  - '成本控制：硬上限（3-5轮）+ 早停（置信度τ）+ 缓存 + 降级 + 小模型决策'
+  - 传统RAG检索1次固定流程；AgenticRAG检索N次LLM决策
+  - Query Rewrite 严格说不算 Agentic（无决策回路）
+  - 多轮检索用 Self-Ask / ReAct-RAG / Plan-and-Execute
+  - 检索失败：改写query / 切数据源 / 降难度 / 兜底转人工
+  - 成本控制：硬上限（3-5轮）+ 早停（置信度τ）+ 缓存 + 降级 + 小模型决策
 first_principle:
   essence: Agentic = 决策回路引入
   derivation: 一步检索只能答简单事实 → 多跳推理需要多次检索 → 谁决定"要不要再查"→ LLM决策回路 → 决策点带来灵活性也带来失败点和成本 → 必须加上下界控制
@@ -27,6 +27,11 @@ follow_up:
 - Anthropic 的 deep-research / multi-agent research 论文怎么拆分研究任务？
 - 怎么定义"置信度"做早停？LLM 自评可信吗？
 - Agentic RAG 失败时怎么 fallback 到传统 RAG？
+memory_points:
+- 核心区别：传统RAG无决策权单次检索，Agentic靠LLM决策多跳检索
+- Query Rewrite不算Agentic，缺乏“看结果决定是否再查”的决策回路
+- 多轮检索三范式：Self-Ask拆子问题、ReAct边想边查、Plan-and-Execute先规划
+- 控制高成本与不稳定性：设最大轮数上限、置信度早停、失败则降级传统RAG
 ---
 
 # 【字节飞连面经】Agentic RAG 和传统 RAG 区别？Query Rewrite 算 Agentic 吗？
@@ -104,3 +109,11 @@ Agentic RAG：
 - **置信度评估**：让 LLM 自评"我对这个答案有多确定"（0-1），但 LLM 自评有过度自信偏差 → 用 Retrieval confidence（检索分数）+ LLM 自评 + 多次采样一致性 综合判断
 - **成本预算**：给每个 query 设 token budget，超了就强制降级
 - **评测指标**：除了答案准确率，还要看"平均检索轮数""平均成本""早停命中率"
+
+## 记忆要点
+
+- 核心区别：传统RAG无决策权单次检索，Agentic靠LLM决策多跳检索
+- Query Rewrite不算Agentic，缺乏“看结果决定是否再查”的决策回路
+- 多轮检索三范式：Self-Ask拆子问题、ReAct边想边查、Plan-and-Execute先规划
+- 控制高成本与不稳定性：设最大轮数上限、置信度早停、失败则降级传统RAG
+

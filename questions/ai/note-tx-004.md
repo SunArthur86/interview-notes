@@ -13,15 +13,20 @@ feynman:
   essence: CC记忆=上下文+CLAUDE.md（简单直接，用压缩管理窗口），OpenClaw记忆=分层外部存储（功能完整，支持跨会话长期记忆）。
   analogy: CC像金鱼记忆——只记得眼前的事，但有个笔记本（CLAUDE.md）随时翻。OpenClaw像大象记忆——能记住很久以前的事，通过外部大脑（向量DB）检索。
   key_points:
-  - 'CC:上下文内+CLAUDE.md+Auto-Compact'
-  - 'OpenClaw:分层记忆+外部向量DB'
+  - CC:上下文内+CLAUDE.md+Auto-Compact
+  - OpenClaw:分层记忆+外部向量DB
   - CC简单可靠无幻觉
   - OpenClaw功能完整可跨会话
-first_principle:
+first_principle: null
 follow_up:
 - CC的Auto-Compact会丢失信息吗？——会，但有任务状态快照保证关键目标不丢
 - OpenClaw支持哪些向量数据库？——通常支持Milvus/Qdrant/ChromaDB
 - CC的错误恢复机制是什么？——失败重试+回滚到最近检查点+人工介入
+memory_points:
+- 核心对比：Claude Code是轻量上下文派，OpenClaw是外部存储派。
+- Claude机制：上下文即记忆，强依赖CLAUDE.md做静态长期记忆与Auto-Compact快照压缩。
+- OpenClaw机制：分层外部存储，划分为工作记忆、时序情景记忆与向量语义记忆。
+- 本质差异：CC追求极简但受窗口限制，OpenClaw依赖异步抽取支持跨会话但架构重。
 ---
 
 # 【腾讯面经】Claude Code 的 memory 是怎么做的？OpenClaw 的 memory 是怎么做的？两者的记忆机制有什么区别？
@@ -201,3 +206,11 @@ OpenClaw 支持可配置的遗忘策略：
 2. **提到 Task State Snapshot**：这是 CC 压缩不丢任务的关键，多数候选人答不到这一层。
 3. **举真实例子**：如 CC 在长任务中压缩后仍能继续，对比 GPT-4 直接用长上下文但成本爆炸。
 4. **延伸到成本**：CC 的 Auto-Compact 本质是省钱——压缩后后续每轮都少付 token 费；OpenClaw 的检索增加延迟和向量DB成本。
+
+## 记忆要点
+
+- 核心对比：Claude Code是轻量上下文派，OpenClaw是外部存储派。
+- Claude机制：上下文即记忆，强依赖CLAUDE.md做静态长期记忆与Auto-Compact快照压缩。
+- OpenClaw机制：分层外部存储，划分为工作记忆、时序情景记忆与向量语义记忆。
+- 本质差异：CC追求极简但受窗口限制，OpenClaw依赖异步抽取支持跨会话但架构重。
+

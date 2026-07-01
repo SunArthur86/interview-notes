@@ -4,28 +4,32 @@ difficulty: L2
 category: other
 subcategory: 操作系统
 tags:
-  - Shopee
-  - 面经
-  - Python
-  - GIL
-  - 并发
+- Shopee
+- 面经
+- Python
+- GIL
+- 并发
 feynman:
   essence: GIL是CPython的全局解释器锁，同一时刻只允许一个线程执行Python字节码
-  analogy: 'GIL像一个办公室只有一间会议室——虽然有很多员工(线程)，但同一时间只有一个人能用会议室(CPU)'
-  first_principle: 'CPython内存管理不是线程安全的(引用计数)，用GIL做最粗粒度的互斥保证安全'
+  analogy: GIL像一个办公室只有一间会议室——虽然有很多员工(线程)，但同一时间只有一个人能用会议室(CPU)
+  first_principle: CPython内存管理不是线程安全的(引用计数)，用GIL做最粗粒度的互斥保证安全
   key_points:
-    - GIL是CPython特有的，同一时刻只有一个线程执行字节码
-    - 进程是资源分配最小单位，独立内存可利用多核
-    - 线程共享内存但受GIL限制不能并行CPU
-    - 协程是用户态轻量线程，适合高并发IO
+  - GIL是CPython特有的，同一时刻只有一个线程执行字节码
+  - 进程是资源分配最小单位，独立内存可利用多核
+  - 线程共享内存但受GIL限制不能并行CPU
+  - 协程是用户态轻量线程，适合高并发IO
 first_principle:
   essence: Python的并发模型选择取决于任务是CPU密集还是IO密集
-  derivation: 'CPU密集→GIL限制→用多进程。IO密集→等待时释放GIL→用多线程或协程'
-  conclusion: 'CPU密集用multiprocessing，IO密集用asyncio/多线程'
+  derivation: CPU密集→GIL限制→用多进程。IO密集→等待时释放GIL→用多线程或协程
+  conclusion: CPU密集用multiprocessing，IO密集用asyncio/多线程
 follow_up:
-  - 'GIL能被移除吗？PEP 703是什么？'
-  - '多线程在Python中什么时候有用？'
-  - 'asyncio和线程池的区别？'
+- GIL能被移除吗？PEP 703是什么？
+- 多线程在Python中什么时候有用？
+- asyncio和线程池的区别？
+memory_points:
+- GIL本质是全局锁：因为保护引用计数，所以同一时刻仅单线程执行Python字节码。
+- 场景对比：CPU密集多进程绕GIL，而IO密集多线程/协程遇阻塞会自动释放GIL。
+- 概念对比：进程资源独立开销大，线程共享内存受GIL限，协程极轻量单线程内并发。
 ---
 
 # Python的GIL是什么？什么是进程？什么是协程？
@@ -167,3 +171,10 @@ asyncio.run(main())
 2. **GIL释放时机**：IO操作和每100条字节码（Python 3.2+基于时间5ms）
 3. **PEP 703**：Python 3.13开始实验性支持可选GIL（自由线程）
 4. **选型公式**：CPU密集→进程，IO密集→协程，简单IO→线程
+
+## 记忆要点
+
+- GIL本质是全局锁：因为保护引用计数，所以同一时刻仅单线程执行Python字节码。
+- 场景对比：CPU密集多进程绕GIL，而IO密集多线程/协程遇阻塞会自动释放GIL。
+- 概念对比：进程资源独立开销大，线程共享内存受GIL限，协程极轻量单线程内并发。
+

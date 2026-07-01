@@ -14,11 +14,11 @@ feynman:
   analogy: 像查谁连续打卡7天——给每天的打卡编个流水号（行号），再把日期转成数字序号。如果一个人连续打卡，日期序号和行号的差值会一直不变（因为两个都每天+1）；一旦断了一天，差值就变了。相同差值的连续打卡归为一组，数每组有几天就行。
   first_principle: 连续的数学特征是"等差数列"。日期是自然序（每天+1），连续登录的行号也是等差（+1），两者相减得到恒定分组键。利用这个不变量就能把"连续"转化成"分组"。
   key_points:
-  - '核心：连续日期的"日期序号 - 行号 = 恒定分组键"'
-  - 'ROW_NUMBER差值法：用date减row_number得grp，group by grp having count>=7'
-  - 'LEAD/LAG法：判断相邻日期差是否=1'
-  - '自连接法不推荐（O(n²)性能差）'
-  - '易扩展：改having count的数字即可改成连续N天'
+  - 核心：连续日期的"日期序号 - 行号 = 恒定分组键"
+  - ROW_NUMBER差值法：用date减row_number得grp，group by grp having count>=7
+  - LEAD/LAG法：判断相邻日期差是否=1
+  - 自连接法不推荐（O(n²)性能差）
+  - 易扩展：改having count的数字即可改成连续N天
 first_principle:
   essence: 连续 = 等差数列的不变量
   derivation: 连续日期是等差(差1) → 连续登录的行号也等差(差1) → 两个等差数列相减得常数 → 用常数做分组键 → 每组就是一段连续
@@ -27,6 +27,10 @@ follow_up:
 - 如果要找"连续登录至少N天且期间不能有一天中断"，怎么改？
 - 如果登录时间精确到秒，怎么按天去重？
 - ROW_NUMBER、RANK、DENSE_RANK 区别？什么时候用哪个？
+memory_points:
+- 核心口诀：日期减去行号等于相同分组键（DATE - ROW_NUMBER = Grp）
+- 因连续日期递增与行号递增相减得常数，断线则常数变，借此巧妙分组
+- 通用解题框架：先DISTINCT去重，再用窗口打行号，最后GroupBy并Having判定大于等于N天
 ---
 
 # 【神州专车面经】手写 SQL：找出连续7天都有登录的司机ID
@@ -150,3 +154,10 @@ WHERE login_date >= DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY)
 - **跨月连续**：DATE_SUB 处理跨月没问题（数据库自动算），不用担心
 - **允许中断1天**：用 LEAD 看下一个日期差 ≤2 的归为同组（更复杂的业务规则）
 - **滑动窗口版**：用 SUM(1) OVER(ORDER BY date RANGE BETWEEN 6 PRECEDING AND CURRENT ROW) 判断窗口内是否满 7 天
+
+## 记忆要点
+
+- 核心口诀：日期减去行号等于相同分组键（DATE - ROW_NUMBER = Grp）
+- 因连续日期递增与行号递增相减得常数，断线则常数变，借此巧妙分组
+- 通用解题框架：先DISTINCT去重，再用窗口打行号，最后GroupBy并Having判定大于等于N天
+

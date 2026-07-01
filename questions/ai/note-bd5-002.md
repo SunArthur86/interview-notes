@@ -4,28 +4,33 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - MCP
-  - Skills
-  - Agent
+- 字节
+- 面经
+- MCP
+- Skills
+- Agent
 feynman:
-  essence: "Rules是全局行为约束(永远生效)，Skills是可调用的能力模块(按需执行)；不合并因为关注点不同——Rules管行为边界，Skills管能力执行"
-  analogy: "Rules像交通法规(红灯停绿灯行，永远生效)；Skills像开车技能(需要时才用)。你不会把'红灯停'写进'如何开车'的说明书里——法规和技能是两个层次"
-  first_principle: "Agent系统需要两层控制：行为约束(Rules)和能力扩展(Skills)，分层解耦才能独立演进"
+  essence: Rules是全局行为约束(永远生效)，Skills是可调用的能力模块(按需执行)；不合并因为关注点不同——Rules管行为边界，Skills管能力执行
+  analogy: Rules像交通法规(红灯停绿灯行，永远生效)；Skills像开车技能(需要时才用)。你不会把'红灯停'写进'如何开车'的说明书里——法规和技能是两个层次
+  first_principle: Agent系统需要两层控制：行为约束(Rules)和能力扩展(Skills)，分层解耦才能独立演进
   key_points:
-    - 'Rules: 系统级约束，不可违反(安全/合规/格式)'
-    - 'Skills: 工具能力，按需调用(搜索/计算/生成)'
-    - 'MCP: 标准化工具协议，统一Skills的注册和调用'
-    - 'Instructions: 最高层prompt，定义Agent角色和目标'
+  - 'Rules: 系统级约束，不可违反(安全/合规/格式)'
+  - 'Skills: 工具能力，按需调用(搜索/计算/生成)'
+  - 'MCP: 标准化工具协议，统一Skills的注册和调用'
+  - 'Instructions: 最高层prompt，定义Agent角色和目标'
 first_principle:
-  essence: "分层控制 = 策略层(Instructions) + 约束层(Rules) + 能力层(Skills) + 协议层(MCP)"
-  derivation: "Agent需要知道目标 → Instructions → 需要知道边界 → Rules → 需要有能力 → Skills → 需要标准接口 → MCP → 四层缺一不可"
-  conclusion: "不合并Rules和Skills因为它们的生命周期、更新频率、影响范围完全不同"
+  essence: 分层控制 = 策略层(Instructions) + 约束层(Rules) + 能力层(Skills) + 协议层(MCP)
+  derivation: Agent需要知道目标 → Instructions → 需要知道边界 → Rules → 需要有能力 → Skills → 需要标准接口 → MCP → 四层缺一不可
+  conclusion: 不合并Rules和Skills因为它们的生命周期、更新频率、影响范围完全不同
 follow_up:
-  - "MCP协议的核心设计是什么？"
-  - "Skill版本管理怎么做？"
-  - "Rules冲突怎么解决？"
+- MCP协议的核心设计是什么？
+- Skill版本管理怎么做？
+- Rules冲突怎么解决？
+memory_points:
+- 概念对比：Rules是全局的行为约束，Skills是局部的执行能力
+- 类比记忆：Rules如交通法规永久生效，Skills如开车技能按需调用
+- 因果句：因为Rules更新慢而Skills更新快，所以混写会导致代码耦合且挤占上下文
+- 核心结论：Rules管全局合规（不可违反），Skills管具体调用（按需执行）
 ---
 
 # Rules 和 Skills 有什么区别？为什么不把 Skills 的指导写进 Rules？
@@ -149,3 +154,11 @@ MCP方式:
 # 3. 别名机制: 一个Skill可以有多个description别名
 # 4. A/B测试: 新description先灰度, 监控调用率变化
 ```
+
+## 记忆要点
+
+- 概念对比：Rules是全局的行为约束，Skills是局部的执行能力
+- 类比记忆：Rules如交通法规永久生效，Skills如开车技能按需调用
+- 因果句：因为Rules更新慢而Skills更新快，所以混写会导致代码耦合且挤占上下文
+- 核心结论：Rules管全局合规（不可违反），Skills管具体调用（按需执行）
+

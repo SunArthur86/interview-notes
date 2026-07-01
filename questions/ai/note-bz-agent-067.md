@@ -4,29 +4,34 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - 字节
-  - Agent框架
-  - 选型
-  - 面经
+- B站面经
+- 字节
+- Agent框架
+- 选型
+- 面经
 feynman:
   essence: 主流Agent框架各有侧重：LangChain生态全(通用)、LangGraph可控(生产)、LlamaIndex精RAG、AutoGen强多Agent、CrewAI重角色、Dify低代码。选型看团队能力/场景/可控性需求。
   analogy: 像选车——代步选Toyota(LangChain通用)、越野选LandRover(LangGraph可控)、赛车选F1(自研)、新手选自动挡(Dify低代码)。
   first_principle: 框架选型=团队能力×场景需求×可控性要求的匹配。没有最好只有最合适。
   key_points:
-    - LangChain：通用，生态好
-    - LangGraph：生产级，可控
-    - LlamaIndex：RAG专精
-    - AutoGen/CrewAI：多Agent
-    - 选型维度：场景/团队/可控性/成本
+  - LangChain：通用，生态好
+  - LangGraph：生产级，可控
+  - LlamaIndex：RAG专精
+  - AutoGen/CrewAI：多Agent
+  - 选型维度：场景/团队/可控性/成本
 first_principle:
   essence: 框架是工具，选型应匹配约束（团队/场景/时间/成本）。
-  derivation: '小团队快速验证→Dify低代码。需要深度定制→LangGraph。专注RAG→LlamaIndex。研究多Agent→AutoGen。选型错=事倍功半。'
+  derivation: 小团队快速验证→Dify低代码。需要深度定制→LangGraph。专注RAG→LlamaIndex。研究多Agent→AutoGen。选型错=事倍功半。
   conclusion: 框架选型 = 匹配约束（团队能力/场景需求/可控性/成本/时间）
 follow_up:
-  - 字节内部用什么？——自研为主（有特殊需求和能力）
-  - 不用框架行吗？——行，但重复造轮子（除非有特殊需求）
-  - 选错了怎么办？——早期发现早迁移，框架间逻辑相通
+- 字节内部用什么？——自研为主（有特殊需求和能力）
+- 不用框架行吗？——行，但重复造轮子（除非有特殊需求）
+- 选错了怎么办？——早期发现早迁移，框架间逻辑相通
+memory_points:
+- 全景分类：LangChain(通用)、LlamaIndex(RAG)、AutoGen/CrewAI(多Agent)、Dify(低代码)
+- 选型看场景：重RAG选LlamaIndex，生产级单体选LangGraph，多Agent协作用CrewAI/AutoGen
+- 选型看团队：非技术团队用Dify拖拽，资深研发或特殊需求建议自研框架
+- 主流框架痛点：抽象过度、API迭代快、多Agent调试复杂且成本高
 ---
 
 # 字节 AI 二面：对主流 Agent 框架有什么看法？怎么选型？
@@ -197,3 +202,11 @@ selection_dimensions = {
 2. **给选型建议**：不同场景推荐不同框架，体现判断力
 3. **结合实践**：说自己用过什么、为什么选——有真实经验最加分
 4. **务实态度**：承认多 Agent 框架不够成熟，生产建议 LangGraph——不自嗨
+
+## 记忆要点
+
+- 全景分类：LangChain(通用)、LlamaIndex(RAG)、AutoGen/CrewAI(多Agent)、Dify(低代码)
+- 选型看场景：重RAG选LlamaIndex，生产级单体选LangGraph，多Agent协作用CrewAI/AutoGen
+- 选型看团队：非技术团队用Dify拖拽，资深研发或特殊需求建议自研框架
+- 主流框架痛点：抽象过度、API迭代快、多Agent调试复杂且成本高
+

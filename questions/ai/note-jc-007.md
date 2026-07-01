@@ -15,11 +15,11 @@ feynman:
   analogy: 像有经验的山地徒步者——一阶矩（动量）像记住之前走的方向（保持惯性，不会因一块石头就改向），二阶矩（RMSProp）像根据"这路陡不陡"调步幅（陡的地方小步稳，平的地方大步快）。两者结合就是 Adam。
   first_principle: SGD 只用当前梯度（噪声大）。Momentum 加历史方向（平滑噪声、加速）。RMSProp 加历史幅度（自适应学习率）。Adam = Momentum + RMSProp，同时利用梯度的一阶和二阶统计量。
   key_points:
-  - '一阶矩 m_t = β1·m_{t-1}+(1-β1)·g_t（动量，梯度方向的EMA）'
-  - '二阶矩 v_t = β2·v_{t-1}+(1-β2)·g_t²（梯度幅度的EMA）'
-  - '偏差修正 m_hat=m_t/(1-β1^t), v_hat=v_t/(1-β2^t)'
-  - '更新 θ=θ-lr·m_hat/(√v_hat+ε)'
-  - '默认 β1=0.9, β2=0.999, ε=1e-8'
+  - 一阶矩 m_t = β1·m_{t-1}+(1-β1)·g_t（动量，梯度方向的EMA）
+  - 二阶矩 v_t = β2·v_{t-1}+(1-β2)·g_t²（梯度幅度的EMA）
+  - 偏差修正 m_hat=m_t/(1-β1^t), v_hat=v_t/(1-β2^t)
+  - 更新 θ=θ-lr·m_hat/(√v_hat+ε)
+  - 默认 β1=0.9, β2=0.999, ε=1e-8
 first_principle:
   essence: Adam = Momentum(一阶) + RMSProp(二阶)
   derivation: SGD噪声大 → 加历史方向(Momentum,一阶矩)平滑 → 但各维度学习率一样 → 加历史幅度(RMSProp,二阶矩)自适应 → 两者结合=Adam
@@ -28,6 +28,12 @@ follow_up:
 - 为什么需要偏差修正？
 - Adam 和 AdamW 的区别？
 - 为什么 Adam 训 LLM 要用更大的 β2（如0.95）？
+memory_points:
+- 核心本质：Adam = Momentum(一阶动量) + RMSProp(二阶矩)
+- 一阶矩控方向：梯度的EMA抗噪加速；二阶矩控步长：除以√v自适应学习率
+- 偏差修正原因：初值设0导致前几步严重低估，需除以(1-β^t)补偿
+- 超参记忆：LLM常用β2=0.95（非默认0.999）以更快适应梯度变化
+- 扩展：AdamW解耦了weight decay和自适应学习率，是LLM标配
 ---
 
 # 【阶跃星辰面经】Adam 优化器的公式：一阶矩、二阶矩、梯度更新
@@ -162,3 +168,12 @@ AdamW 修正：weight decay 直接作用在参数上，不和梯度耦合
 - **学习率 warmup**：LLM 训练前几百步线性增 lr，配合 Adam 防止初期 v_t 不稳导致发散
 - **Lookahead**：Adam 的 wrapper，用"快慢两个优化器"提升泛化
 - **Sophia / Lion**：更新的优化器，声称比 Adam 更适合 LLM
+
+## 记忆要点
+
+- 核心本质：Adam = Momentum(一阶动量) + RMSProp(二阶矩)
+- 一阶矩控方向：梯度的EMA抗噪加速；二阶矩控步长：除以√v自适应学习率
+- 偏差修正原因：初值设0导致前几步严重低估，需除以(1-β^t)补偿
+- 超参记忆：LLM常用β2=0.95（非默认0.999）以更快适应梯度变化
+- 扩展：AdamW解耦了weight decay和自适应学习率，是LLM标配
+

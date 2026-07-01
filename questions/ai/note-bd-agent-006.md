@@ -4,28 +4,33 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Agent
-  - 多Agent
-  - 编排
+- 字节
+- 面经
+- Agent
+- 多Agent
+- 编排
 feynman:
   essence: 不让Agent直接互调，而是加一层Orchestrator做任务拆分和调度，靠限制机制防失控
-  analogy: '不要让两个员工直接互相派活(容易死循环)，而是通过项目经理(Orchestrator)统一分配和验收'
-  first_principle: '多Agent协作本质是分布式系统问题——需要任务分发、状态同步、错误传播控制和死循环防护'
+  analogy: 不要让两个员工直接互相派活(容易死循环)，而是通过项目经理(Orchestrator)统一分配和验收
+  first_principle: 多Agent协作本质是分布式系统问题——需要任务分发、状态同步、错误传播控制和死循环防护
   key_points:
-    - 加Orchestrator中间层做统一调度
-    - 固定流程用LangGraph串节点
-    - 复杂任务用消息队列异步通信
-    - 防失控靠max depth、timeout、retry limit
+  - 加Orchestrator中间层做统一调度
+  - 固定流程用LangGraph串节点
+  - 复杂任务用消息队列异步通信
+  - 防失控靠max depth、timeout、retry limit
 first_principle:
   essence: 多Agent直接互调会产生不可控的依赖环，必须有中心化调度打破环路
-  derivation: 'Agent A调用B、B反向调用A→无限递归→资源耗尽。引入Orchestrator后A和B只与Orchestrator通信→DAG无环→可控'
+  derivation: Agent A调用B、B反向调用A→无限递归→资源耗尽。引入Orchestrator后A和B只与Orchestrator通信→DAG无环→可控
   conclusion: 多Agent编排的核心原则是DAG化（有向无环图）+ 资源限制
 follow_up:
-  - 'Orchestrator本身会不会成为单点故障？'
-  - 'Agent间的状态怎么同步？'
-  - '如何评估多Agent协作的效果？'
+- Orchestrator本身会不会成为单点故障？
+- Agent间的状态怎么同步？
+- 如何评估多Agent协作的效果？
+memory_points:
+- 核心防失控原则：绝不Agent互调，必须引入Orchestrator(调度中心)统一编排
+- 同步与异步：LangGraph适合简单状态图同步流，复杂解耦依赖MQ异步通信
+- 防死循环三板斧：设置最大迭代次数、条件收敛检测、DLQ(死信队列)异常兜底
+- 状态隔离：多Agent共享状态需引入StateGraph维护，避免状态污染
 ---
 
 # 如果一个Agent需要调用另一个Agent，怎么做编排和防失控？
@@ -198,3 +203,11 @@ Agent执行 → 成功 → 更新DAG → 继续下游
 2. **分布式经验**：提到DLQ、熔断、限流等分布式系统经典概念
 3. **分层设计**：同步用LangGraph，异步用MQ，体现技术选型能力
 4. **安全第一**：强调"防失控"是Agent工程化的核心命题
+
+## 记忆要点
+
+- 核心防失控原则：绝不Agent互调，必须引入Orchestrator(调度中心)统一编排
+- 同步与异步：LangGraph适合简单状态图同步流，复杂解耦依赖MQ异步通信
+- 防死循环三板斧：设置最大迭代次数、条件收敛检测、DLQ(死信队列)异常兜底
+- 状态隔离：多Agent共享状态需引入StateGraph维护，避免状态污染
+

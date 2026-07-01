@@ -4,28 +4,33 @@ difficulty: L4
 category: ai
 subcategory: LLM
 tags:
-  - 腾讯
-  - 面经
-  - Function Calling
-  - SFT
-  - DPO
+- 腾讯
+- 面经
+- Function Calling
+- SFT
+- DPO
 feynman:
-  essence: "大模型的工具调用能力不是预训练自带的，而是通过SFT教会格式+DPO/RLHF优化决策质量两阶段训练获得的"
-  analogy: "SFT是驾校学基本操作(打方向盘、踩油门)；DPO是教练告诉你哪种变道方式更好、什么时候不该变道——教的是判断力"
-  first_principle: "预训练只学到语言知识，不知道工具调用的JSON格式和调用时机，必须通过后训练注入"
+  essence: 大模型的工具调用能力不是预训练自带的，而是通过SFT教会格式+DPO/RLHF优化决策质量两阶段训练获得的
+  analogy: SFT是驾校学基本操作(打方向盘、踩油门)；DPO是教练告诉你哪种变道方式更好、什么时候不该变道——教的是判断力
+  first_principle: 预训练只学到语言知识，不知道工具调用的JSON格式和调用时机，必须通过后训练注入
   key_points:
-    - '预训练阶段不具备工具调用能力'
-    - 'SFT: 构造工具调用数据集，教会格式和参数填充'
-    - 'DPO/RLHF: 构造偏好对，优化调用决策(何时调/调什么/何时停)'
-    - 'SFT只能复刻样本，DPO让模型学会判断好坏'
+  - 预训练阶段不具备工具调用能力
+  - 'SFT: 构造工具调用数据集，教会格式和参数填充'
+  - 'DPO/RLHF: 构造偏好对，优化调用决策(何时调/调什么/何时停)'
+  - SFT只能复刻样本，DPO让模型学会判断好坏
 first_principle:
-  essence: "工具调用 = 格式能力(SFT) + 决策能力(DPO)"
-  derivation: "LLM预训练只学了文本生成 → 不知道结构化JSON输出 → SFT教会格式 → 但SFT只是模仿，不知道什么情况该调/不该调 → DPO通过偏好对优化决策"
-  conclusion: "工业界标配是SFT打底 + DPO轻量化对齐"
+  essence: 工具调用 = 格式能力(SFT) + 决策能力(DPO)
+  derivation: LLM预训练只学了文本生成 → 不知道结构化JSON输出 → SFT教会格式 → 但SFT只是模仿，不知道什么情况该调/不该调 → DPO通过偏好对优化决策
+  conclusion: 工业界标配是SFT打底 + DPO轻量化对齐
 follow_up:
-  - "工具调用数据集怎么构造？需要多少条？"
-  - "DPO和RLHF在工具调用场景的区别？"
-  - "开源模型不微调能做Function Calling吗？"
+- 工具调用数据集怎么构造？需要多少条？
+- DPO和RLHF在工具调用场景的区别？
+- 开源模型不微调能做Function Calling吗？
+memory_points:
+- SFT解决能力有无：教格式对齐(合法JSON)与参数填充，但只懂模仿
+- DPO解决质量好坏：通过好vs坏偏好对，教自主判断、调用顺序与停止
+- 因为SFT无法区分逻辑好坏(如死循环)，所以必须接DPO优化决策
+- 训练三部曲：预训练打底 → SFT学格式工具 → DPO/RLHF对齐偏好
 ---
 
 # 大模型工具调用(Function Calling)能力是如何训练出来的？SFT和DPO分别解决什么问题？
@@ -190,3 +195,11 @@ DPO偏好对: 1K-10K对好/坏调用对比
   - 工具选择准确率: 选对工具的比例
   - 冗余调用率: 不必要的重复调用比例
 ```
+
+## 记忆要点
+
+- SFT解决能力有无：教格式对齐(合法JSON)与参数填充，但只懂模仿
+- DPO解决质量好坏：通过好vs坏偏好对，教自主判断、调用顺序与停止
+- 因为SFT无法区分逻辑好坏(如死循环)，所以必须接DPO优化决策
+- 训练三部曲：预训练打底 → SFT学格式工具 → DPO/RLHF对齐偏好
+

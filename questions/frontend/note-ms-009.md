@@ -27,8 +27,19 @@ follow_up:
 - 任务状态机怎么设计？
 - 产物版本管理用什么方案？
 - 任务中心的UI怎么组织？
+memory_points:
+- 核心对象五大件：Task(任务) + Artifact(产物) + Context(上下文) + Checkpoint(检查点) + Log(日志)
+- Task是调度核心，记录状态机与执行依赖关系
+- Checkpoint保运行快照，Log记操作痕迹，二者保障可追溯与断点续传
 ---
 
 # 【月之暗面面经】如果让你设计桌面 Agent 的任务中心，会有哪些关键对象？
 
 <!-- ANSWER_BODY_HERE -->
+
+## 记忆要点
+
+- 核心对象五大件：Task(任务) + Artifact(产物) + Context(上下文) + Checkpoint(检查点) + Log(日志)
+- Task是调度核心，记录状态机与执行依赖关系
+- Checkpoint保运行快照，Log记操作痕迹，二者保障可追溯与断点续传
+

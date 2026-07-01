@@ -27,6 +27,10 @@ follow_up:
 - 怎么防止用户A的请求拿到用户B的会话？
 - LLM 并发槽位怎么估？
 - 多租户怎么计费？
+memory_points:
+- 会话隔离：每请求用ThreadLocal/ContextVars存用户ID，绝不共享全局上下文
+- 并发控制：令牌桶限制单用户QPS防滥用，信号量限制LLM总并发槽位防雪崩
+- 数据隔离：DB用行级安全(RLS)，向量库检索强制带user_id过滤表达式防越权
 ---
 
 # 【某讯面经】高并发多用户会话隔离设计
@@ -210,3 +214,10 @@ def check_quota(user_id, max_daily_tokens=100000):
 - **分布式会话**：服务无状态，会话全在 Redis，支持水平扩展
 - **会话亲和性（Sticky Session）**：负载均衡把同一用户路由到同一实例（减少 Redis 读取，但有单点风险）
 - **多租户架构**：DB 隔离（每租户独立DB）vs Schema 隔离 vs Row 隔离，按租户规模选
+
+## 记忆要点
+
+- 会话隔离：每请求用ThreadLocal/ContextVars存用户ID，绝不共享全局上下文
+- 并发控制：令牌桶限制单用户QPS防滥用，信号量限制LLM总并发槽位防雪崩
+- 数据隔离：DB用行级安全(RLS)，向量库检索强制带user_id过滤表达式防越权
+

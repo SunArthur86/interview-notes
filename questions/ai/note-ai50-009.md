@@ -4,29 +4,34 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 某厂
-  - 面经
-  - Agent
-  - JSON
-  - 输出稳定性
-  - 工具调用
+- 某厂
+- 面经
+- Agent
+- JSON
+- 输出稳定性
+- 工具调用
 feynman:
-  essence: '通过Schema约束+格式校验+失败兜底三层机制，确保LLM输出可被程序可靠解析的JSON'
-  analogy: '就像快递填写收件地址——先给标准模板(Schema约束)，快递员检查地址完整性(格式校验)，填错了打回重填(兜底重试)'
-  first_principle: 'LLM是概率模型，无法保证100%输出合法JSON。工程上需要将"期望"变为"契约"——用Schema定义+校验+降级策略构建可靠性'
+  essence: 通过Schema约束+格式校验+失败兜底三层机制，确保LLM输出可被程序可靠解析的JSON
+  analogy: 就像快递填写收件地址——先给标准模板(Schema约束)，快递员检查地址完整性(格式校验)，填错了打回重填(兜底重试)
+  first_principle: LLM是概率模型，无法保证100%输出合法JSON。工程上需要将"期望"变为"契约"——用Schema定义+校验+降级策略构建可靠性
   key_points:
-    - '第一层: JSON Mode / Structured Output / Function Calling'
-    - '第二层: Pydantic / JSON Schema校验'
-    - '第三层: 自动修复 + 重试 + 正则提取兜底'
-    - '关键: 永远不要假设LLM输出的JSON一定合法'
+  - '第一层: JSON Mode / Structured Output / Function Calling'
+  - '第二层: Pydantic / JSON Schema校验'
+  - '第三层: 自动修复 + 重试 + 正则提取兜底'
+  - '关键: 永远不要假设LLM输出的JSON一定合法'
 first_principle:
-  essence: 'LLM生成的每个token都是概率采样，任何格式约束都无法达到100%保证'
-  derivation: '即使temperature=0，不同batch、不同版本模型仍可能输出微小差异。JSON语法是严格的(少一个逗号就parse失败)，而LLM输出是模糊的。必须用工程手段弥合'
-  conclusion: 'JSON输出的可靠性 = 模型能力 × 约束强度 × 兜底完整性'
+  essence: LLM生成的每个token都是概率采样，任何格式约束都无法达到100%保证
+  derivation: 即使temperature=0，不同batch、不同版本模型仍可能输出微小差异。JSON语法是严格的(少一个逗号就parse失败)，而LLM输出是模糊的。必须用工程手段弥合
+  conclusion: JSON输出的可靠性 = 模型能力 × 约束强度 × 兜底完整性
 follow_up:
-  - 'JSON Mode和Function Calling有什么区别？'
-  - '如果JSON嵌套很深(3层以上)，模型输出准确率会降多少？'
-  - '用什么工具可以做JSON Schema的可视化设计？'
+- JSON Mode和Function Calling有什么区别？
+- 如果JSON嵌套很深(3层以上)，模型输出准确率会降多少？
+- 用什么工具可以做JSON Schema的可视化设计？
+memory_points:
+- 核心策略：模型原生约束+校验拦截+兜底修复的三层保障机制
+- 模型层：直接使用JSON Mode或Function Calling保证底座输出约90%合法
+- 校验层：用Pydantic或JSON Schema验证字段，精准拦截格式异常
+- 兜底层：遇错带提示重试、正则强行提取或默认值降级，保100%可用
 ---
 
 # 怎么保证大模型稳定输出JSON？格式不对怎么兜底？
@@ -268,3 +273,11 @@ def reliable_json_output(query, schema, max_retries=3):
 | +Pydantic校验 | ~98% | ~95% | 中 | 1× |
 | +重试+自动修复 | ~99.5% | ~98% | 高 | 1.2× |
 | +Structured Output | ~99.9% | ~99% | 低 | 1× |
+
+## 记忆要点
+
+- 核心策略：模型原生约束+校验拦截+兜底修复的三层保障机制
+- 模型层：直接使用JSON Mode或Function Calling保证底座输出约90%合法
+- 校验层：用Pydantic或JSON Schema验证字段，精准拦截格式异常
+- 兜底层：遇错带提示重试、正则强行提取或默认值降级，保100%可用
+

@@ -4,26 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Prompt
 tags:
-  - B站面经
-  - Prompt工程
-  - Agent
+- B站面经
+- Prompt工程
+- Agent
 feynman:
   essence: Agent提示词和普通提示词的差=四层结构。普通Prompt只有"任务指令"，Agent Prompt有：角色定义+能力边界+工具说明+流程规范+输出约束+安全规则。
   analogy: 普通Prompt像给临时工一句话指令(把这个搬走)，Agent Prompt像给员工的岗位说明书(职责/权限/工具/流程/红线)。
   first_principle: Agent是自主行动的系统，需要更完整的"行为规范"。普通Prompt解决"做一件事"，Agent Prompt定义"怎么持续地做一类事"。
   key_points:
-    - 四层：角色定义/能力与边界/工具与流程/输出与安全
-    - 普通Prompt：单次任务指令
-    - Agent Prompt：持续行为规范
-    - 核心：明确边界+流程+安全
+  - 四层：角色定义/能力与边界/工具与流程/输出与安全
+  - 普通Prompt：单次任务指令
+  - Agent Prompt：持续行为规范
+  - 核心：明确边界+流程+安全
 first_principle:
   essence: Agent Prompt本质是"制度"而非"指令"——定义长期行为规范。
-  derivation: '普通Prompt针对单次任务(写一首诗)。Agent Prompt定义Agent的身份/能力/工具/流程/安全，指导它在各种情况下的行为。这需要更结构化的"制度"式prompt。'
+  derivation: 普通Prompt针对单次任务(写一首诗)。Agent Prompt定义Agent的身份/能力/工具/流程/安全，指导它在各种情况下的行为。这需要更结构化的"制度"式prompt。
   conclusion: Agent Prompt = 角色定义 + 能力边界 + 工具流程 + 输出约束 + 安全规则的四层规范
 follow_up:
-  - Agent Prompt多长合适？——够用即可，过长会稀释注意力
-  - 怎么测试Agent Prompt？——边界case测试+回归测试集
-  - Prompt能版本管理吗？——能，和代码一样git管理
+- Agent Prompt多长合适？——够用即可，过长会稀释注意力
+- 怎么测试Agent Prompt？——边界case测试+回归测试集
+- Prompt能版本管理吗？——能，和代码一样git管理
+memory_points:
+- 口诀「谁、能干啥、怎么干、底线」：四层即角色、能力边界、工具流程、输出安全
+- 普通Prompt求单次完成，而Agent Prompt求长期自主行动
+- 因为有自主行动目标，所以必须明确定义工具与行为流程边界
+- 输入输出需结构化：明确可用工具清单与规范的输出格式要求
 ---
 
 # Agent 提示词和普通提示词差在哪？（四层结构）
@@ -219,3 +224,11 @@ Agent Prompt示例:
 1. **四层结构**：角色/能力边界/工具流程/输出安全——体系化
 2. **强调"边界"**：Agent Prompt 最重要的是定义"不能做什么"，而非"能做什么"
 3. **类比"岗位说明书"**：Agent Prompt 是给 Agent 的 job description，不是一次性指令
+
+## 记忆要点
+
+- 口诀「谁、能干啥、怎么干、底线」：四层即角色、能力边界、工具流程、输出安全
+- 普通Prompt求单次完成，而Agent Prompt求长期自主行动
+- 因为有自主行动目标，所以必须明确定义工具与行为流程边界
+- 输入输出需结构化：明确可用工具清单与规范的输出格式要求
+

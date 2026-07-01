@@ -26,6 +26,11 @@ follow_up:
 - LFU Cache怎么实现？
 - Java的LinkedHashMap能直接实现LRU吗？
 - LRU在高并发下怎么保证线程安全？
+memory_points:
+- 核心设计：HashMap负责O(1)查找，双向链表负责O(1)维护时序
+- 双向链表原因：删除节点需找前驱，双向才能O(1)断开重连，单向需O(n)
+- 必须设哨兵节点：dummy head和tail互指，彻底免除边界空指针判断
+- 淘汰逻辑：新节点插入头部，满容量时直接淘汰tail.prev(最久未使用)
 ---
 
 # 【字节面经】实现一个 LRU Cache，要求 get/put 均为 O(1)。
@@ -445,3 +450,11 @@ public int get(int key) {
 ## 九、总结一句话
 
 > LRU Cache = **HashMap（O(1) 查找）+ 双向链表（O(1) 删除/插入）**，head 端是最近访问，tail 端是最久未访问。get 和 put 的核心操作都是 HashMap 查找 + 链表节点移动，每步都是 O(1)。面试中先说 OrderedDict/LinkedHashMap 方案展示知识广度，再手写完整实现展示底层功底，同时准备好线程安全和 LFU 的追问。
+
+## 记忆要点
+
+- 核心设计：HashMap负责O(1)查找，双向链表负责O(1)维护时序
+- 双向链表原因：删除节点需找前驱，双向才能O(1)断开重连，单向需O(n)
+- 必须设哨兵节点：dummy head和tail互指，彻底免除边界空指针判断
+- 淘汰逻辑：新节点插入头部，满容量时直接淘汰tail.prev(最久未使用)
+

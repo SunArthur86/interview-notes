@@ -4,27 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Prompt
-  - Skill
-  - 提示工程
+- B站面经
+- Prompt
+- Skill
+- 提示工程
 feynman:
   essence: 把Prompt升级为Skill=给裸prompt加上"元数据(触发条件)+工具依赖+流程定义+输入输出Schema+示例"。从"一段话"变成"一个可复用的能力模块"。
   analogy: Prompt像便签纸上的菜谱(写完就扔)，Skill像装订成册的菜谱书(有目录/食材表/步骤图/营养信息)，可保存可分享可复用。
   first_principle: Prompt是一次性的指令，Skill是结构化的能力。升级=把隐性的prompt经验，显性化为可管理的资产。
   key_points:
-    - Prompt→Skill五步：加元数据/加工具/加流程/加Schema/加示例
-    - 核心区别：Skill是结构化可管理的，Prompt是扁平的
-    - 升级价值：可复用/可分享/可迭代/可测试
-    - 方法：提取共性+固化流程+定义边界
+  - Prompt→Skill五步：加元数据/加工具/加流程/加Schema/加示例
+  - 核心区别：Skill是结构化可管理的，Prompt是扁平的
+  - 升级价值：可复用/可分享/可迭代/可测试
+  - 方法：提取共性+固化流程+定义边界
 first_principle:
   essence: Skill是Prompt的"工程化升级"——从一次性指令到可管理资产。
-  derivation: 'Prompt：写在代码/配置里的字符串，难管理难复用。Skill：结构化封装(触发/工具/流程/Schema)，可版本管理/分享/测试。升级=工程化。'
+  derivation: Prompt：写在代码/配置里的字符串，难管理难复用。Skill：结构化封装(触发/工具/流程/Schema)，可版本管理/分享/测试。升级=工程化。
   conclusion: Prompt→Skill = 结构化封装（元数据+工具+流程+Schema+示例）
 follow_up:
-  - 所有Prompt都该升级成Skill吗？——不，高频复用的才值得
-  - Skill怎么版本管理？——语义版本号+向后兼容+变更日志
-  - 怎么判断Skill质量？——测试用例+成功率+用户反馈
+- 所有Prompt都该升级成Skill吗？——不，高频复用的才值得
+- Skill怎么版本管理？——语义版本号+向后兼容+变更日志
+- 怎么判断Skill质量？——测试用例+成功率+用户反馈
+memory_points:
+- 对比差异：Prompt是低复用文本，Skill是高复用、可管理、带Schema的结构化模块。
+- 核心五步：加元数据(可发现)→加工具依赖(声明式)→加流程(可复现)→加Schema(可测试)→加示例(提质量)。
+- 总结口诀：从裸文本进化为带身份、依赖、流程、接口和例子的标准化组件。
 ---
 
 # Prompt 不等于 Skill，怎么把 Prompt 升级为 Skill？
@@ -250,3 +254,10 @@ class SkillLifecycle:
 1. **五步升级法**：元数据→工具→流程→Schema→示例，结构化清晰
 2. **不是所有 Prompt 都要升级**：只升级高频复用的，体现"投资回报"思维
 3. **强调"资产管理"**：Skill 是组织的资产（可版本/分享/迭代），Prompt 是消耗品
+
+## 记忆要点
+
+- 对比差异：Prompt是低复用文本，Skill是高复用、可管理、带Schema的结构化模块。
+- 核心五步：加元数据(可发现)→加工具依赖(声明式)→加流程(可复现)→加Schema(可测试)→加示例(提质量)。
+- 总结口诀：从裸文本进化为带身份、依赖、流程、接口和例子的标准化组件。
+

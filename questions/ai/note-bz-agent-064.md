@@ -4,26 +4,30 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - LangGraph
-  - Agent应用
+- B站面经
+- LangGraph
+- Agent应用
 feynman:
   essence: 基于LangGraph搭Agent=定义State→构建节点(Node)→连边(Edge)→编译。核心是把Agent建模为状态图，节点是动作，边是流转，天然支持循环和分支。
   analogy: 像画流程图——状态是节点，决策是分支，工具调用是动作，LangGraph把流程图变成可执行的Agent。
   first_principle: Agent本质是状态机+循环。LangGraph用图结构显式建模，比隐式的Chain更可控、可调试、可中断。
   key_points:
-    - 四步：定义State→建节点→连边→编译
-    - 核心概念：Node(节点)/Edge(边)/State(状态)
-    - 关键能力：循环/条件分支/人工节点/检查点
-    - 优势：可控可调试可中断
+  - 四步：定义State→建节点→连边→编译
+  - 核心概念：Node(节点)/Edge(边)/State(状态)
+  - 关键能力：循环/条件分支/人工节点/检查点
+  - 优势：可控可调试可中断
 first_principle:
   essence: Agent是状态驱动的图——状态在节点间流转，节点修改状态，边决定流向。
-  derivation: 'ReAct的Thought-Act-Obs是循环。Plan-Execute有分支。这些用代码写if-else难维护。LangGraph用图显式定义，可视化、可调试、支持复杂模式。'
+  derivation: ReAct的Thought-Act-Obs是循环。Plan-Execute有分支。这些用代码写if-else难维护。LangGraph用图显式定义，可视化、可调试、支持复杂模式。
   conclusion: LangGraph = 把Agent建模为状态图（Node=动作，Edge=流转，State=数据）
 follow_up:
-  - LangGraph和普通代码写Agent什么区别？——图结构更清晰可调试
-  - 怎么做人工审核？——interrupt_before节点+恢复机制
-  - 支持并行吗？——支持，多个节点可并发
+- LangGraph和普通代码写Agent什么区别？——图结构更清晰可调试
+- 怎么做人工审核？——interrupt_before节点+恢复机制
+- 支持并行吗？——支持，多个节点可并发
+memory_points:
+- 核心三要素：State(状态：流转数据)、Node(节点：执行动作)、Edge(边：流转控制)
+- 搭建四步法：1.定义State结构体 → 2.编写节点动作函数 → 3.连线(含条件分支) → 4.编译运行
+- 条件边是灵魂：根据State中的变量(如是否需人工)动态决定下一跳节点，实现智能路由
 ---
 
 # 如何基于 LangGraph 搭建一个 Agent 应用？
@@ -258,3 +262,10 @@ react_agent = graph.compile()
 1. **四步法清晰**：State→Node→Edge→Compile，标准化的搭建流程
 2. **强调"图结构"优势**：可视化/可调试/支持循环分支——比代码 if-else 更清晰
 3. **人工节点是亮点**：interrupt 机制支持 Human-in-the-loop，这是生产刚需
+
+## 记忆要点
+
+- 核心三要素：State(状态：流转数据)、Node(节点：执行动作)、Edge(边：流转控制)
+- 搭建四步法：1.定义State结构体 → 2.编写节点动作函数 → 3.连线(含条件分支) → 4.编译运行
+- 条件边是灵魂：根据State中的变量(如是否需人工)动态决定下一跳节点，实现智能路由
+

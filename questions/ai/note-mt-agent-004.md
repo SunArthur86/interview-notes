@@ -26,6 +26,11 @@ follow_up:
 - MCP如何解决工具发现和鉴权？
 - Skills如何版本管理？
 - Claude Skills和LangChain Tools的区别？
+memory_points:
+- 递进抽象关系：FunctionCall是原子级，MCP是协议级，Skills是能力级
+- FunctionCall：厂商原生的单次函数调用，灵活性最高但绑定特定格式无状态
+- MCP：基于JSON-RPC的开放标准协议，实现跨平台工具发现与生态接入
+- Skills：封装多Tool加Prompt加流程逻辑，抽象层级最高直接复用完整业务
 ---
 
 # 【美团面经】Function Call到MCP到Skills的区别与优缺点？
@@ -301,3 +306,11 @@ agent.run("帮我订一张明天北京到上海的机票，靠窗")
 ### Q4: 为什么不能直接用 Function Call 搞定一切？
 
 **答：** 当工具数量超过 20 个时，Function Call 面临「选择困难」——LLM 需要在巨大的工具列表中选对函数，准确率显著下降。MCP 通过工具发现和分组缓解了这个问题；Skills 则从根本上减少了 LLM 需要决策的粒度——从「选哪个函数」升级为「选哪个能力」，大幅降低决策复杂度。
+
+## 记忆要点
+
+- 递进抽象关系：FunctionCall是原子级，MCP是协议级，Skills是能力级
+- FunctionCall：厂商原生的单次函数调用，灵活性最高但绑定特定格式无状态
+- MCP：基于JSON-RPC的开放标准协议，实现跨平台工具发现与生态接入
+- Skills：封装多Tool加Prompt加流程逻辑，抽象层级最高直接复用完整业务
+

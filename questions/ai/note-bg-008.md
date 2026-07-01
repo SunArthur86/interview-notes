@@ -26,9 +26,14 @@ first_principle:
   derivation: TP在每次前向传播的每一层都需要AllReduce同步（每层2次），通信频率高，当TP过大时通信无法被计算掩盖。PP通信只在层边界（每层1次），但有流水线气泡。DP通信在每个micro-batch梯度同步时（批量），容易被计算掩盖。三者各有适用规模。
   conclusion: 选型原则=小模型DP为主，中等模型TP+DP，千亿模型TP+PP+DP
 follow_up:
-  - 如何选择TP/PP/DP的组合？有什么经验公式？
-  - Pipeline Parallel的bubble ratio怎么计算和降低？
-  - ZeRO、FSDP和传统DP有什么区别？
+- 如何选择TP/PP/DP的组合？有什么经验公式？
+- Pipeline Parallel的bubble ratio怎么计算和降低？
+- ZeRO、FSDP和传统DP有什么区别？
+memory_points:
+- 三者对比：DP切数据全量模型，TP层内切矩阵，PP层间切流水线
+- DP机制：每卡独立算前向反向，最后AllReduce通信平均梯度
+- TP变慢原因：因层内频繁AllReduce通信开销暴增，故切卡过多反降计算效率
+- PP气泡问题：因层间串行执行需前后等待，导致GPU产生大量空闲流水线气泡
 ---
 
 # 【八股总结】TP/PP/DP 分布式策略 & TP 开大为什么变慢
@@ -356,3 +361,11 @@ ZeRO-3: 切分优化器状态 + 梯度 + 参数（省Nx，即FSDP）
 - **DeepSpeed ZeRO**：微软的显存优化方案，ZeRO-3即FSDP
 - **Sequence Parallel**：TP的变体，把序列维度也切分，进一步减通信
 - **Ring Attention**：长序列场景的特殊并行，跨GPU分布式attention
+
+## 记忆要点
+
+- 三者对比：DP切数据全量模型，TP层内切矩阵，PP层间切流水线
+- DP机制：每卡独立算前向反向，最后AllReduce通信平均梯度
+- TP变慢原因：因层内频繁AllReduce通信开销暴增，故切卡过多反降计算效率
+- PP气泡问题：因层间串行执行需前后等待，导致GPU产生大量空闲流水线气泡
+

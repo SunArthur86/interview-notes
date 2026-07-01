@@ -4,29 +4,34 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 某厂
-  - 面经
-  - Agent
-  - 流式输出
-  - SSE
-  - 异步
+- 某厂
+- 面经
+- Agent
+- 流式输出
+- SSE
+- 异步
 feynman:
-  essence: '用SSE(Server-Sent Events)或WebSocket将Agent中间步骤实时推送给前端，让用户看到思考和执行过程'
-  analogy: '就像看直播做饭——不是等菜全做好才端上来，而是从切菜、炒菜到装盘全程实时展示，用户不用干等'
-  first_principle: 'Agent多步任务总延迟 = Σ(每步LLM调用 + 工具执行)，可能长达30-60秒。用户在等待期间没有反馈会认为系统卡死。流式传输通过分段推送解决感知延迟问题'
+  essence: 用SSE(Server-Sent Events)或WebSocket将Agent中间步骤实时推送给前端，让用户看到思考和执行过程
+  analogy: 就像看直播做饭——不是等菜全做好才端上来，而是从切菜、炒菜到装盘全程实时展示，用户不用干等
+  first_principle: Agent多步任务总延迟 = Σ(每步LLM调用 + 工具执行)，可能长达30-60秒。用户在等待期间没有反馈会认为系统卡死。流式传输通过分段推送解决感知延迟问题
   key_points:
-    - 'SSE是Agent流式传输的主流方案(单向推送, 基于HTTP)'
-    - 'WebSocket适合需要双向交互的场景'
-    - '流式内容: Thought流(逐token) + Action事件 + Observation事件 + Final Answer流'
-    - '前端用EventSource(SSE)或WebSocket接收事件流'
+  - SSE是Agent流式传输的主流方案(单向推送, 基于HTTP)
+  - WebSocket适合需要双向交互的场景
+  - '流式内容: Thought流(逐token) + Action事件 + Observation事件 + Final Answer流'
+  - 前端用EventSource(SSE)或WebSocket接收事件流
 first_principle:
-  essence: '用户感知延迟 < 实际计算延迟时体验急剧下降'
+  essence: 用户感知延迟 < 实际计算延迟时体验急剧下降
   derivation: 'Nielsen可用性准则: 0.1秒以内感知瞬时，1秒以内不打断思路，10秒以上需要明确反馈。Agent多步执行通常10-60秒，必须有流式反馈'
-  conclusion: '流式传输不是性能优化而是体验必需品，是Agent产品化的基础能力'
+  conclusion: 流式传输不是性能优化而是体验必需品，是Agent产品化的基础能力
 follow_up:
-  - 'SSE和WebSocket在Agent场景下怎么选？'
-  - '流式传输中前端如何优雅地渲染Markdown？'
-  - '如果某个工具调用特别慢(>30s)，流式体验怎么保证？'
+- SSE和WebSocket在Agent场景下怎么选？
+- 流式传输中前端如何优雅地渲染Markdown？
+- 如果某个工具调用特别慢(>30s)，流式体验怎么保证？
+memory_points:
+- 底层协议：基于SSE（Server-Sent Events）实现前端流式传输
+- 事件拆解：将Agent过程拆分为token流、action_start、observation等独立事件
+- 后端实现：LangChain调用astream_events(version='v2')，按事件类型分别yield数据
+- 前端体验：用EventSource接收，让用户实时看到思考与工具执行过程，消除等待焦虑
 ---
 
 # Agent多步任务的流式传输怎么实现？
@@ -239,3 +244,11 @@ async def safe_agent_stream(query):
     
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 ```
+
+## 记忆要点
+
+- 底层协议：基于SSE（Server-Sent Events）实现前端流式传输
+- 事件拆解：将Agent过程拆分为token流、action_start、observation等独立事件
+- 后端实现：LangChain调用astream_events(version='v2')，按事件类型分别yield数据
+- 前端体验：用EventSource接收，让用户实时看到思考与工具执行过程，消除等待焦虑
+

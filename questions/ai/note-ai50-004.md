@@ -4,28 +4,32 @@ difficulty: L3
 category: ai
 subcategory: RAG
 tags:
-  - 某厂
-  - 面经
-  - RAG
-  - Reranker
-  - 检索优化
+- 某厂
+- 面经
+- RAG
+- Reranker
+- 检索优化
 feynman:
-  essence: '向量检索是粗筛，Reranker是精排，两阶段pipeline用不同模型各司其职'
-  analogy: '就像招聘——HR先按简历关键词海选(向量检索)，然后技术面试官逐个深入评估(Reranker)。两步都不可少'
-  first_principle: '双塔模型(向量检索)速度快但精度低因为Query和Doc独立编码无法交互；Cross-Encoder(Reranker)精度高因为能建模Query-Doc的深层交互但速度慢'
+  essence: 向量检索是粗筛，Reranker是精排，两阶段pipeline用不同模型各司其职
+  analogy: 就像招聘——HR先按简历关键词海选(向量检索)，然后技术面试官逐个深入评估(Reranker)。两步都不可少
+  first_principle: 双塔模型(向量检索)速度快但精度低因为Query和Doc独立编码无法交互；Cross-Encoder(Reranker)精度高因为能建模Query-Doc的深层交互但速度慢
   key_points:
-    - '向量检索用Bi-Encoder: Query和Doc分别编码，速度快可离线计算'
-    - 'Reranker用Cross-Encoder: Query和Doc拼接后联合编码，精度高但只能在线计算'
-    - '工业标准: 向量召回Top-50~100 → Reranker精排Top-5~10'
-    - '主流Reranker: BGE-Reranker, Cohere Rerank, bce-reranker'
+  - '向量检索用Bi-Encoder: Query和Doc分别编码，速度快可离线计算'
+  - 'Reranker用Cross-Encoder: Query和Doc拼接后联合编码，精度高但只能在线计算'
+  - '工业标准: 向量召回Top-50~100 → Reranker精排Top-5~10'
+  - '主流Reranker: BGE-Reranker, Cohere Rerank, bce-reranker'
 first_principle:
-  essence: '检索质量 = 召回率 × 精确率，Bi-Encoder保证召回率，Cross-Encoder提升精确率'
-  derivation: 'Bi-Encoder将Query和Doc独立映射到向量空间，无法捕获细粒度的Query-Doc交互信息。Cross-Encoder让两者在attention层交互，能判断"这个段落是否真的回答了这个问题"'
-  conclusion: '两阶段检索是计算成本和信息精度的最优权衡'
+  essence: 检索质量 = 召回率 × 精确率，Bi-Encoder保证召回率，Cross-Encoder提升精确率
+  derivation: Bi-Encoder将Query和Doc独立映射到向量空间，无法捕获细粒度的Query-Doc交互信息。Cross-Encoder让两者在attention层交互，能判断"这个段落是否真的回答了这个问题"
+  conclusion: 两阶段检索是计算成本和信息精度的最优权衡
 follow_up:
-  - 'Reranker的延迟通常是多少？如何优化？'
-  - '如果向量检索的召回率本身很低，加Reranker有用吗？'
-  - '可以自己训练Reranker吗？需要什么数据？'
+- Reranker的延迟通常是多少？如何优化？
+- 如果向量检索的召回率本身很低，加Reranker有用吗？
+- 可以自己训练Reranker吗？需要什么数据？
+memory_points:
+- 原因：向量检索（双塔模型）Query与Doc独立编码缺乏深层交互，导致语义相近但答非所问。
+- 重排器（Cross-Encoder）将Query和Doc拼接联合编码，靠Self-Attention计算极高精度的相关性。
+- 工业标准两阶段：第一阶段用Bi-Encoder粗排召回Top-50追求速度，第二阶段用Cross-Encoder精排追求准确度。
 ---
 
 # 为什么要加Reranker重排？直接拿向量检索结果给模型会有什么问题？
@@ -147,3 +151,10 @@ pairs = [(query, doc['content'][:512]) for doc in candidates]
 | 向量+Reranker+RAGAS调优 | 93% | 88% | 120ms |
 
 **结论**: Reranker通常能提升15-20个百分点的Recall@5，是RAG系统从60分到80分的关键组件。
+
+## 记忆要点
+
+- 原因：向量检索（双塔模型）Query与Doc独立编码缺乏深层交互，导致语义相近但答非所问。
+- 重排器（Cross-Encoder）将Query和Doc拼接联合编码，靠Self-Attention计算极高精度的相关性。
+- 工业标准两阶段：第一阶段用Bi-Encoder粗排召回Top-50追求速度，第二阶段用Cross-Encoder精排追求准确度。
+

@@ -4,28 +4,33 @@ difficulty: L3
 category: database
 subcategory: Redis
 tags:
-  - 字节
-  - 面经
-  - Redis
-  - MySQL
-  - 一致性
+- 字节
+- 面经
+- Redis
+- MySQL
+- 一致性
 feynman:
   essence: MySQL是最终数据源，Redis存过程态，用Cache Aside+消息补偿保证最终一致性
-  analogy: '就像银行和手机银行——银行柜台(MySQL)是准的，手机银行(Redis)可能有延迟，但最终会对上账'
-  first_principle: '强一致双写性能差且复杂，最终一致性在业务可接受范围内用最低成本保证数据最终正确'
+  analogy: 就像银行和手机银行——银行柜台(MySQL)是准的，手机银行(Redis)可能有延迟，但最终会对上账
+  first_principle: 强一致双写性能差且复杂，最终一致性在业务可接受范围内用最低成本保证数据最终正确
   key_points:
-    - MySQL是唯一数据源(Source of Truth)
-    - Redis更多存过程态不做强一致双写
-    - 读用Cache Aside，写用先写MySQL后删Redis
-    - 异常通过MQ重试和定时任务补偿
+  - MySQL是唯一数据源(Source of Truth)
+  - Redis更多存过程态不做强一致双写
+  - 读用Cache Aside，写用先写MySQL后删Redis
+  - 异常通过MQ重试和定时任务补偿
 first_principle:
   essence: 分布式系统CAP定理下，强一致性必然牺牲可用性，业务场景允许最终一致
-  derivation: '强一致双写需要2PC/XA事务→性能下降50%+→业务拼团场景不需要→选择最终一致+异步补偿'
+  derivation: 强一致双写需要2PC/XA事务→性能下降50%+→业务拼团场景不需要→选择最终一致+异步补偿
   conclusion: 最终一致性 = Cache Aside读 + 先DB后Cache写 + MQ补偿兜底
 follow_up:
-  - '先删缓存再写DB会有什么问题？'
-  - '延迟双删方案是什么？'
-  - 'Canal监听binlog同步可行吗？'
+- 先删缓存再写DB会有什么问题？
+- 延迟双删方案是什么？
+- Canal监听binlog同步可行吗？
+memory_points:
+- 核心主从：MySQL是唯一数据源，而Redis仅作临时过程态。
+- 写策略口诀：先写DB后删Cache。
+- 反面论证：因为先删Cache时并发读会把旧数据写回，所以极易造成脏读污染。
+- 兜底补偿机制：延迟双删或利用MQ重试机制保证缓存最终必定删除。
 ---
 
 # Redis和MySQL同时存业务状态时，怎么保证最终一致性？
@@ -195,3 +200,11 @@ def pre_deduct_with_fallback(item_id, qty):
 2. **知道为什么后删**：能解释"先删Cache后写DB"的并发脏读问题
 3. **补偿体系**：MQ实时补偿 + 定时任务兜底对账
 4. **预扣回滚**：落库失败时释放Redis预扣，保证不超卖
+
+## 记忆要点
+
+- 核心主从：MySQL是唯一数据源，而Redis仅作临时过程态。
+- 写策略口诀：先写DB后删Cache。
+- 反面论证：因为先删Cache时并发读会把旧数据写回，所以极易造成脏读污染。
+- 兜底补偿机制：延迟双删或利用MQ重试机制保证缓存最终必定删除。
+

@@ -14,11 +14,11 @@ feynman:
   analogy: 像一个厨师——Planning 是菜谱步骤（先切后炒），Memory 是尝过的味道记事本，Tool 是锅碗刀灶，Action 是真正动手切菜/开火。大脑（LLM）指挥，但没手脚（Tool/Action）做不出菜，没记事本（Memory）记不住口味偏好。
   first_principle: Agent 区别于纯 LLM 的本质是"能行动"。LLM 只能说，Agent 能做。四组件分别解决：做什么(Planning)、记得什么(Memory)、能调用什么(Tool)、怎么执行(Action)。
   key_points:
-  - 'Planning：把复杂任务拆解成步骤（CoT/ReAct/ToT/Plan&Execute）'
-  - 'Memory：短期会话+长期向量记忆，存历史供检索'
-  - 'Tool：扩展能力边界，调API/DB/代码/搜索引擎'
-  - 'Action：执行具体操作（调工具/改状态/产出结果）'
-  - '四者构成"感知-决策-执行-反馈"闭环'
+  - Planning：把复杂任务拆解成步骤（CoT/ReAct/ToT/Plan&Execute）
+  - Memory：短期会话+长期向量记忆，存历史供检索
+  - Tool：扩展能力边界，调API/DB/代码/搜索引擎
+  - Action：执行具体操作（调工具/改状态/产出结果）
+  - 四者构成"感知-决策-执行-反馈"闭环
 first_principle:
   essence: Agent = LLM 大脑 + 四组件手脚
   derivation: LLM 只能说不能做 → 加 Tool 扩展能力 → 加 Planning 拆解复杂任务 → 加 Memory 积累经验 → 加 Action 执行 → 形成能行动的闭环
@@ -27,6 +27,12 @@ follow_up:
 - Planning 的四种范式（CoT/ReAct/ToT/Plan&Execute）怎么选？
 - Memory 的短期/长期/向量记忆怎么分工？
 - Tool 和 Action 有什么区别？
+memory_points:
+- 一句话定义：Agent=LLM+感知+记忆+规划+工具+行动，目标导向的动态自控系统
+- 四大组件闭环：Planning拆任务，Memory供上下文，Tool给能力，Action去执行
+- 概念辨析：Tool是静态的能力清单，而Action是动态的具体执行行为
+- 核心区分：Agent是LLM动态决策（灵活），而Workflow是固定流程（确定）
+- 隐性加分项：Reflection（反思机制）是Agent自我纠错与进化的关键
 ---
 
 # 【某讯面经】什么是 Agent？核心组件（Planning、Memory、Tool、Action）作用分别是什么？
@@ -161,3 +167,12 @@ Planning 拆解：
 - **Reflection（反思）**：第五个隐性组件——执行后评估"做得对不对"，是 Agent 自我进化的关键
 - **Multi-Agent**：多个 Agent 分工协作（Planner/Executor/Critic），处理更复杂任务
 - **Computer Use**：Anthropic 的能力，Agent 直接操作电脑（点击/输入/截屏），Tool 扩展到 GUI
+
+## 记忆要点
+
+- 一句话定义：Agent=LLM+感知+记忆+规划+工具+行动，目标导向的动态自控系统
+- 四大组件闭环：Planning拆任务，Memory供上下文，Tool给能力，Action去执行
+- 概念辨析：Tool是静态的能力清单，而Action是动态的具体执行行为
+- 核心区分：Agent是LLM动态决策（灵活），而Workflow是固定流程（确定）
+- 隐性加分项：Reflection（反思机制）是Agent自我纠错与进化的关键
+

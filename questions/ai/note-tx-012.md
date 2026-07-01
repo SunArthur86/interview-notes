@@ -26,6 +26,11 @@ follow_up:
 - GRPO 的组大小 G 如何选择？太大太小有什么影响？
 - GRPO 能否用于非 LLM 的强化学习任务？
 - 为什么 DeepSeek 选择 GRPO 而不是 PPO？
+memory_points:
+- 对比定位：PPO需维护4个模型显存极高，而GRPO砍掉Critic省50%显存
+- 核心原理：同Prompt多次采样，用组内奖励均值作Baseline替代Critic网络
+- 数学本质：用蒙特卡洛经验均值估计优势函数，省去庞大的价值网络
+- 工程意义：DeepSeek-R1借此实现纯RL驱动，验证大规模推理涌现能力
 ---
 
 # 【腾讯面经】GRPO 算法的原理是什么？和 PPO 有什么区别？
@@ -439,3 +444,11 @@ GRPO 的精妙之处在于它用**最简洁的统计方法**替代了 PPO 中最
 | GPU 需求 | Actor + Critic + RM + Ref | Actor + RM + Ref |
 
 面试核心表述：**GRPO 是 PPO 在 LLM 对齐场景下的工程优化，核心创新是用同一 prompt 的 G 个采样的组内统计量替代 Critic 网络做 baseline 估计，在不损失训练效果的前提下将显存开销减半。DeepSeek-R1 验证了 GRPO + 规则奖励可以实现纯 RL 驱动的推理能力涌现。**
+
+## 记忆要点
+
+- 对比定位：PPO需维护4个模型显存极高，而GRPO砍掉Critic省50%显存
+- 核心原理：同Prompt多次采样，用组内奖励均值作Baseline替代Critic网络
+- 数学本质：用蒙特卡洛经验均值估计优势函数，省去庞大的价值网络
+- 工程意义：DeepSeek-R1借此实现纯RL驱动，验证大规模推理涌现能力
+

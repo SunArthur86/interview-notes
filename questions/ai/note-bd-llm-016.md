@@ -27,6 +27,11 @@ follow_up:
 - PagedAttention(vLLM)的原理？
 - KV Cache的内存怎么估算？
 - 如何做KV Cache的淘汰策略？
+memory_points:
+- 原理：Attention计算中历史Token的K和V不变，缓存复用避免重复计算。
+- 阶段：Prefill处理Prompt存入Cache，Decode每步只算新Token的QKV。
+- 复杂度：计算量从O(N²)降为O(N)，显存随序列长度和层数线性增加。
+- 优化：多轮对话Cache命中率低时，可用Prefix Caching/PD分离/Radix Tree优化。
 ---
 
 # 【字节面经】KV Cache 的核心原理是什么？在多轮对话场景下，KV Cache 命中率低时你会怎么优化？
@@ -391,3 +396,11 @@ class SessionKVCacheManager:
 3. 知道 SGLang 的 RadixAttention 是 Prefix Caching 的进化版，能自动发现动态前缀
 4. 提到注意力Sink现象——前几个token天然吸引注意力，不能丢弃
 5. 知道 KV Cache 的淘汰策略需要权衡：显存节省 vs 重算开销（Recomputation Cost）
+
+## 记忆要点
+
+- 原理：Attention计算中历史Token的K和V不变，缓存复用避免重复计算。
+- 阶段：Prefill处理Prompt存入Cache，Decode每步只算新Token的QKV。
+- 复杂度：计算量从O(N²)降为O(N)，显存随序列长度和层数线性增加。
+- 优化：多轮对话Cache命中率低时，可用Prefix Caching/PD分离/Radix Tree优化。
+

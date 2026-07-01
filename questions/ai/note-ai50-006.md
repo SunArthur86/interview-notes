@@ -4,28 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 某厂
-  - 面经
-  - 幻觉
-  - Prompt工程
-  - RAG
+- 某厂
+- 面经
+- 幻觉
+- Prompt工程
+- RAG
 feynman:
-  essence: '幻觉是模型"编造"不存在的信息，工程上通过输入约束、输出验证和架构设计三层面压制'
-  analogy: '就像让学生开卷考试——给他教材(RAG)、限定答题范围(Prompt约束)、考完对答案(后处理校验)，三管齐下防止瞎编'
-  first_principle: '幻觉源于LLM的自回归生成机制——模型基于概率分布预测下一个token，当训练数据中缺乏确切知识时，概率最高的token可能是编造的'
+  essence: 幻觉是模型"编造"不存在的信息，工程上通过输入约束、输出验证和架构设计三层面压制
+  analogy: 就像让学生开卷考试——给他教材(RAG)、限定答题范围(Prompt约束)、考完对答案(后处理校验)，三管齐下防止瞎编
+  first_principle: 幻觉源于LLM的自回归生成机制——模型基于概率分布预测下一个token，当训练数据中缺乏确切知识时，概率最高的token可能是编造的
   key_points:
-    - '输入层: RAG检索 + 高质量Prompt约束'
-    - '模型层: 降低temperature + 选择低幻觉模型'
-    - '输出层: NLI验证 + 事实校验 + 结构化输出'
-    - '系统层: 多轮自检 + Human-in-the-loop'
+  - '输入层: RAG检索 + 高质量Prompt约束'
+  - '模型层: 降低temperature + 选择低幻觉模型'
+  - '输出层: NLI验证 + 事实校验 + 结构化输出'
+  - '系统层: 多轮自检 + Human-in-the-loop'
 first_principle:
-  essence: '幻觉是自回归语言模型的固有特性，无法消除只能压制'
-  derivation: 'LLM生成第t个token时，P(token_t | context)是概率分布。当context不足以确定答案时，高概率token可能不是事实正确的。降低temperature使分布更尖锐但不能根除'
-  conclusion: '工程上通过"约束输入→控制生成→验证输出"三层防线将幻觉率从30%降到5%以下'
+  essence: 幻觉是自回归语言模型的固有特性，无法消除只能压制
+  derivation: LLM生成第t个token时，P(token_t | context)是概率分布。当context不足以确定答案时，高概率token可能不是事实正确的。降低temperature使分布更尖锐但不能根除
+  conclusion: 工程上通过"约束输入→控制生成→验证输出"三层防线将幻觉率从30%降到5%以下
 follow_up:
-  - '如何量化测量幻觉率？'
-  - 'CoT(思维链)会增加还是减少幻觉？'
-  - '模型微调能否减少特定领域的幻觉？'
+- 如何量化测量幻觉率？
+- CoT(思维链)会增加还是减少幻觉？
+- 模型微调能否减少特定领域的幻觉？
+memory_points:
+- 三层防线：输入层防发散、模型层降随机、输出层强校验。
+- 输入层靠RAG提供真实文档并用Prompt强约束（如要求只基于资料回答并标注来源）。
+- 模型层调低temperature（0.1-0.3）并强制JSON结构化输出限制自由发挥；输出层用NLI模型做事实一致性校验。
 ---
 
 # 防止大模型幻觉的工程和Prompt手段
@@ -210,3 +214,10 @@ def anti_hallucination_pipeline(query, vector_store):
     
     return checked
 ```
+
+## 记忆要点
+
+- 三层防线：输入层防发散、模型层降随机、输出层强校验。
+- 输入层靠RAG提供真实文档并用Prompt强约束（如要求只基于资料回答并标注来源）。
+- 模型层调低temperature（0.1-0.3）并强制JSON结构化输出限制自由发挥；输出层用NLI模型做事实一致性校验。
+

@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - GraphRAG
-  - RAG
+- 字节
+- 面经
+- GraphRAG
+- RAG
 feynman:
-  essence: "GraphRAG在向量检索基础上叠加知识图谱的关系信息，解决多跳推理和全局摘要问题，适合有复杂实体关系的知识库"
-  analogy: "普通向量RAG像查字典——按相似度翻到最像的条目；GraphRAG像查维基百科——不仅找到条目，还能顺着超链接跳转到关联条目，理解实体间关系"
-  first_principle: "向量检索捕捉语义相似性，图谱检索捕捉结构关联性，两者互补"
+  essence: GraphRAG在向量检索基础上叠加知识图谱的关系信息，解决多跳推理和全局摘要问题，适合有复杂实体关系的知识库
+  analogy: 普通向量RAG像查字典——按相似度翻到最像的条目；GraphRAG像查维基百科——不仅找到条目，还能顺着超链接跳转到关联条目，理解实体间关系
+  first_principle: 向量检索捕捉语义相似性，图谱检索捕捉结构关联性，两者互补
   key_points:
-    - '向量RAG: 语义相似度匹配，适合单跳问答'
-    - 'GraphRAG: 实体+关系图遍历，适合多跳推理'
-    - '本地生活场景: GraphRAG适合处理餐厅→商圈→活动→优惠的关联'
-    - '成本: GraphRAG建图成本高，但查询时能减少幻觉'
+  - '向量RAG: 语义相似度匹配，适合单跳问答'
+  - 'GraphRAG: 实体+关系图遍历，适合多跳推理'
+  - '本地生活场景: GraphRAG适合处理餐厅→商圈→活动→优惠的关联'
+  - '成本: GraphRAG建图成本高，但查询时能减少幻觉'
 first_principle:
-  essence: "知识有两种结构：语义相似性(向量空间)和关系拓扑性(图结构)"
-  derivation: "用户问'A餐厅附近有什么景点' → 向量RAG只能找到相似文本 → 不知道A和景点的空间关系 → GraphRAG通过图遍历找到A→商圈→景点的关联 → 回答更准确"
-  conclusion: "有复杂实体关系的数据用GraphRAG，纯文档问答用向量RAG"
+  essence: 知识有两种结构：语义相似性(向量空间)和关系拓扑性(图结构)
+  derivation: 用户问'A餐厅附近有什么景点' → 向量RAG只能找到相似文本 → 不知道A和景点的空间关系 → GraphRAG通过图遍历找到A→商圈→景点的关联 → 回答更准确
+  conclusion: 有复杂实体关系的数据用GraphRAG，纯文档问答用向量RAG
 follow_up:
-  - "GraphRAG的知识图谱怎么自动构建？"
-  - "GraphRAG和Agentic RAG有什么区别？"
-  - "本地生活知识库建图的成本？"
+- GraphRAG的知识图谱怎么自动构建？
+- GraphRAG和Agentic RAG有什么区别？
+- 本地生活知识库建图的成本？
+memory_points:
+- 向量RAG靠相似度匹配找局部Chunks，GraphRAG靠实体关系图遍历支持多跳推理
+- 因为GraphRAG建图成本高，所以纯文本评论仍用向量RAG，关系查询用图
+- 本地生活天然是图结构：餐厅到商圈/地铁站的关系极其适合GraphRAG精确过滤
+- 生产级最佳实践：混合检索(Hybrid)，先用意图判断决定走Graph还是走向量
 ---
 
 # GraphRAG 和普通向量 RAG 的区别？适合本地生活知识库吗？
@@ -169,3 +174,11 @@ Step 4: 图谱存储 (Neo4j / NebulaGraph)
 Step 5: 社区检测 + 摘要 (Leiden算法)
   将图分成社区 → 每个社区生成摘要 → 支持全局问答
 ```
+
+## 记忆要点
+
+- 向量RAG靠相似度匹配找局部Chunks，GraphRAG靠实体关系图遍历支持多跳推理
+- 因为GraphRAG建图成本高，所以纯文本评论仍用向量RAG，关系查询用图
+- 本地生活天然是图结构：餐厅到商圈/地铁站的关系极其适合GraphRAG精确过滤
+- 生产级最佳实践：混合检索(Hybrid)，先用意图判断决定走Graph还是走向量
+

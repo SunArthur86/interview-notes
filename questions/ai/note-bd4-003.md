@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - RAG
-  - Agentic RAG
+- 字节
+- 面经
+- RAG
+- Agentic RAG
 feynman:
-  essence: "Naive RAG是一次性检索+生成；Agentic RAG让Agent主动决策检索策略，支持多轮检索、查询改写、结果评估和迭代优化"
-  analogy: "Naive RAG像去图书馆问前台要一本书；Agentic RAG像一个研究员——先查目录，发现不够再查参考文献，交叉验证，直到满意才写报告"
-  first_principle: "检索增强的本质是弥补LLM知识不足，Naive RAG假设一次检索就够了，Agentic RAG承认有些问题需要多步探索"
+  essence: Naive RAG是一次性检索+生成；Agentic RAG让Agent主动决策检索策略，支持多轮检索、查询改写、结果评估和迭代优化
+  analogy: Naive RAG像去图书馆问前台要一本书；Agentic RAG像一个研究员——先查目录，发现不够再查参考文献，交叉验证，直到满意才写报告
+  first_principle: 检索增强的本质是弥补LLM知识不足，Naive RAG假设一次检索就够了，Agentic RAG承认有些问题需要多步探索
   key_points:
-    - 'Naive RAG: 单次检索→拼接→生成，简单但脆弱'
-    - 'Agentic RAG: Agent控制检索循环，支持查询改写/多路检索/结果评估/迭代'
-    - '何时需要Agentic RAG: 多跳推理、复杂条件、需要交叉验证的场景'
-    - '何时用Naive RAG: 简单FAQ、单文档问答、对延迟敏感的场景'
+  - 'Naive RAG: 单次检索→拼接→生成，简单但脆弱'
+  - 'Agentic RAG: Agent控制检索循环，支持查询改写/多路检索/结果评估/迭代'
+  - '何时需要Agentic RAG: 多跳推理、复杂条件、需要交叉验证的场景'
+  - '何时用Naive RAG: 简单FAQ、单文档问答、对延迟敏感的场景'
 first_principle:
-  essence: "检索是手段而非目的，何时检索、检索什么、检索结果好不好用都需要判断"
-  derivation: "LLM的知识有截止日期和覆盖范围限制 → 需要外部知识增强 → 但用户的query可能不精确 → 需要Agent判断和改写查询 → 检索结果可能不相关 → 需要评估和重试"
-  conclusion: "Agentic RAG将检索从静态管道变为动态决策过程"
+  essence: 检索是手段而非目的，何时检索、检索什么、检索结果好不好用都需要判断
+  derivation: LLM的知识有截止日期和覆盖范围限制 → 需要外部知识增强 → 但用户的query可能不精确 → 需要Agent判断和改写查询 → 检索结果可能不相关 → 需要评估和重试
+  conclusion: Agentic RAG将检索从静态管道变为动态决策过程
 follow_up:
-  - "Agentic RAG的延迟怎么控制？"
-  - "如何评估Agentic RAG比Naive RAG效果好？"
-  - "Self-RAG和Agentic RAG有什么区别？"
+- Agentic RAG的延迟怎么控制？
+- 如何评估Agentic RAG比Naive RAG效果好？
+- Self-RAG和Agentic RAG有什么区别？
+memory_points:
+- 普通RAG单次检索直接生成，Agentic RAG以Agent为主导支持多轮迭代检索
+- Agentic RAG核心能力：Query改写、结果评估、多跳推理、动态路由
+- 因为Agentic RAG多次调用LLM导致延迟高成本高，所以简单FAQ和低延迟场景用Naive RAG即可
+- 适用Agentic RAG：多跳推理、复杂条件查询、需交叉验证的医疗/法律场景
 ---
 
 # Agentic RAG 和普通 Naive RAG 的区别？什么时候需要 Agentic RAG？
@@ -143,3 +148,11 @@ LLM在生成过程中自问：
 - **缓存**：Semantic Cache缓存相似query的结果，避免重复检索
 - **最大检索轮数**：限制3-5轮，防止Agent无限循环
 - **超时控制**：总延迟控制在5s以内，超过则降级为Naive RAG结果
+
+## 记忆要点
+
+- 普通RAG单次检索直接生成，Agentic RAG以Agent为主导支持多轮迭代检索
+- Agentic RAG核心能力：Query改写、结果评估、多跳推理、动态路由
+- 因为Agentic RAG多次调用LLM导致延迟高成本高，所以简单FAQ和低延迟场景用Naive RAG即可
+- 适用Agentic RAG：多跳推理、复杂条件查询、需交叉验证的医疗/法律场景
+

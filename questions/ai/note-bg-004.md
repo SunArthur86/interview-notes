@@ -25,9 +25,15 @@ first_principle:
   derivation: RLHF的目标是最大化 E[r(x,y)] 同时不偏离参考策略。PPO用RM近似r，用KL约束不偏离。DPO通过推导发现，最优解 π*/π_ref = exp(r/β)，把r用π表示后，偏好对的对比loss可以直接优化π，无需显式RM。GRPO发现，用"组内均值做baseline"代替Critic估计的value，效果相当且省一半显存。
   conclusion: PPO→GRPO(省Critic)→DAPO(动态采样)是on-policy线的演进；DPO是另一条off-policy路线
 follow_up:
-  - GRPO去掉Critic后，优势估计的方差会变大吗？
-  - DPO和PPO在什么场景下各有优劣？
-  - DAPO的动态采样具体怎么过滤？为什么能提升效率？
+- GRPO去掉Critic后，优势估计的方差会变大吗？
+- DPO和PPO在什么场景下各有优劣？
+- DAPO的动态采样具体怎么过滤？为什么能提升效率？
+memory_points:
+- 四者对比：PPO需Critic四模型，GRPO组内相对去Critic，DAPO动态采样解耦，DPO离线无需RM
+- PPO原理：用概率比值计算，限制在[1-ε, 1+ε]内裁剪，悲观更新保稳定
+- GRPO原理：同prompt采样G个回答，组内分数标准化作为优势值，免去价值网络
+- DAPO优化：因全对全错样本梯度为0，故动态剔除以提升有效梯度密度
+- DPO本质：直接偏好优化，通过构造闭式解跳过RL和RM，全离线训练
 ---
 
 # 【八股总结】PPO、GRPO、DPO、DAPO 的基本原理
@@ -361,3 +367,12 @@ def choose_method(task_type, resources, data):
 - **DAPO论文**：字节跳动2025，动态采样+解耦裁剪，刷新AIME记录
 - **DPO论文**：Stanford 2023，RLHF的偏好直接优化理论
 - **其他变体**：KTO（Kahneman-Tversky，只需好/坏标签无需成对）、IPO、ORPO
+
+## 记忆要点
+
+- 四者对比：PPO需Critic四模型，GRPO组内相对去Critic，DAPO动态采样解耦，DPO离线无需RM
+- PPO原理：用概率比值计算，限制在[1-ε, 1+ε]内裁剪，悲观更新保稳定
+- GRPO原理：同prompt采样G个回答，组内分数标准化作为优势值，免去价值网络
+- DAPO优化：因全对全错样本梯度为0，故动态剔除以提升有效梯度密度
+- DPO本质：直接偏好优化，通过构造闭式解跳过RL和RM，全离线训练
+

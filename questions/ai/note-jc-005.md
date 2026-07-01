@@ -29,6 +29,12 @@ follow_up:
 - MoE 的负载均衡损失怎么设计？
 - GSPO 的序列级优势怎么定义？
 - 除了 GSPO，还有哪些 MoE 友好的 RL 方法？
+memory_points:
+- RL训MoE痛点：RL梯度扰动离散路由，加剧负载不均和路由震荡
+- GRPO劣势：token级梯度加剧MoE专家抢占与参数更新稀疏
+- GSPO优化一：序列级优势，平滑梯度减少对单token路由的扰动
+- GSPO优化二：显式负载均衡损失，防止expert collapse（专家死亡）
+- GSPO优化三：token级重要性采样，适配MoE稀疏激活特性
 ---
 
 # 【阶跃星辰/字节面经】用 RL 训练 MoE 架构容易遇到哪些问题？GSPO 相比 GRPO 做了哪些优化？
@@ -181,3 +187,12 @@ GSPO 用 token 级重要性权重修正：
 - **DeepSeek-V3/R1 的 MoE**：用共享专家 + 路由专家，缓解负载均衡
 - **DAPO**（字节）：另一款 GRPO 变体，针对 RLHF 优化（动态采样 + 长度归一化）
 - **Mixtral / Qwen-MoE**：开源 MoE 模型，训练细节公开可参考
+
+## 记忆要点
+
+- RL训MoE痛点：RL梯度扰动离散路由，加剧负载不均和路由震荡
+- GRPO劣势：token级梯度加剧MoE专家抢占与参数更新稀疏
+- GSPO优化一：序列级优势，平滑梯度减少对单token路由的扰动
+- GSPO优化二：显式负载均衡损失，防止expert collapse（专家死亡）
+- GSPO优化三：token级重要性采样，适配MoE稀疏激活特性
+

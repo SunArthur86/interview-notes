@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - ReAct
-  - 认知框架
-  - Agent
+- B站面经
+- ReAct
+- 认知框架
+- Agent
 feynman:
   essence: ReAct=Reasoning(推理)+Acting(行动)交替进行。先思考(Thought)再行动(Action)再观察(Observation)，把"想"和"做"交织，比纯思考更接地气，比纯行动更有章法。
   analogy: 像做实验的科学家——先假设(Thought)→做实验(Action)→看结果(Observation)→再假设，循环逼近真相。而不是闭门造车空想，或盲目乱试。
   first_principle: 纯推理(CoT)会幻觉（脱离事实），纯行动(Act-only)会盲目（没有规划）。ReAct把两者交织，推理指导行动，行动反馈修正推理。
   key_points:
-    - 三元组循环：Thought→Action→Observation
-    - 解决CoT的幻觉问题（用工具获取真实信息）
-    - 解决Act-only的盲目问题（推理指导行动）
-    - 是现代Agent最基础的认知范式
+  - 三元组循环：Thought→Action→Observation
+  - 解决CoT的幻觉问题（用工具获取真实信息）
+  - 解决Act-only的盲目问题（推理指导行动）
+  - 是现代Agent最基础的认知范式
 first_principle:
   essence: ReAct解决了"思考"与"行动"的割裂——人类解决问题时两者本就是交织的。
-  derivation: '纯CoT：只在脑中推理，无法验证，易幻觉。纯Act：无脑调用工具，无规划，低效。ReAct：每次行动前先思考为什么，行动后观察结果修正思考，形成感知-决策闭环。'
+  derivation: 纯CoT：只在脑中推理，无法验证，易幻觉。纯Act：无脑调用工具，无规划，低效。ReAct：每次行动前先思考为什么，行动后观察结果修正思考，形成感知-决策闭环。
   conclusion: ReAct = 交替的推理与行动，让Agent既有脑（推理）又有手（工具）
 follow_up:
-  - ReAct和CoT能结合吗？——可以，ReAct的Thought本质就是CoT
-  - ReAct的Token消耗大吗？——大，因为要显式输出Thought，可用内部推理优化
-  - ReAct什么时候失效？——任务过于复杂（需全局规划）或过于简单（无需推理）
+- ReAct和CoT能结合吗？——可以，ReAct的Thought本质就是CoT
+- ReAct的Token消耗大吗？——大，因为要显式输出Thought，可用内部推理优化
+- ReAct什么时候失效？——任务过于复杂（需全局规划）或过于简单（无需推理）
+memory_points:
+- 核心定义：ReAct = Reasoning + Acting，让大模型交替进行推理和行动
+- 循环机制：Thought(思考) -> Action(行动) -> Observation(观察)循环执行
+- 解决痛点：纯CoT易产生幻觉，纯Act缺乏全局规划，ReAct结合两者优势
+- 终止条件：Action输出为Finish时，代表获得最终答案，结束循环
 ---
 
 # 什么是 ReAct 框架？它的原理是什么？
@@ -199,3 +204,11 @@ response = client.chat.completions.create(
 1. **讲清动机**：ReAct 是为了同时解决 CoT 的幻觉和 Act-only 的盲目，是两者的融合
 2. **强调"交织"**：核心是推理与行动**交替**，而非串接——每步行动都基于上一步的观察
 3. **提"现代内化"**：现代 Agent 框架的 ReAct 已内化到 function calling，无需手写 Thought 解析
+
+## 记忆要点
+
+- 核心定义：ReAct = Reasoning + Acting，让大模型交替进行推理和行动
+- 循环机制：Thought(思考) -> Action(行动) -> Observation(观察)循环执行
+- 解决痛点：纯CoT易产生幻觉，纯Act缺乏全局规划，ReAct结合两者优势
+- 终止条件：Action输出为Finish时，代表获得最终答案，结束循环
+

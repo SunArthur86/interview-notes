@@ -15,11 +15,11 @@ feynman:
   analogy: 过期像家里的过期食品——你不会每秒检查每包（太累），而是偶尔翻冰箱（定期删除）+ 拿起来要吃时才看保质期（惰性删除）。淘汰像衣柜满了——丢最久没穿的（LRU）、丢最不常穿的（LFU）、随机丢（random）、按保质期丢（ttl）。
   first_principle: Redis 是内存数据库，内存有限。过期是"主动声明"，淘汰是"被动应对"。两者协同保证 Redis 既不存垃圾也不爆内存。
   key_points:
-  - '过期不立刻删：惰性删除(访问时检查) + 定期删除(每100ms抽样) 组合'
-  - '8 种淘汰策略：noeviction / allkeys-{lru,lfu,random} / volatile-{lru,lfu,random,ttl}'
-  - 'volatile-* 只淘汰设了 TTL 的 key；allkeys-* 淘汰所有'
-  - 'LRU 近似（采样N个淘汰最久未用），LFU 按访问频率'
-  - 'Agent 会话状态选 allkeys-lru 或 volatile-lru'
+  - 过期不立刻删：惰性删除(访问时检查) + 定期删除(每100ms抽样) 组合
+  - 8 种淘汰策略：noeviction / allkeys-{lru,lfu,random} / volatile-{lru,lfu,random,ttl}
+  - volatile-* 只淘汰设了 TTL 的 key；allkeys-* 淘汰所有
+  - LRU 近似（采样N个淘汰最久未用），LFU 按访问频率
+  - Agent 会话状态选 allkeys-lru 或 volatile-lru
 first_principle:
   essence: 过期(主动声明) + 淘汰(被动应对) = 内存可控
   derivation: 内存有限 → 必须有机制回收 → 过期是用户主动声明"可删" → 淘汰是 Redis 被动应对"满了得删谁" → 两者协同
@@ -28,6 +28,11 @@ follow_up:
 - LRU 是严格 LRU 吗？为什么用近似？
 - LFU 怎么实现的？衰减机制是什么？
 - Agent 会话状态选 volatile-lru 还是 allkeys-lru？
+memory_points:
+- 过期不立刻删：组合使用惰性删除(访问才查)与定期删除(100ms抽样)，避免阻塞主线程
+- 8大淘汰策略：noeviction默认报错，allkeys-*管所有键，volatile-*只踢设了TTL的键
+- 淘汰算法看场景：LRU淘汰最久未用(保活跃)，LFU淘汰频次低(保热点)
+- 淘汰非严格LRU，而是采样近似(maxmemory-samples默认取5个选最老)
 ---
 
 # 【字节飞连面经】Redis 过期删除策略 + 内存淘汰策略：Key 过期会立刻删吗？
@@ -94,3 +99,11 @@ Redis 的 LRU 是**近似 LRU**：
 - **持久化与过期的交互**：RDB 快照不存已过期的 key；AOF 写入时会检查过期
 - **主从复制的过期**：从节点不主动删过期 key（等主节点 DEL 命令同步），导致从节点可能读到"过期但未删"的数据——读到后惰性删除
 - **Redis 7.0** 的多线程 I/O 对过期策略无影响（过期逻辑仍在主线程）
+
+## 记忆要点
+
+- 过期不立刻删：组合使用惰性删除(访问才查)与定期删除(100ms抽样)，避免阻塞主线程
+- 8大淘汰策略：noeviction默认报错，allkeys-*管所有键，volatile-*只踢设了TTL的键
+- 淘汰算法看场景：LRU淘汰最久未用(保活跃)，LFU淘汰频次低(保热点)
+- 淘汰非严格LRU，而是采样近似(maxmemory-samples默认取5个选最老)
+

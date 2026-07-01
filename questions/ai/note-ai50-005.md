@@ -4,28 +4,32 @@ difficulty: L2
 category: ai
 subcategory: RAG
 tags:
-  - 某厂
-  - 面经
-  - RAG
-  - 文档切片
-  - Chunk
+- 某厂
+- 面经
+- RAG
+- 文档切片
+- Chunk
 feynman:
-  essence: 'Overlap让相邻chunk共享一部分文本，避免关键信息被切断在两个chunk的边界处'
-  analogy: '就像装修贴瓷砖留重叠缝——每块瓷砖边缘和下一块重叠一小段，这样即使某块有瑕疵，整体也不会出现明显的缝隙'
-  first_principle: '一个完整语义单元（如一句话、一个段落）恰好跨越两个chunk的边界时，两个chunk都不完整。Overlap提供冗余，保证边界信息至少在一个chunk中是完整的'
+  essence: Overlap让相邻chunk共享一部分文本，避免关键信息被切断在两个chunk的边界处
+  analogy: 就像装修贴瓷砖留重叠缝——每块瓷砖边缘和下一块重叠一小段，这样即使某块有瑕疵，整体也不会出现明显的缝隙
+  first_principle: 一个完整语义单元（如一句话、一个段落）恰好跨越两个chunk的边界时，两个chunk都不完整。Overlap提供冗余，保证边界信息至少在一个chunk中是完整的
   key_points:
-    - '标准配置: chunk_size=512, overlap=50-100 tokens'
-    - 'Overlap不是越大越好——增加存储和计算成本'
-    - 'Overlap解决的是"硬切分"问题，更好的方案是语义切分'
-    - '对于表格、代码等结构化内容，Overlap应设为0'
+  - '标准配置: chunk_size=512, overlap=50-100 tokens'
+  - Overlap不是越大越好——增加存储和计算成本
+  - Overlap解决的是"硬切分"问题，更好的方案是语义切分
+  - 对于表格、代码等结构化内容，Overlap应设为0
 first_principle:
-  essence: '语义完整性要求上下文连续性，硬切分破坏这种连续性'
-  derivation: '假设chunk边界恰好在一句话中间，前一个chunk缺少句尾，后一个chunk缺少句首。Overlap=50 tokens意味着两句话的边界内容在两个chunk中都存在，检索时至少有一个chunk包含完整句子'
-  conclusion: 'Overlap是对硬切分的廉价修补，语义切分是更优的解决方案'
+  essence: 语义完整性要求上下文连续性，硬切分破坏这种连续性
+  derivation: 假设chunk边界恰好在一句话中间，前一个chunk缺少句尾，后一个chunk缺少句首。Overlap=50 tokens意味着两句话的边界内容在两个chunk中都存在，检索时至少有一个chunk包含完整句子
+  conclusion: Overlap是对硬切分的廉价修补，语义切分是更优的解决方案
 follow_up:
-  - '语义切分(Semantic Chunking)怎么实现？'
-  - 'chunk_size设多大最合适？和模型上下文窗口什么关系？'
-  - '如果文档很短（比如只有2段），还需要切片吗？'
+- 语义切分(Semantic Chunking)怎么实现？
+- chunk_size设多大最合适？和模型上下文窗口什么关系？
+- 如果文档很短（比如只有2段），还需要切片吗？
+memory_points:
+- 目的：解决硬性切分导致的语义断裂，防止关键信息在切片交界处因缺少上下文而无法被理解。
+- Overlap保留相邻Chunk的重叠部分，经验值通常设为Chunk大小的10%-20%。
+- 最优解是语义切分：按段落和句子自然边界断开，而非固定Token数硬切。
 ---
 
 # 文档切片为什么要有Overlap？它主要解决什么问题？
@@ -154,3 +158,10 @@ def semantic_chunk(text, max_chunk_size=512):
 | 表格 | 整表作为一个chunk | 0 |
 | Markdown | 按标题层级 | 0 |
 | 对话记录 | 按对话轮次 | 5-10% |
+
+## 记忆要点
+
+- 目的：解决硬性切分导致的语义断裂，防止关键信息在切片交界处因缺少上下文而无法被理解。
+- Overlap保留相邻Chunk的重叠部分，经验值通常设为Chunk大小的10%-20%。
+- 最优解是语义切分：按段落和句子自然边界断开，而非固定Token数硬切。
+

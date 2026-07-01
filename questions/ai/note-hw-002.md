@@ -23,9 +23,14 @@ first_principle:
   derivation: 在MapReduce/Spark中，数据按key的hash分布到N个partition并行处理，总耗时=max(各partition耗时)。当某个key的频次远超其他（如null、空字符串、热门ID），其所在partition成为瓶颈。窗口函数通过预排序+滑动窗口，避免了GROUP BY的shuffle代价。
   conclusion: 性能优化=让数据分布均匀(治倾斜)+让计算本地化(减少shuffle+合理用窗口函数)
 follow_up:
-  - ROWS BETWEEN和RANGE BETWEEN的区别？
-  - 开窗函数和GROUP BY能否在同一个查询中混用？
-  - Spark中如何诊断数据倾斜？如何看SQL执行计划？
+- ROWS BETWEEN和RANGE BETWEEN的区别？
+- 开窗函数和GROUP BY能否在同一个查询中混用？
+- Spark中如何诊断数据倾斜？如何看SQL执行计划？
+memory_points:
+- 本质对比：GROUP BY 合并行降维，窗口函数保留原行明细并附加聚合计算结果。
+- 三要素：语法包含 PARTITION BY(分组)、ORDER BY(组内排序)、ROWS/RANGE(框架范围)。
+- 函数分类：聚合类做累计求和，排名类(ROW_NUMBER等)常用于去重，偏移类(LAG/LEAD)算同比。
+- 倾斜处理：因 Key 分布不均导致，优化常靠打散重组、加盐扩容或开启 Skew Join 参数。
 ---
 
 # 【华为面经】SQL 窗口函数与数据倾斜问题如何处理？
@@ -303,3 +308,11 @@ SELECT * FROM final WHERE rn = 1;
 - **Spark Adaptive Query Execution (AQE)**：Spark 3.0+运行时自动检测倾斜并切分partition，无需手动加盐（`spark.sql.adaptive.skewJoin.enabled`）
 - **Hive的SkewJoin优化**：`set hive.optimize.skewjoin=true`，自动把倾斜key单独走MapJoin
 - **大模型数据去重工具**：datasketch（MinHash LSH）、Deduplicating Massive Datasets（CCNet的精确去重）
+
+## 记忆要点
+
+- 本质对比：GROUP BY 合并行降维，窗口函数保留原行明细并附加聚合计算结果。
+- 三要素：语法包含 PARTITION BY(分组)、ORDER BY(组内排序)、ROWS/RANGE(框架范围)。
+- 函数分类：聚合类做累计求和，排名类(ROW_NUMBER等)常用于去重，偏移类(LAG/LEAD)算同比。
+- 倾斜处理：因 Key 分布不均导致，优化常靠打散重组、加盐扩容或开启 Skew Join 参数。
+

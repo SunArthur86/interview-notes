@@ -19,7 +19,7 @@ feynman:
   - 'ReAct: Thought-Action-Observation循环，边推理边调工具'
   - 'ToT: 树状多路径探索+回溯，复杂问题需探索多方案'
   - 'Plan&Execute: 先全局规划再执行，步骤明确的长任务'
-  - '选型：简单→CoT；需工具→ReAct；需探索→ToT；步骤明确→Plan&Execute'
+  - 选型：简单→CoT；需工具→ReAct；需探索→ToT；步骤明确→Plan&Execute
 first_principle:
   essence: 推理范式 = 规划深度 × 执行灵活性的权衡
   derivation: 简单任务一条链够(CoT) → 需调工具加循环(ReAct) → 需探索多方案加分支回溯(ToT) → 步骤明确先规划(Plan&Execute) → 复杂度递增，成本递增
@@ -28,6 +28,12 @@ follow_up:
 - ReAct 怎么防止"想太多"无限循环？
 - ToT 的分支评估函数怎么设计？
 - Plan&Execute 规划过时怎么动态调整？
+memory_points:
+- 四大范式定位：CoT纯推理、ReAct边想边做、ToT多路探索、Plan先全局后执行
+- 适用场景：数学题选CoT，调工具选ReAct，创意策划选ToT，长线任务选Plan
+- 防死循环：ReAct必须设步数硬上限、参数去重及早停机制
+- 控制成本：ToT极贵，必须限制树的深度、分支数并配合早期剪枝
+- 黄金组合：Plan&Execute架构中，单步Execute底层常使用ReAct兼顾灵活
 ---
 
 # 【某讯面经】CoT / ReAct / ToT / Plan&Verify 适用场景对比，项目怎么选型
@@ -167,3 +173,12 @@ Answer: 北京今天晴，气温25℃
 - **Self-Consistency**：CoT 的增强版，采样多条推理路径，多数投票选答案，提升准确率
 - **Reflexion**：ReAct + 反思，执行失败后反思原因再重试，自我进化
 - **LATS（Language Agent Tree Search）**：ToT + MCTS（蒙特卡洛树搜索），更系统的探索
+
+## 记忆要点
+
+- 四大范式定位：CoT纯推理、ReAct边想边做、ToT多路探索、Plan先全局后执行
+- 适用场景：数学题选CoT，调工具选ReAct，创意策划选ToT，长线任务选Plan
+- 防死循环：ReAct必须设步数硬上限、参数去重及早停机制
+- 控制成本：ToT极贵，必须限制树的深度、分支数并配合早期剪枝
+- 黄金组合：Plan&Execute架构中，单步Execute底层常使用ReAct兼顾灵活
+

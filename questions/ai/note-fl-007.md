@@ -14,11 +14,11 @@ feynman:
   analogy: LangChain 像流水线传送带（A→B→C 线性），LangGraph 像地铁线路图（有分叉、有环线、有换乘站）。前者简单场景快，后者复杂场景才理得清。AutoGen 像开会议——几个人各说各的，会议记录又长又乱。
   first_principle: 复杂 Agent 逻辑本质是状态机。把状态（State）、动作（Node）、转移（Edge）显式化，才能调试、回放、断点、并行、人工介入。隐式的"Agent 互聊"无法做到这些工程能力。
   key_points:
-  - 'LangChain 链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入'
-  - 'State：TypedDict 定义共享上下文，每个 Node 读+改它'
-  - 'Node：纯函数（input=State, output=State partial）'
-  - 'Edge：静态(A→B)/Conditional(函数返回下一节点名)/END'
-  - '选 LangGraph：显式状态+路由+复用通用能力，比 AutoGen/CrewAI/手写更可控'
+  - LangChain 链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入
+  - State：TypedDict 定义共享上下文，每个 Node 读+改它
+  - Node：纯函数（input=State, output=State partial）
+  - Edge：静态(A→B)/Conditional(函数返回下一节点名)/END
+  - 选 LangGraph：显式状态+路由+复用通用能力，比 AutoGen/CrewAI/手写更可控
 first_principle:
   essence: Agent = 显式状态机
   derivation: 复杂逻辑本质是状态机 → 状态/动作/转移必须显式 → 才能调试回放断点并行 → LangGraph 把这三者抽象成 State/Node/Edge → 隐式互聊（AutoGen）无法工程化
@@ -27,6 +27,11 @@ follow_up:
 - LangGraph 的 interrupt() 怎么实现 human-in-the-loop？
 - LangGraph 的 CheckpointSaver 接口怎么接 Redis/Postgres？
 - 框架能力不满足时怎么扩展？
+memory_points:
+- 选LangGraph因其为图抽象(状态机)，支持循环/分支/并行，LangChain只适合简单线性流
+- 核心三要素：State(共享上下文)、Node(执行动作)、Conditional Edge(条件路由分支)
+- 对比优势：AutoGen难调试，手写缺通用基建。LangGraph自带持久化与流处理
+- 加分项：interrupt机制结合Checkpoint，原生支持human-in-the-loop人工介入审批
 ---
 
 # 【字节飞连面经】用过哪些 Agent 框架？LangGraph vs LangChain？为什么选 LangGraph？
@@ -110,3 +115,11 @@ Edge（边）：下一步去哪
 - **2026 H2 生态变化**：OpenAI Agents SDK、Anthropic Computer Use SDK、字节自研 Agent Studio 都在抢这个生态位，但抽象本质（State/Node/Edge）不会变
 - **LangGraph 的 Subgraph**：把复杂图拆成子图复用，类似函数调用
 - **并行 Node**：LangGraph 支持 fan-out/fan-in，多个 Node 并行执行后聚合结果
+
+## 记忆要点
+
+- 选LangGraph因其为图抽象(状态机)，支持循环/分支/并行，LangChain只适合简单线性流
+- 核心三要素：State(共享上下文)、Node(执行动作)、Conditional Edge(条件路由分支)
+- 对比优势：AutoGen难调试，手写缺通用基建。LangGraph自带持久化与流处理
+- 加分项：interrupt机制结合Checkpoint，原生支持human-in-the-loop人工介入审批
+

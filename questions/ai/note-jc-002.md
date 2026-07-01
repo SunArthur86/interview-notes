@@ -17,9 +17,9 @@ feynman:
   key_points:
   - 'MC: 等轨迹结束用实际总回报更新，无偏但方差大、必须等终止'
   - 'TD: 只看一步 r + γV(s_next) 更新，有偏(bootstrap)但方差小、每步可学'
-  - 'MC 不依赖自身估计(无bootstrap)，TD 依赖(有bootstrap)'
-  - 'MC 适合 episodic 任务，TD 适合连续任务'
-  - 'TD(0)是1步TD，n-step TD和TD(λ)是折中'
+  - MC 不依赖自身估计(无bootstrap)，TD 依赖(有bootstrap)
+  - MC 适合 episodic 任务，TD 适合连续任务
+  - TD(0)是1步TD，n-step TD和TD(λ)是折中
 first_principle:
   essence: 价值估计 = 多久更新 + 是否依赖自身
   derivation: 价值=期望回报 → 用样本回报估计 → 等全程得MC(无偏方差大) → 只等一步得TD(有偏方差小) → TD用自身估计下一步(bootstrap)
@@ -28,6 +28,12 @@ follow_up:
 - TD 的 bootstrap 是什么意思？
 - n-step TD 怎么折中 MC 和 TD？
 - 为什么 TD 收敛到的是 Bellman 最优？
+memory_points:
+- 对比核心：MC无偏但方差大，TD有偏（bootstrap）但方差小
+- 更新时机：MC须等轨迹结束算实际回报，TD走一步即可更新
+- TD目标含估计值V(s')而MC用真实总回报
+- 因为RLHF需要训练稳定，所以PPO用TD融合版GAE而不用纯MC
+- GAE用λ参数在MC和TD之间做插值
 ---
 
 # 【阶跃星辰面经】蒙特卡洛模拟与时序差分估计，核心差异在哪里
@@ -134,3 +140,12 @@ TD(λ) / GAE：用 (γλ)^k 衰减权重融合所有 n 步 → 最优折中
 - **Q-learning**：off-policy 的 TD 控制，用 max Q(s',a') 做 bootstrap
 - **SARSA**：on-policy 的 TD 控制，用实际 Q(s',a') 做 bootstrap
 - **为什么 RLHF 用 GAE 而非纯 MC**：MC 方差大导致 PPO 训练不稳，GAE 平衡
+
+## 记忆要点
+
+- 对比核心：MC无偏但方差大，TD有偏（bootstrap）但方差小
+- 更新时机：MC须等轨迹结束算实际回报，TD走一步即可更新
+- TD目标含估计值V(s')而MC用真实总回报
+- 因为RLHF需要训练稳定，所以PPO用TD融合版GAE而不用纯MC
+- GAE用λ参数在MC和TD之间做插值
+

@@ -4,27 +4,31 @@ difficulty: L2
 category: database
 subcategory: Redis
 tags:
-  - Shopee
-  - 面经
-  - Redis
-  - 消息队列
+- Shopee
+- 面经
+- Redis
+- 消息队列
 feynman:
   essence: Redis是内存数据库做缓存/锁/队列，比Python内置queue好在跨进程、跨机器、持久化和多消费者
-  analogy: 'Python queue像办公室内电话(同楼才通)，Redis像微信(跨城市、有记录、多人能收)'
-  first_principle: '消息队列需求=跨进程通信+持久化+多消费者+消费确认，Python内置queue只满足单进程内通信'
+  analogy: Python queue像办公室内电话(同楼才通)，Redis像微信(跨城市、有记录、多人能收)
+  first_principle: 消息队列需求=跨进程通信+持久化+多消费者+消费确认，Python内置queue只满足单进程内通信
   key_points:
-    - Redis核心功能：缓存、分布式锁、计数器、排行榜、消息队列
-    - 跨进程跨机器是Redis相比Python queue的核心优势
-    - Redis支持持久化，进程死数据不丢
-    - 支持多消费者和消费确认
+  - Redis核心功能：缓存、分布式锁、计数器、排行榜、消息队列
+  - 跨进程跨机器是Redis相比Python queue的核心优势
+  - Redis支持持久化，进程死数据不丢
+  - 支持多消费者和消费确认
 first_principle:
   essence: 分布式系统需要跨进程跨机器的消息传递，单进程数据结构无法满足
-  derivation: 'Python queue只在单进程内有效→进程崩溃队列消失→无法跨机器→生产环境不可用→需要独立的消息中间件'
+  derivation: Python queue只在单进程内有效→进程崩溃队列消失→无法跨机器→生产环境不可用→需要独立的消息中间件
   conclusion: Redis作为消息队列 = 跨进程 + 持久化 + 多消费者 + 高性能
 follow_up:
-  - 'Redis Stream和Kafka/RabbitMQ有什么区别？'
-  - 'Redis消息队列会丢消息吗？'
-  - 'Redis做消息队列有什么局限性？'
+- Redis Stream和Kafka/RabbitMQ有什么区别？
+- Redis消息队列会丢消息吗？
+- Redis做消息队列有什么局限性？
+memory_points:
+- 核心功能口诀：缓存、锁、计数、排行、消息队列
+- 选Redis做队列是因为跨进程且支持持久化，而Python内置Queue仅限单进程
+- Redis队列两方案：List作简单队列(LPUSH/BRPOP)，Stream作高可靠队列(支持ACK)
 ---
 
 # Redis的主要功能？为什么用Redis实现消息队列？跟Python内置的比有什么优点？
@@ -170,3 +174,10 @@ while True:
 2. **Stream vs List**：能说出Stream比List多了ACK、消费者组、消息回溯
 3. **局限性认知**：知道Redis MQ不适合大规模流处理场景
 4. **选型建议**：根据场景推荐Redis/Kafka/RabbitMQ
+
+## 记忆要点
+
+- 核心功能口诀：缓存、锁、计数、排行、消息队列
+- 选Redis做队列是因为跨进程且支持持久化，而Python内置Queue仅限单进程
+- Redis队列两方案：List作简单队列(LPUSH/BRPOP)，Stream作高可靠队列(支持ACK)
+

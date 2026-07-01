@@ -4,25 +4,29 @@ difficulty: L3
 category: ai
 subcategory: LLM
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: MHA每个头有独立的Q/K/V，MQA所有头共享一组K/V，GQA介于两者之间——分组共享K/V
-  analogy: '像一个公司开会——MHA是每个部门各派翻译（贵但精准），MQA是所有人共用一个翻译（省资源但可能不够精准），GQA是几个相近部门共用一个翻译（性价比最优）'
+  analogy: 像一个公司开会——MHA是每个部门各派翻译（贵但精准），MQA是所有人共用一个翻译（省资源但可能不够精准），GQA是几个相近部门共用一个翻译（性价比最优）
   first_principle: 注意力头的多样性来自Query的差异化，而Key/Value更多是共享的信息载体，因此可以减少K/V头数而不显著损失效果
   key_points:
-    - 'MHA: N个Q头 + N个K/V头 → 效果最好但KV Cache最大'
-    - 'MQA: N个Q头 + 1个K/V头 → KV Cache最小但效果下降'
-    - 'GQA: N个Q头 + G个K/V头 → 效果接近MHA，KV Cache大幅减少'
+  - 'MHA: N个Q头 + N个K/V头 → 效果最好但KV Cache最大'
+  - 'MQA: N个Q头 + 1个K/V头 → KV Cache最小但效果下降'
+  - 'GQA: N个Q头 + G个K/V头 → 效果接近MHA，KV Cache大幅减少'
 first_principle:
   essence: 多头注意力的核心价值是让模型从不同子空间关注不同信息
-  derivation: '不同头的Query投影到不同子空间是关键，而K/V本质是信息存储，相邻头的K/V高度相似。GQA利用这一冗余性，让每组Q头共享K/V，在保持表征多样性的同时减少存储'
+  derivation: 不同头的Query投影到不同子空间是关键，而K/V本质是信息存储，相邻头的K/V高度相似。GQA利用这一冗余性，让每组Q头共享K/V，在保持表征多样性的同时减少存储
   conclusion: GQA是MHA和MQA的最优折中，已成为主流大模型的标准配置
 follow_up:
-  - GQA中分组数G应该怎么选？
-  - 为什么MQA效果下降明显但GQA几乎无损？
-  - KV Cache大小对推理延迟的影响有多大？
+- GQA中分组数G应该怎么选？
+- 为什么MQA效果下降明显但GQA几乎无损？
+- KV Cache大小对推理延迟的影响有多大？
+memory_points:
+- KV头数渐变缩：MHA全独立，MQA全共享，GQA分组共享折中两者。
+- 显存推理两极化：MQA缓存最小最快但效果掉，MHA效果最好但显存大。
+- GQA平衡成主流：按组共享K/V，显存大幅减少且效果逼近MHA，代表LLaMA-2。
 ---
 
 # 请对比MHA、MQA、GQA三种注意力机制的区别
@@ -163,3 +167,10 @@ H5 [ 0.28 0.30 0.29 0.80 1.0  0.82 ]  ← 可合并为同一组
 | 长文本(32K+) | GQA (G=N/8) | KV Cache节省至关重要 |
 
 **面试加分点**：提到LLaMA-2 70B使用GQA(num_kv_heads=8)而7B/13B仍用MHA；提到vLLM和TensorRT-LLM对GQA做了专门优化；提到GQA是当前开源大模型的事实标准（LLaMA-3、Qwen-2、Mistral、DeepSeek-V2等全部采用）。
+
+## 记忆要点
+
+- KV头数渐变缩：MHA全独立，MQA全共享，GQA分组共享折中两者。
+- 显存推理两极化：MQA缓存最小最快但效果掉，MHA效果最好但显存大。
+- GQA平衡成主流：按组共享K/V，显存大幅减少且效果逼近MHA，代表LLaMA-2。
+

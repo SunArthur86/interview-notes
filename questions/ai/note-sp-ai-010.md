@@ -4,26 +4,31 @@ difficulty: L2
 category: ai
 subcategory: LLM
 tags:
-  - Shopee
-  - 面经
-  - Transformer
+- Shopee
+- 面经
+- Transformer
 feynman:
   essence: Transformer是纯注意力机制的编码器-解码器架构，抛弃了RNN
-  analogy: 'Encoder像阅读理解——通读全文做笔记。Decoder像写作文——看着笔记一个字一个字写出来'
-  first_principle: '自注意力让每个词看到全句上下文，比RNN的顺序处理更高效且能并行'
+  analogy: Encoder像阅读理解——通读全文做笔记。Decoder像写作文——看着笔记一个字一个字写出来
+  first_principle: 自注意力让每个词看到全句上下文，比RNN的顺序处理更高效且能并行
   key_points:
-    - Encoder读完整输入，每个词融合全句上下文
-    - Decoder逐词自回归生成，多一层交叉注意力
-    - 每层结构：自注意力+前馈+残差+LayerNorm
-    - N层堆叠（原论文N=6）
+  - Encoder读完整输入，每个词融合全句上下文
+  - Decoder逐词自回归生成，多一层交叉注意力
+  - 每层结构：自注意力+前馈+残差+LayerNorm
+  - N层堆叠（原论文N=6）
 first_principle:
-  essence: '用注意力机制替代RNN的递归——O(1)路径长度让任意两词直接交互，且可并行计算'
-  derivation: 'RNN→O(n)路径长度→远距离信息衰减。注意力→O(1)路径→任意距离直接交互。代价是O(n²)计算量'
+  essence: 用注意力机制替代RNN的递归——O(1)路径长度让任意两词直接交互，且可并行计算
+  derivation: RNN→O(n)路径长度→远距离信息衰减。注意力→O(1)路径→任意距离直接交互。代价是O(n²)计算量
   conclusion: Transformer用自注意力实现全局感受野，并行计算解决RNN的训练瓶颈
 follow_up:
-  - '为什么Encoder可以并行而Decoder不能？'
-  - 'Pre-LN和Post-LN有什么区别？'
-  - 'Decoder-only和Encoder-only分别适合什么任务？'
+- 为什么Encoder可以并行而Decoder不能？
+- Pre-LN和Post-LN有什么区别？
+- Decoder-only和Encoder-only分别适合什么任务？
+memory_points:
+- Transformer双核：Encoder负责双向看全句提取特征，Decoder负责单向看前文生成文本。
+- Encoder结构：核心是全局Self-Attention（Q=K=V），不设掩码。
+- Decoder特有Mask：因为有Masked Self-Attn遮挡未来词，所以只能按序自回归生成。
+- Decoder特征融合：通过Cross-Attention（Q来自Decoder，K与V来自Encoder）获取源句信息。
 ---
 
 # Transformer的整体结构是怎样的？Encoder和Decoder分别做什么？
@@ -167,3 +172,11 @@ class DecoderLayer(nn.Module):
 2. **Mask的作用**：Decoder的causal mask防止"偷看"未来词
 3. **为什么Decoder-only成为主流**：统一架构、scaling简单、零样本能力强
 4. **训练vs推理**：训练时teacher forcing可并行，推理时逐词自回归
+
+## 记忆要点
+
+- Transformer双核：Encoder负责双向看全句提取特征，Decoder负责单向看前文生成文本。
+- Encoder结构：核心是全局Self-Attention（Q=K=V），不设掩码。
+- Decoder特有Mask：因为有Masked Self-Attn遮挡未来词，所以只能按序自回归生成。
+- Decoder特征融合：通过Cross-Attention（Q来自Decoder，K与V来自Encoder）获取源句信息。
+

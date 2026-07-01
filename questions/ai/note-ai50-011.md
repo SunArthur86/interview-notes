@@ -4,28 +4,33 @@ difficulty: L4
 category: ai
 subcategory: Agent
 tags:
-  - 某厂
-  - 面经
-  - Agent
-  - Harness
-  - 工程化
+- 某厂
+- 面经
+- Agent
+- Harness
+- 工程化
 feynman:
-  essence: 'Agent Harness是包裹在LLM外面的工程框架，解决评测、观测、回放和安全控制四大问题，没有它Agent就像没有仪表盘的汽车'
-  analogy: '就像飞机的黑匣子+自动驾驶仪——不光让飞机飞起来(LLM生成)，还要记录每一步操作(Trace)、监控异常(Observability)、能复现问题(Replay)、紧急时能接管(Control)'
-  first_principle: 'LLM是随机系统，同一个输入可能产生不同输出。生产环境要求可调试、可监控、可复现、可回滚，这些能力LLM本身不提供，必须由外部Harness提供'
+  essence: Agent Harness是包裹在LLM外面的工程框架，解决评测、观测、回放和安全控制四大问题，没有它Agent就像没有仪表盘的汽车
+  analogy: 就像飞机的黑匣子+自动驾驶仪——不光让飞机飞起来(LLM生成)，还要记录每一步操作(Trace)、监控异常(Observability)、能复现问题(Replay)、紧急时能接管(Control)
+  first_principle: LLM是随机系统，同一个输入可能产生不同输出。生产环境要求可调试、可监控、可复现、可回滚，这些能力LLM本身不提供，必须由外部Harness提供
   key_points:
-    - '评测(Eval): 任务完成率、工具调用成功率、成本效率'
-    - '观测(Observability): Trace每一步的Prompt/Response/Tool I/O'
-    - '回放(Replay): 精确复现某次执行的完整链路'
-    - '控制(Control): 超时中断、重试策略、安全护栏'
+  - '评测(Eval): 任务完成率、工具调用成功率、成本效率'
+  - '观测(Observability): Trace每一步的Prompt/Response/Tool I/O'
+  - '回放(Replay): 精确复现某次执行的完整链路'
+  - '控制(Control): 超时中断、重试策略、安全护栏'
 first_principle:
-  essence: '生产系统要求确定性，LLM本质是概率系统，Harness是在概率系统上构建确定性工程保障的中间层'
+  essence: 生产系统要求确定性，LLM本质是概率系统，Harness是在概率系统上构建确定性工程保障的中间层
   derivation: '没有Harness: Agent出错时无法定位(哪一步失败?)、无法复现(随机性)、无法统计(成功率多少?)、无法控制(无限循环?)。每个问题都是生产事故'
-  conclusion: 'Agent Harness不是锦上添花而是生产必需，是从Demo到产品的必经之路'
+  conclusion: Agent Harness不是锦上添花而是生产必需，是从Demo到产品的必经之路
 follow_up:
-  - 'LangSmith和Langfuse等工具在Harness中的角色？'
-  - 'Agent评测自动化怎么搭建？'
-  - 'Harness和Agent Framework(如LangChain)是什么关系？'
+- LangSmith和Langfuse等工具在Harness中的角色？
+- Agent评测自动化怎么搭建？
+- Harness和Agent Framework(如LangChain)是什么关系？
+memory_points:
+- 核心痛点：无Harness的Agent面临不可调试、不可复现、不可控三大黑洞
+- Trace能力：全链路追踪Prompt、Response、Token和工具调用，定位具体出错步骤
+- 控制能力：防止Agent陷入死循环或调用危险工具，限制成本和步数
+- 评估迭代：支持A/B测试与指标监控，量化对比不同模型或Prompt的效果
 ---
 
 # 没有Agent Harness大模型会遇到什么瓶颈？
@@ -192,3 +197,11 @@ class AgentController:
 □ Versioning: Prompt和模型版本管理
 □ A/B Test: 新策略灰度对比
 ```
+
+## 记忆要点
+
+- 核心痛点：无Harness的Agent面临不可调试、不可复现、不可控三大黑洞
+- Trace能力：全链路追踪Prompt、Response、Token和工具调用，定位具体出错步骤
+- 控制能力：防止Agent陷入死循环或调用危险工具，限制成本和步数
+- 评估迭代：支持A/B测试与指标监控，量化对比不同模型或Prompt的效果
+

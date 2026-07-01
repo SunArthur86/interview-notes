@@ -24,9 +24,14 @@ first_principle:
   derivation: 模型的推理能力（逻辑、数学）是训练得到的相对稳定能力，但事实知识（最新数据、私有信息）会过时或缺失。CoT假设模型"已知所有需要的信息"，这在开放域问题中不成立。ReAct承认模型信息不全，通过工具调用补充信息，让推理建立在准确信息之上。
   conclusion: ReAct = CoT的推理能力 + 工具调用的信息获取能力
 follow_up:
-  - ReAct什么时候不如CoT？（工具调用引入噪声时）
-  - 如何让模型自主决定"何时调工具"？
-  - ReAct的失败模式有哪些？
+- ReAct什么时候不如CoT？（工具调用引入噪声时）
+- 如何让模型自主决定"何时调工具"？
+- ReAct的失败模式有哪些？
+memory_points:
+- 本质对比：CoT仅依赖内部知识静态推理，而ReAct能调外部工具获取新知
+- ReAct三步循环：Thought思考行动理由 → Action调用外部工具 → Observation观察结果
+- 触发技巧：Zero-shot用“step by step”启动CoT，Few-shot用样例引导启动ReAct
+- 核心优势：借外部行动打破知识盲区，通过交互补齐最新信息避免幻觉
 ---
 
 # 【八股总结】ReAct 基本原理 & 相比 CoT 的优势
@@ -374,3 +379,11 @@ Thought: 根据我的知识，2026年的iPhone是iPhone 16（忽略了observatio
 - **Reflexion**：Shinn et al., 2023，ReAct+自我反思
 - **ToolFormer**：Meta，教模型自主学会调工具
 - **Function Call标准化**：OpenAI/Anthropic的tool use API，是ReAct的工程化实现
+
+## 记忆要点
+
+- 本质对比：CoT仅依赖内部知识静态推理，而ReAct能调外部工具获取新知
+- ReAct三步循环：Thought思考行动理由 → Action调用外部工具 → Observation观察结果
+- 触发技巧：Zero-shot用“step by step”启动CoT，Few-shot用样例引导启动ReAct
+- 核心优势：借外部行动打破知识盲区，通过交互补齐最新信息避免幻觉
+

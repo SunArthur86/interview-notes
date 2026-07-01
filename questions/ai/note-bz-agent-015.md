@@ -4,27 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - 多Agent
-  - 架构
-  - 协作
+- B站面经
+- 多Agent
+- 架构
+- 协作
 feynman:
   essence: 多Agent协作系统=把大任务拆给不同专长的Agent，像团队分工——有人负责调研(Researcher)、有人负责写代码(Coder)、有人负责审核(Critic)，通过消息传递协作完成。
   analogy: 像公司项目组——产品经理(规划)、开发(执行)、测试(验证)、运维(部署)，各司其职，通过文档/会议(消息)协作。
   first_principle: 单Agent受限于上下文窗口和单一角色，复杂任务需要专业化分工。多Agent通过角色分离+消息总线实现可扩展的协作。
   key_points:
-    - 核心要素：角色定义+通信机制+协作流程
-    - 常见模式：主管-工人/辩论/流水线/对等协作
-    - 通信：消息总线/共享黑板/直接调用
-    - 挑战：冲突、死循环、成本控制
+  - 核心要素：角色定义+通信机制+协作流程
+  - 常见模式：主管-工人/辩论/流水线/对等协作
+  - 通信：消息总线/共享黑板/直接调用
+  - 挑战：冲突、死循环、成本控制
 first_principle:
   essence: 复杂性需要专业化——单Agent做所有事会顾此失彼。
-  derivation: '单Agent上下文有限，塞太多角色指令会混淆。多Agent让每个Agent专注一个角色（prompt精简、能力强），通过消息传递整合结果。本质是"分治"+ "专业化"。'
+  derivation: 单Agent上下文有限，塞太多角色指令会混淆。多Agent让每个Agent专注一个角色（prompt精简、能力强），通过消息传递整合结果。本质是"分治"+ "专业化"。
   conclusion: 多Agent = 角色专业化 + 消息通信 + 分治整合，突破单Agent的能力上限
 follow_up:
-  - 多Agent一定比单Agent好吗？——不一定，简单任务多Agent反而更慢更贵
-  - Agent间怎么通信？——消息总线/共享状态/直接函数调用
-  - 怎么防止Agent互相踢皮球？——明确角色边界+终止条件+主管仲裁
+- 多Agent一定比单Agent好吗？——不一定，简单任务多Agent反而更慢更贵
+- Agent间怎么通信？——消息总线/共享状态/直接函数调用
+- 怎么防止Agent互相踢皮球？——明确角色边界+终止条件+主管仲裁
+memory_points:
+- 单Agent瓶颈：上下文有限、角色混淆、无法并行，多Agent实现专业化
+- 三要素：角色(Roles)、通信(Communication)、协作流程(Workflow)
+- 典型模式：主管-工人分发，流水线串行，多Agent辩论择优
 ---
 
 # 如何设计一个多 Agent 协作系统架构？
@@ -225,3 +229,10 @@ analysis = blackboard.read("research_data")  # writer读取使用
 1. **强调"专业化分工"**：多 Agent 的核心价值是专业化，每个 Agent 专注一件事质量更高
 2. **不止说优势**：要承认多 Agent 成本高、调试难，简单任务单 Agent 更好
 3. **提通信是关键**：Agent 间如何通信（消息总线/黑板）是架构设计的核心决策
+
+## 记忆要点
+
+- 单Agent瓶颈：上下文有限、角色混淆、无法并行，多Agent实现专业化
+- 三要素：角色(Roles)、通信(Communication)、协作流程(Workflow)
+- 典型模式：主管-工人分发，流水线串行，多Agent辩论择优
+

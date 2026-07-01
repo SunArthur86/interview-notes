@@ -24,9 +24,13 @@ first_principle:
   derivation: Policy Gradient的梯度估计 ∇J = E[∇logπ(a|s) · R]。当π(a|s)接近均匀分布（未训练），几乎所有a的概率都微小，梯度方差爆炸。SFT把π收敛到合理分布后，RL的梯度才有意义。这就是为什么所有RLHF流程都是 SFT → RM → PPO，而不是直接RM → PPO。
   conclusion: SFT冷启动是RL的"地基"——它不直接提升上限，但决定了RL能否有效启动
 follow_up:
-  - SFT冷启动数据需要多少条？质量vs数量怎么权衡？
-  - 能否跳过SFT直接RL？有什么失败案例？
-  - DPO为什么也需要SFT冷启动？
+- SFT冷启动数据需要多少条？质量vs数量怎么权衡？
+- 能否跳过SFT直接RL？有什么失败案例？
+- DPO为什么也需要SFT冷启动？
+memory_points:
+- RL前必须SFT：SFT教指令遵循和格式模板，RL在此子空间内优化执行质量
+- 若跳过SFT直接RL：探索空间过大导致梯度方差爆炸，Reward信号被噪声淹没
+- SFT收敛输出空间：让模型稳定输出对话格式，RL才能有效区分'好'与'更好
 ---
 
 # 【八股总结】SFT 冷启动和后续 RL 的关系是什么？为什么 RL 前需要 SFT？
@@ -306,3 +310,10 @@ SFT数据量推荐：
 - **InstructGPT论文**：OpenAI的系统消融实验，证明SFT→RM→PPO的必要性
 - **Constitutional AI**：Anthropic的方案，用AI反馈代替部分人类标注，但SFT冷启动仍然必需
 - **KTO/ORPO**：新的偏好优化方法，尝试减少对SFT的依赖，但目前仍需冷启动
+
+## 记忆要点
+
+- RL前必须SFT：SFT教指令遵循和格式模板，RL在此子空间内优化执行质量
+- 若跳过SFT直接RL：探索空间过大导致梯度方差爆炸，Reward信号被噪声淹没
+- SFT收敛输出空间：让模型稳定输出对话格式，RL才能有效区分'好'与'更好
+

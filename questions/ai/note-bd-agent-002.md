@@ -4,26 +4,31 @@ difficulty: L2
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Agent
+- 字节
+- 面经
+- Agent
 feynman:
   essence: Agent四大核心能力——工作流编排、记忆管理、RAG检索、工具调用
-  analogy: '像一个有经验的助理——有工作流程(Workflow)、有记事本(Memory)、能查资料(RAG)、会用工具(Tool Calling)'
+  analogy: 像一个有经验的助理——有工作流程(Workflow)、有记事本(Memory)、能查资料(RAG)、会用工具(Tool Calling)
   first_principle: Agent = LLM + 感知(输入) + 记忆(状态) + 规划(推理) + 行动(工具)
   key_points:
-    - Workflow编排控制任务执行流程
-    - Memory管理解决长上下文遗忘
-    - RAG检索提供外部知识
-    - Tool Calling实现与外部系统交互
+  - Workflow编排控制任务执行流程
+  - Memory管理解决长上下文遗忘
+  - RAG检索提供外部知识
+  - Tool Calling实现与外部系统交互
 first_principle:
   essence: Agent本质上是LLM加上工程化外挂，让模型从被动回答变成主动执行
   derivation: 纯LLM是stateless的函数，加入Memory变stateful，加入RAG获得外部知识，加入Tool获得行动能力
   conclusion: Agent = LLM(大脑) + Memory(记忆) + RAG(知识库) + Tool(手脚)
 follow_up:
-  - '四种能力的优先级和依赖关系是什么？'
-  - 'Memory用向量库还是关系型数据库？'
-  - 'Tool Calling失败时如何降级处理？'
+- 四种能力的优先级和依赖关系是什么？
+- Memory用向量库还是关系型数据库？
+- Tool Calling失败时如何降级处理？
+memory_points:
+- 四大能力：Workflow编排控制流程，Memory防遗忘，RAG注知识，Tool连外部
+- 记忆分层：短期记忆存Redis(会话级)，长期记忆走向量库(永久级)防人设崩塌
+- RAG细节：使用向量检索+关键词的混合检索，重排序后再组装上下文
+- 工具调用：敏感操作必须有明确的Schema定义、超时重试及权限校验机制
 ---
 
 # AI Agent项目实际用到了哪些Agent技术能力？
@@ -132,3 +137,11 @@ Tool ←─── LLM推理决策 ───→ 更新Memory
 2. **Memory分层设计**：区分短期/长期/工作记忆，体现工程深度
 3. **Tool Calling安全**：提到权限校验和超时控制
 4. **协同关系**：能画出四大能力的交互流程图
+
+## 记忆要点
+
+- 四大能力：Workflow编排控制流程，Memory防遗忘，RAG注知识，Tool连外部
+- 记忆分层：短期记忆存Redis(会话级)，长期记忆走向量库(永久级)防人设崩塌
+- RAG细节：使用向量检索+关键词的混合检索，重排序后再组装上下文
+- 工具调用：敏感操作必须有明确的Schema定义、超时重试及权限校验机制
+

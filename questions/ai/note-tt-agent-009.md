@@ -4,30 +4,35 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 淘天
-  - 面经
-  - 二面
-  - Workflow
-  - Agent选型
-  - 架构设计
+- 淘天
+- 面经
+- 二面
+- Workflow
+- Agent选型
+- 架构设计
 feynman:
   essence: Workflow是固定流程（确定性高、可控），Agent是自主决策（灵活但不可控）。标准化高频场景用Workflow，复杂多变场景用Agent
   analogy: 就像流水线 vs 高级技工——流水线（Workflow）固定流程效率高但不能处理意外，高级技工（Agent）能随机应变但成本高且需要监督
   first_principle: 确定性和灵活性是Trade-off。Workflow牺牲灵活性换取确定性（每步可预测），Agent牺牲确定性换取灵活性（能处理未见过的场景）
   key_points:
-    - Workflow：预定义DAG，节点固定，流程可预测
-    - Agent：动态规划，自主决策路径，能处理异常
-    - 选Workflow：流程标准化、高频重复、合规要求高
-    - 选Agent：输入多变、需灵活决策、探索性任务
-    - 混合模式：Workflow做骨架，Agent处理异常分支
+  - Workflow：预定义DAG，节点固定，流程可预测
+  - Agent：动态规划，自主决策路径，能处理异常
+  - 选Workflow：流程标准化、高频重复、合规要求高
+  - 选Agent：输入多变、需灵活决策、探索性任务
+  - 混合模式：Workflow做骨架，Agent处理异常分支
 first_principle:
   essence: 系统的确定性应与业务场景的标准化程度匹配
-  derivation: '客服场景中80%是标准问题（退货流程固定），20%是复杂问题（需多轮沟通判断）。对80%用Workflow（成本低、可控），对20%用Agent（灵活但贵）。全用Agent会浪费80%场景的成本'
+  derivation: 客服场景中80%是标准问题（退货流程固定），20%是复杂问题（需多轮沟通判断）。对80%用Workflow（成本低、可控），对20%用Agent（灵活但贵）。全用Agent会浪费80%场景的成本
   conclusion: 选型原则 = 标准化程度×频率 决定Workflow占比，复杂度×不确定性 决定Agent占比
 follow_up:
-  - Workflow和Agent混合架构怎么做？什么节点该固定什么该灵活？
-  - 如何评估一个场景是否值得从Workflow升级为Agent？
-  - Agent的"自主决策"边界怎么界定？防止Agent乱跑？
+- Workflow和Agent混合架构怎么做？什么节点该固定什么该灵活？
+- 如何评估一个场景是否值得从Workflow升级为Agent？
+- Agent的"自主决策"边界怎么界定？防止Agent乱跑？
+memory_points:
+- 对比句：Workflow流程固定成本极低，Agent大模型动态规划自主性极高灵活性极强
+- 因果句：因为高频标准场景要求低延迟且高合规，所以选固定工作流Workflow
+- 因果句：因为客诉等非标场景输入多变且需多步反思，所以必须用自研Agent
+- 口诀法：混合架构是趋势，标准查流程走捷径，长尾复杂推理交Agent
 ---
 
 # Workflow固定工作流和自主决策Agent怎么区分？什么场景选Workflow、什么必须自研Agent？
@@ -129,3 +134,11 @@ Agent路径（灵活、高成本）：
 2. **渐进式架构**：先用Workflow跑通主流程，遇到瓶颈再逐步引入Agent处理异常分支
 3. **监控指标**：Workflow看成功率/延迟，Agent看完成率/平均轮数/成本/用户满意度
 4. **Anthropic的建议**："能用Workflow就别用Agent"——Workflow可控性远高于Agent
+
+## 记忆要点
+
+- 对比句：Workflow流程固定成本极低，Agent大模型动态规划自主性极高灵活性极强
+- 因果句：因为高频标准场景要求低延迟且高合规，所以选固定工作流Workflow
+- 因果句：因为客诉等非标场景输入多变且需多步反思，所以必须用自研Agent
+- 口诀法：混合架构是趋势，标准查流程走捷径，长尾复杂推理交Agent
+

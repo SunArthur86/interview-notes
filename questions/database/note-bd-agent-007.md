@@ -4,26 +4,31 @@ difficulty: L2
 category: database
 subcategory: Redis
 tags:
-  - 字节
-  - 面经
-  - Redis
+- 字节
+- 面经
+- Redis
 feynman:
   essence: Redis在高并发业务中主要解决缓存、锁单、分布式锁、库存预扣和热点配置问题
-  analogy: 'Redis就像前台的暂存柜——常用东西放这拿得快(缓存)、贵重物品先锁起来(锁单)、多人抢同一个东西先到先得(分布式锁)'
-  first_principle: '数据库面向磁盘设计随机IO慢，Redis全内存操作快10-100倍，适合做热点数据的缓冲层'
+  analogy: Redis就像前台的暂存柜——常用东西放这拿得快(缓存)、贵重物品先锁起来(锁单)、多人抢同一个东西先到先得(分布式锁)
+  first_principle: 数据库面向磁盘设计随机IO慢，Redis全内存操作快10-100倍，适合做热点数据的缓冲层
   key_points:
-    - 拼团锁单防止超卖
-    - 库存预扣用Redis原子操作
-    - 分布式锁控制并发
-    - 热点配置和限流阈值缓存
+  - 拼团锁单防止超卖
+  - 库存预扣用Redis原子操作
+  - 分布式锁控制并发
+  - 热点配置和限流阈值缓存
 first_principle:
   essence: MySQL单机QPS上限~5000，Redis单机QPS可达10万+，高并发场景必须用Redis做缓冲层
-  derivation: '拼团高峰QPS可达数万→MySQL扛不住→先用Redis原子操作预扣库存→异步落库→保护MySQL'
+  derivation: 拼团高峰QPS可达数万→MySQL扛不住→先用Redis原子操作预扣库存→异步落库→保护MySQL
   conclusion: Redis在业务系统中的定位是高并发缓冲层和过程态存储
 follow_up:
-  - 'Redis和MySQL的数据一致性怎么保证？'
-  - '热点Key问题怎么解决？'
-  - 'Redis集群模式选主从还是哨兵？'
+- Redis和MySQL的数据一致性怎么保证？
+- 热点Key问题怎么解决？
+- Redis集群模式选主从还是哨兵？
+memory_points:
+- 两大核心场景：高并发读写缓存，以及分布式锁防超卖。
+- 防超卖方案：因为高并发下MySQL行锁慢，所以用Redis配合Lua脚本做原子库存预扣。
+- 分布式锁实现：短耗时用SetNX，长链路用Redisson自动续期。
+- 数据类型：热点数据(如配置)做缓存，异步任务用消息队列(如List/Stream)。
 ---
 
 # Redis在业务项目中主要解决了哪些问题？
@@ -160,3 +165,11 @@ def check_rate_limit(user_id, api):
 2. **原子操作**：强调Lua脚本保证预扣库存的原子性
 3. **异步落库**：Redis做过程态，MySQL做最终态，体现架构思维
 4. **TTL管理**：不同数据设置不同过期时间，平衡一致性和性能
+
+## 记忆要点
+
+- 两大核心场景：高并发读写缓存，以及分布式锁防超卖。
+- 防超卖方案：因为高并发下MySQL行锁慢，所以用Redis配合Lua脚本做原子库存预扣。
+- 分布式锁实现：短耗时用SetNX，长链路用Redisson自动续期。
+- 数据类型：热点数据(如配置)做缓存，异步任务用消息队列(如List/Stream)。
+

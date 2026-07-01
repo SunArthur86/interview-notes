@@ -4,25 +4,29 @@ difficulty: L3
 category: ai
 subcategory: 推理优化
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: KV Cache缓存已计算的Key/Value避免重复计算；PagedAttention像操作系统的虚拟内存分页管理KV Cache；Continuous Batching像流水线动态组批
-  analogy: 'KV Cache像读书时做笔记——翻过的页不用重新读，只看笔记。PagedAttention像图书馆——不必每人搬一整套书，按页借阅用完归还。Continuous Batching像超市收银——不等所有人到齐才开收银台，来一个结一个'
-  first_principle: '自回归生成的每一步都要重新计算所有token的attention，但历史token的K/V不变，缓存它们可以避免O(n²)的重复计算'
+  analogy: KV Cache像读书时做笔记——翻过的页不用重新读，只看笔记。PagedAttention像图书馆——不必每人搬一整套书，按页借阅用完归还。Continuous Batching像超市收银——不等所有人到齐才开收银台，来一个结一个
+  first_principle: 自回归生成的每一步都要重新计算所有token的attention，但历史token的K/V不变，缓存它们可以避免O(n²)的重复计算
   key_points:
-    - 'KV Cache: 存储历史token的K/V矩阵，推理时只计算新token'
-    - 'PagedAttention: 分块存储KV Cache，消除碎片化，显存利用率从60%→97%'
-    - 'Continuous Batching: 请求级别动态调度，不同请求可随时加入/退出batch'
+  - 'KV Cache: 存储历史token的K/V矩阵，推理时只计算新token'
+  - 'PagedAttention: 分块存储KV Cache，消除碎片化，显存利用率从60%→97%'
+  - 'Continuous Batching: 请求级别动态调度，不同请求可随时加入/退出batch'
 first_principle:
   essence: Transformer自回归推理的瓶颈是内存带宽而非计算
-  derivation: '每生成一个token需要读取所有历史token的KV Cache。显存读写量 = 2 × L × hidden × seq_len。当seq_len很大时，这是HBM带宽的主要消耗。PagedAttention通过减少碎片和共享前缀来优化这一开销'
+  derivation: 每生成一个token需要读取所有历史token的KV Cache。显存读写量 = 2 × L × hidden × seq_len。当seq_len很大时，这是HBM带宽的主要消耗。PagedAttention通过减少碎片和共享前缀来优化这一开销
   conclusion: vLLM的两大优化分别解决了KV Cache的显存碎片问题和batch调度的效率问题
 follow_up:
-  - Prefix Caching如何加速多轮对话？
-  - Speculative Decoding如何减少推理延迟？
-  - Tensor Parallel和Pipeline Parallel在推理中如何应用？
+- Prefix Caching如何加速多轮对话？
+- Speculative Decoding如何减少推理延迟？
+- Tensor Parallel和Pipeline Parallel在推理中如何应用？
+memory_points:
+- KV Cache省算力：避免重复计算历史token，将推理复杂度从O(n³)降至O(n²)。
+- PagedAttention治碎片：仿OS虚拟内存按块离散分配，打破连续预分配，显存利用达97%。
+- Continuous Batching提吞吐：请求级别动态拼Batch，消除队列等待，GPU不空转。
 ---
 
 # KV Cache的工作原理是什么？vLLM的PagedAttention和Continuous Batching解决了什么问题？
@@ -189,3 +193,10 @@ PagedAttention:
 ```
 
 **面试加分点**：提到vLLM论文(Kwon et al., 2023, SOSP)；提到PagedAttention灵感来自OS的虚拟内存分页机制；提到Continuous Batching也称为Iteration-Level Batching；提到Prefix Caching可以加速多用户共享相同system prompt的场景；提到TensorRT-LLM也实现了类似优化（In-flight Batching）。
+
+## 记忆要点
+
+- KV Cache省算力：避免重复计算历史token，将推理复杂度从O(n³)降至O(n²)。
+- PagedAttention治碎片：仿OS虚拟内存按块离散分配，打破连续预分配，显存利用达97%。
+- Continuous Batching提吞吐：请求级别动态拼Batch，消除队列等待，GPU不空转。
+

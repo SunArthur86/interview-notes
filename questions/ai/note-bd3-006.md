@@ -4,26 +4,30 @@ difficulty: L3
 category: ai
 subcategory: 推理优化
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: 训练显存 = 模型权重 + 梯度 + 优化器状态 + 激活值，通常是模型权重的4-6倍
-  analogy: '就像搬家——家具本身(权重)只占一部分，你还需要搬运车(梯度)、包装材料(优化器状态)和临时堆放空间(激活值)，总开销远超家具本身'
-  first_principle: '反向传播需要保存前向传播的中间结果（激活值），同时维护梯度副本和优化器状态，这些内存开销与模型参数量成正比'
+  analogy: 就像搬家——家具本身(权重)只占一部分，你还需要搬运车(梯度)、包装材料(优化器状态)和临时堆放空间(激活值)，总开销远超家具本身
+  first_principle: 反向传播需要保存前向传播的中间结果（激活值），同时维护梯度副本和优化器状态，这些内存开销与模型参数量成正比
   key_points:
-    - 'FP16模型权重: 14B × 2 bytes = 28GB'
-    - 'AdamW优化器: 权重 × 4倍 (权重2B + 梯度2B + m 2B + v 2B = 8B/参数)'
-    - '激活值: 与batch_size × seq_len × hidden_dim成正比'
-    - 'INT8量化节省约50%权重存储'
+  - 'FP16模型权重: 14B × 2 bytes = 28GB'
+  - 'AdamW优化器: 权重 × 4倍 (权重2B + 梯度2B + m 2B + v 2B = 8B/参数)'
+  - '激活值: 与batch_size × seq_len × hidden_dim成正比'
+  - INT8量化节省约50%权重存储
 first_principle:
   essence: 训练时的显存开销可以精确分解为四个组成部分
   derivation: '每个FP16参数需要存储: 原始权重(2B) + 梯度(2B) + AdamW的m和v(各2B) = 8 bytes/参数。激活值依赖序列长度和批量大小'
   conclusion: 14B模型FP16训练需要约112GB(权重+优化器) + 激活值，INT8量化可减半权重部分
 follow_up:
-  - ZeRO-2和ZeRO-3分别能节省多少显存？
-  - 梯度检查点(Gradient Checkpointing)如何减少激活值显存？
-  - 混合精度训练中Loss Scaling的作用是什么？
+- ZeRO-2和ZeRO-3分别能节省多少显存？
+- 梯度检查点(Gradient Checkpointing)如何减少激活值显存？
+- 混合精度训练中Loss Scaling的作用是什么？
+memory_points:
+- 参数显存乘以16：AdamW混合精度训练中，每参数需16Bytes(权重2+梯度2+优化器状态12)。
+- 优化器状态是大头：FP32的主权重、动量m和v占据12Bytes，占整体显存超一半。
+- 总显存需四张卡：14B模型纯训练显存高达约224GB，需4张A100-80G才能装下。
 ---
 
 # 训练一个14B参数的FP16模型，理论上需要多少显存？
@@ -175,3 +179,10 @@ training_args = TrainingArguments(
 ```
 
 **面试加分点**：提到Megatron-LM的TP+PP组合可以将14B模型放在8×V100-32GB上训练；提到Flash Attention减少激活值存储（IO-aware的精确注意力）；提到CPU offloading将优化器状态放在CPU内存中，用PCIe带宽换取GPU显存。
+
+## 记忆要点
+
+- 参数显存乘以16：AdamW混合精度训练中，每参数需16Bytes(权重2+梯度2+优化器状态12)。
+- 优化器状态是大头：FP32的主权重、动量m和v占据12Bytes，占整体显存超一半。
+- 总显存需四张卡：14B模型纯训练显存高达约224GB，需4张A100-80G才能装下。
+

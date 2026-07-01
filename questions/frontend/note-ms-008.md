@@ -17,8 +17,8 @@ feynman:
   - '编辑: 用户可修改AI产出'
   - '确认: 审核后再进入下一步'
   - '发布: 落地到文件/站点/系统'
-  - '防止AI直接产出造成不可逆'
-  - '每步可回退'
+  - 防止AI直接产出造成不可逆
+  - 每步可回退
 first_principle:
   essence: Human-in-the-loop = 安全+信任+控制
   derivation: AI直接发布→可能有错→不可逆→拆三步→编辑(可改)→确认(可控)→发布(可回退)→安全+信任
@@ -27,6 +27,10 @@ follow_up:
 - 三步流程会不会太繁琐？如何平衡效率和安全性？
 - 确认环节需要展示哪些信息？
 - 发布后的回滚机制怎么设计？
+memory_points:
+- 核心原因：AI产出不可控，为防止不可逆操作，必须引入Human-in-the-loop
+- 三步闭环：编辑(改草案) -> 确认(看Diff) -> 发布(真落地)
+- 状态机设计：draft -> editing -> review -> published，每一步均可回退
 ---
 
 # 【月之暗面面经】桌面端为什么要把结果编辑、确认和发布拆成三步？
@@ -1286,3 +1290,10 @@ function determineFlowDepth(productType: ProductType): 'fast' | 'standard' | 'st
 
 **Q3: 发布后的回滚机制怎么设计？**
 发布前创建 `RollbackSnapshot`（备份所有将被覆盖/删除的文件内容），发布失败或用户主动回滚时：① 恢复备份文件到原始内容 ② 删除新创建的文件。回滚快照与变更单元一一对应，保证操作可逆。已回滚状态 (`rolled_back`) 是终态，不可再次回滚。
+
+## 记忆要点
+
+- 核心原因：AI产出不可控，为防止不可逆操作，必须引入Human-in-the-loop
+- 三步闭环：编辑(改草案) -> 确认(看Diff) -> 发布(真落地)
+- 状态机设计：draft -> editing -> review -> published，每一步均可回退
+

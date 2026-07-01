@@ -28,6 +28,11 @@ follow_up:
 - Outlines的GBNF语法怎么写？
 - 约束解码对推理速度有什么影响？
 - 如何处理嵌套深层JSON？
+memory_points:
+- 可靠性排序：后处理修复 < JSON Mode < 约束解码 < Function Calling。
+- 约束解码：每步将非法Token的logit设为负无穷强制掩盖。
+- 实现库：Outlines用FSM，llama.cpp用GBNF语法实现Schema限制。
+- JSON Mode：API级约束保证整体是合法JSON，但不约束内部字段类型。
 ---
 
 # 【字节面经】让模型稳定输出符合 Schema 的 JSON 数据，除了 Function Calling，你还用过哪些方法？各有什么适用边界？
@@ -475,3 +480,11 @@ class ProductionJSONGenerator:
 3. 能区分 OpenAI 的 `json_object`（仅合法JSON）和 `json_schema`（Schema级约束）
 4. 提到后处理修复的具体策略：尾部逗号、单引号→双引号、`json-repair` 库
 5. 强调生产环境要**组合使用**：约束解码为主 + schema验证为辅 + 后处理为兜底
+
+## 记忆要点
+
+- 可靠性排序：后处理修复 < JSON Mode < 约束解码 < Function Calling。
+- 约束解码：每步将非法Token的logit设为负无穷强制掩盖。
+- 实现库：Outlines用FSM，llama.cpp用GBNF语法实现Schema限制。
+- JSON Mode：API级约束保证整体是合法JSON，但不约束内部字段类型。
+

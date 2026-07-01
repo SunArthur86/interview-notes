@@ -4,26 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Skill
-  - Agent
+- B站面经
+- Skill
+- Agent
 feynman:
   essence: Skill=Agent的可复用能力封装，本质是"Prompt+工具+流程"的组合包。像一个"技能模块"，调用就能完成一类任务，而非每次从零写prompt。
   analogy: 像游戏的技能系统——"火球术"封装了(施法动作+伤害计算+特效)，玩家一键释放，而非每次手动组合。Skill=Agent的"技能"。
   first_principle: 复杂任务需要"prompt+多工具+特定流程"的组合，每次重新组合低效且不稳定。Skill把这些固化成可复用模块。
   key_points:
-    - Skill = Prompt + Tools + Flow 的封装
-    - 本质：可复用的能力模块
-    - 价值：标准化/可复用/可分享
-    - 区别Tool：Tool是单一操作，Skill是多步组合
+  - Skill = Prompt + Tools + Flow 的封装
+  - 本质：可复用的能力模块
+  - 价值：标准化/可复用/可分享
+  - 区别Tool：Tool是单一操作，Skill是多步组合
 first_principle:
   essence: Skill是"设计模式"在Agent中的应用——把验证有效的prompt+工具组合，固化为可复用单元。
-  derivation: '单个Tool是原子操作。复杂任务需要多个Tool+特定prompt+控制流。如果每次重写，质量不稳定。Skill=把这些固化，像函数一样调用。'
+  derivation: 单个Tool是原子操作。复杂任务需要多个Tool+特定prompt+控制流。如果每次重写，质量不稳定。Skill=把这些固化，像函数一样调用。
   conclusion: Skill = 封装(Prompt + Tools + Flow)，是Agent的能力复用单元
 follow_up:
-  - Skill和Tool什么区别？——Tool是单步操作，Skill是多步组合
-  - Skill怎么分享复用？——打包成标准格式(如SKILL.md)，社区共享
-  - Skill Creator是什么？——自动生成Skill的工具
+- Skill和Tool什么区别？——Tool是单步操作，Skill是多步组合
+- Skill怎么分享复用？——打包成标准格式(如SKILL.md)，社区共享
+- Skill Creator是什么？——自动生成Skill的工具
+memory_points:
+- 一句话定义：Skill是可复用的能力模块，封装了Prompt+Tools+执行流程
+- 对比Tool与Skill：Tool是底层原子操作(如search)，Skill是多步组合的复杂业务能力(如调研)
+- Skill五大核心组件：触发条件、提示词、依赖工具、执行流程、输入输出Schema
+- 本质是高内聚低耦合：将常用复杂Agent处理逻辑固化为能力包，实现跨场景复用
 ---
 
 # 什么是 Skill？Agent 架构中 Skill 的本质是什么？
@@ -204,3 +209,11 @@ Claude Code 的 Skill 机制：
 1. **Tool vs Skill 的粒度区别**：Tool 是原子操作，Skill 是能力组合——这个区分是核心
 2. **强调"复用"**：Skill 的价值是"一次开发多次使用"，像软件库一样
 3. **提生态价值**：Skill 可分享可组合，是 Agent 生态的基础（类比 App 之于手机）
+
+## 记忆要点
+
+- 一句话定义：Skill是可复用的能力模块，封装了Prompt+Tools+执行流程
+- 对比Tool与Skill：Tool是底层原子操作(如search)，Skill是多步组合的复杂业务能力(如调研)
+- Skill五大核心组件：触发条件、提示词、依赖工具、执行流程、输入输出Schema
+- 本质是高内聚低耦合：将常用复杂Agent处理逻辑固化为能力包，实现跨场景复用
+

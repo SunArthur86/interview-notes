@@ -16,10 +16,10 @@ feynman:
   first_principle: 策略梯度需要 A=Q-V 降方差。PPO 用 Critic 网络估 V（准但贵），GRPO 用组内平均回报代替 V（粗糙但免费）。baseline=mean(R) 减去它保证"比平均好的正、差的负"，是 REINFORCE 降方差技巧的组内版本。
   key_points:
   - 'GRPO 优势: A_i = (R_i - mean(R_group)) / std(R_group)'
-  - 'baseline = 组均值 mean(R)，降方差让正负优势对称'
-  - '对同一 prompt 采样 G 个回答，组内归一化'
-  - '相比 PPO 不需要 Critic（用组统计代替 V），省一半显存'
-  - '除 std 进一步归一化，让优势尺度稳定'
+  - baseline = 组均值 mean(R)，降方差让正负优势对称
+  - 对同一 prompt 采样 G 个回答，组内归一化
+  - 相比 PPO 不需要 Critic（用组统计代替 V），省一半显存
+  - 除 std 进一步归一化，让优势尺度稳定
 first_principle:
   essence: GRPO 优势 = 组内相对排名
   derivation: 策略梯度需 A 降方差 → PPO 用 Critic 估 V（贵）→ GRPO 用组内 mean(R) 当 V → 组内归一化得相对优势 → 省 Critic
@@ -28,6 +28,12 @@ follow_up:
 - GRPO 的 G（组大小）怎么选？
 - GRPO 相比 PPO 训练更稳还是更不稳？
 - 为什么 GRPO 适合 RLHF？
+memory_points:
+- GRPO优势计算：同prompt采G个回答，A=(R-组均值)/组标准差
+- 核心创新：用组内统计代替Critic网络，显存省一半
+- Baseline作用：减均值不改梯度期望，但有效降低方差
+- RLHF优势：省显存训大模型，且避免Critic难收敛问题
+- DAPO是改进版，DeepSeek-R1标志性应用
 ---
 
 # 【阶跃星辰/字节面经】GRPO 里的优势值是什么？怎么计算？baseline 起什么作用
@@ -144,3 +150,12 @@ GRPO 的洞察：对同一 prompt，组内 mean(R) 就是 V 的天然估计！
 - **G 的选择**：通常 4-16，太小（如2）统计不稳，太大（如64）采样成本高
 - **GRPO 的 KL 惩罚**：和 PPO 一样需要 KL 约束防止偏离参考模型太远
 - **DAPO**：GRPO 的改进版（字节），针对 RLHF 场景优化（动态采样、长度归一化）
+
+## 记忆要点
+
+- GRPO优势计算：同prompt采G个回答，A=(R-组均值)/组标准差
+- 核心创新：用组内统计代替Critic网络，显存省一半
+- Baseline作用：减均值不改梯度期望，但有效降低方差
+- RLHF优势：省显存训大模型，且避免Critic难收敛问题
+- DAPO是改进版，DeepSeek-R1标志性应用
+

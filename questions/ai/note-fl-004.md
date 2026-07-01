@@ -14,11 +14,11 @@ feynman:
   analogy: 就像公司规章——公司章程（CLAUDE.md，全公司遵守）、个人工作习惯笔记（~/.claude，只你用）、本次会议记录（会话 context，会开完就丢）。三层不混，各管各的。
   first_principle: 记忆的价值与共享粒度强相关。团队规则必须进 git 才能共享；个人偏好不该污染团队仓库；会话细节关窗就该消失。三种生命周期决定了三种存储位置。
   key_points:
-  - '三层：项目级 CLAUDE.md（进git）/ 用户级 ~/.claude/CLAUDE.md（不进git）/ 会话级 context（内存）'
-  - '职责隔离：团队约定 vs 个人习惯 vs 当前对话'
-  - '优先级：项目级 > 用户级（团队规矩压过个人喜好）'
-  - 'auto-compact：到 90% context window 自动总结历史 + 保留近期 N 轮原文'
-  - 'prompt cache（5-min TTL）让长 system prompt 不付每次 input cost'
+  - 三层：项目级 CLAUDE.md（进git）/ 用户级 ~/.claude/CLAUDE.md（不进git）/ 会话级 context（内存）
+  - 职责隔离：团队约定 vs 个人习惯 vs 当前对话
+  - 优先级：项目级 > 用户级（团队规矩压过个人喜好）
+  - auto-compact：到 90% context window 自动总结历史 + 保留近期 N 轮原文
+  - prompt cache（5-min TTL）让长 system prompt 不付每次 input cost
 first_principle:
   essence: Memory 分层 = 按生命周期和共享粒度组织记忆
   derivation: 记忆有价值差异 → 团队规则需共享（进git）→ 个人偏好不该共享（不进git）→ 会话细节无需持久（内存）→ 三种生命周期 → 三种存储位置 → 天然隔离
@@ -27,6 +27,11 @@ follow_up:
 - Claude Code 的 memory/ 子目录（auto memory）怎么用 frontmatter 标 type？
 - prompt cache 的 5-min TTL 对 long-running session 有什么影响？
 - 检索式记忆（按相关性召回）vs 全量塞 prompt 怎么选？
+memory_points:
+- 三层记忆：项目级(CLAUDE.md进git) > 用户级(~不进git) > 会话级(内存关窗即丢)
+- 分层是为了隔离职责与共享粒度：团队约定与个人习惯解耦，防止换人乱套
+- 上下文过长应对：触发auto-compact自动摘要，结合5分钟TTL的prompt cache省钱
+- 突破上限靠检索：不塞全量历史，向量化后按相关性召回Top-K片段拼prompt
 ---
 
 # 【字节飞连面经】Claude Code 的 Memory 机制：为什么分层？上下文过长怎么办？
@@ -108,3 +113,11 @@ Claude Code 还支持 `memory/` 子目录写入小记忆文件，用 frontmatter
 - **chapter 切分**：长会话主动 mark chapter，未来检索更准
 - **检索式记忆的工程实现**：把会话历史向量化存向量库，每轮按当前 query 召回 top-K 相关片段拼 prompt
 - **memory 污染问题**：如果 auto memory 写太多低价值内容，反而干扰主任务 → 需要"遗忘机制"（定期清理低引用记忆）
+
+## 记忆要点
+
+- 三层记忆：项目级(CLAUDE.md进git) > 用户级(~不进git) > 会话级(内存关窗即丢)
+- 分层是为了隔离职责与共享粒度：团队约定与个人习惯解耦，防止换人乱套
+- 上下文过长应对：触发auto-compact自动摘要，结合5分钟TTL的prompt cache省钱
+- 突破上限靠检索：不塞全量历史，向量化后按相关性召回Top-K片段拼prompt
+

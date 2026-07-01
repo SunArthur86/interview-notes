@@ -4,30 +4,34 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - 认知框架
-  - CoT
-  - ReAct
-  - Plan-Execute
-  - Reflexion
+- B站面经
+- 认知框架
+- CoT
+- ReAct
+- Plan-Execute
+- Reflexion
 feynman:
   essence: 四大认知框架各有所长——CoT擅长单步推理，ReAct擅长边想边做，Plan-Execute擅长全局规划，Reflexion擅长从错误学习。选型看任务的复杂度、确定性和反馈可得性。
   analogy: 像选交通工具——短途骑车(CoT)，城市出行开车(ReAct)，长途旅行先规划路线(Plan-Execute)，迷路了要看导航纠错(Reflexion)。
   first_principle: 不同任务的"结构"不同——有的可分解(Plan)，有的需探索(ReAct)，有的需推理(CoT)，有的会失败(Reflexion)。框架选择要匹配任务结构。
   key_points:
-    - CoT：单步深度推理（数学/逻辑）
-    - ReAct：推理+行动交替（通用Agent）
-    - Plan-Execute：先规划后执行（多步确定任务）
-    - Reflexion：试错+反思（有反馈的难题）
-    - 选型：看任务复杂度/确定性/反馈可得性
+  - CoT：单步深度推理（数学/逻辑）
+  - ReAct：推理+行动交替（通用Agent）
+  - Plan-Execute：先规划后执行（多步确定任务）
+  - Reflexion：试错+反思（有反馈的难题）
+  - 选型：看任务复杂度/确定性/反馈可得性
 first_principle:
   essence: 没有万能框架，框架是任务结构的映射。
-  derivation: '任务可否分解？→Plan-Execute。是否需要外部信息？→ReAct。是否单步可推？→CoT。失败可否诊断？→Reflexion。选型本质是匹配任务的信息需求结构。'
+  derivation: 任务可否分解？→Plan-Execute。是否需要外部信息？→ReAct。是否单步可推？→CoT。失败可否诊断？→Reflexion。选型本质是匹配任务的信息需求结构。
   conclusion: 框架选型 = 匹配任务的（可分解性/信息需求/反馈可得性/探索需求）
 follow_up:
-  - 这些框架能组合吗？——能，Plan-Execute的每步可用ReAct，ReAct失败可加Reflexion
-  - 哪个最通用？——ReAct，是现代Agent的基础范式
-  - 生产环境怎么选？——复杂度低用ReAct，复杂度高用混合(Plan+ReAct+Reflexion)
+- 这些框架能组合吗？——能，Plan-Execute的每步可用ReAct，ReAct失败可加Reflexion
+- 哪个最通用？——ReAct，是现代Agent的基础范式
+- 生产环境怎么选？——复杂度低用ReAct，复杂度高用混合(Plan+ReAct+Reflexion)
+memory_points:
+- 选型决策树：需外部工具用ReAct，多步且明确用Plan-Execute，可验证难题加Reflexion
+- 场景对比：纯脑内计算用CoT，查新闻用ReAct，写长篇报告用Plan-Execute
+- 生产实践：常组合使用，如Plan做骨架，ReAct执行步骤，Reflexion处理失败
 ---
 
 # 主流认知框架（CoT/ReAct/Plan-Execute/Reflexion）各自适用什么场景？
@@ -203,3 +207,10 @@ def hybrid_agent(goal):
 1. **不要说"哪个最好"**：每个框架有适用场景，选型匹配任务特征才专业
 2. **强调组合**：生产中几乎都是混合架构（Plan 骨架 + ReAct 节点 + Reflexion 兜底）
 3. **从任务结构出发**：可分解？需工具？可验证？——这三个问题决定框架选择
+
+## 记忆要点
+
+- 选型决策树：需外部工具用ReAct，多步且明确用Plan-Execute，可验证难题加Reflexion
+- 场景对比：纯脑内计算用CoT，查新闻用ReAct，写长篇报告用Plan-Execute
+- 生产实践：常组合使用，如Plan做骨架，ReAct执行步骤，Reflexion处理失败
+

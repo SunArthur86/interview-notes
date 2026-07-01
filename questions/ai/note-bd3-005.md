@@ -4,26 +4,30 @@ difficulty: L4
 category: ai
 subcategory: 微调
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: QLoRA将冻结的基础模型量化到4bit(NF4)存储，同时训练低秩LoRA适配器(fp16)，实现"大模型小显存训练"
-  analogy: '就像在一本大部头教科书上做笔记——书本本身缩印成小字(NF4量化)节省空间，你只在书页边贴便签纸(LoRA低秩矩阵)做微调，不需要重印整本书'
-  first_principle: '微调的本质是更新权重。QLoRA观察到大多数参数更新是低秩的，因此冻结高精度的原始权重(量化存储)，只训练少量低秩增量'
+  analogy: 就像在一本大部头教科书上做笔记——书本本身缩印成小字(NF4量化)节省空间，你只在书页边贴便签纸(LoRA低秩矩阵)做微调，不需要重印整本书
+  first_principle: 微调的本质是更新权重。QLoRA观察到大多数参数更新是低秩的，因此冻结高精度的原始权重(量化存储)，只训练少量低秩增量
   key_points:
-    - 'NF4量化: 信息论最优的4bit正态分布量化格式'
-    - '双量化: 对量化常数再做量化，进一步省显存'
-    - '分页优化器: 利用CPU内存处理显存峰值'
-    - 'LoRA: 只训练A和B两个小矩阵，W_new = W_quantized + BA'
+  - 'NF4量化: 信息论最优的4bit正态分布量化格式'
+  - '双量化: 对量化常数再做量化，进一步省显存'
+  - '分页优化器: 利用CPU内存处理显存峰值'
+  - 'LoRA: 只训练A和B两个小矩阵，W_new = W_quantized + BA'
 first_principle:
   essence: 大模型微调的参数更新具有低秩特性，可以用远少于原始参数的矩阵来表达
-  derivation: 'LoRA假设权重更新ΔW是低秩的，分解为ΔW = B×A（rank r << d）。QLoRA进一步将原始W量化为4bit，只需存储量化后的W + fp16的A/B矩阵，总存储 = 0.5bytes×N + 4bytes×2×r×d'
+  derivation: LoRA假设权重更新ΔW是低秩的，分解为ΔW = B×A（rank r << d）。QLoRA进一步将原始W量化为4bit，只需存储量化后的W + fp16的A/B矩阵，总存储 = 0.5bytes×N + 4bytes×2×r×d
   conclusion: QLoRA使得65B模型可在单张48GB GPU上微调，而全参微调需要>40张A100
 follow_up:
-  - 为什么选择NF4而不是INT4或FP4？
-  - LoRA的秩r应该怎么选？选大了和选小了各有什么问题？
-  - QLoRA微调的效果和全参微调差多少？
+- 为什么选择NF4而不是INT4或FP4？
+- LoRA的秩r应该怎么选？选大了和选小了各有什么问题？
+- QLoRA微调的效果和全参微调差多少？
+memory_points:
+- 4bit冻结+16bit训练：NF4量化冻结原权重，仅训练fp16的LoRA低秩矩阵。
+- NF4契合正态分布：传统INT4均匀划分导致0附近精度差，NF4按正态分位点信息论最优。
+- 显存极限压榨：NF4减存储+Double Quant减常量+Paged Optim防峰值溢出。
 ---
 
 # QLoRA降低训练资源成本的核心逻辑是什么？为什么选择NF4与FP16的组合？
@@ -202,3 +206,10 @@ model.print_trainable_parameters()
 ```
 
 **面试加分点**：提到QLoRA论文(Dettmers et al., 2023)证明QLoRA效果与全参16bit微调相当（差距<1%）；提到GA-QoRA(Qi et al.)在QLoRA基础上用GQA进一步优化；提到LoRA的alpha参数控制适配器的影响力(scale = alpha/r)；提到推理时可以将LoRA权重合并回基础模型(merge_and_unload)实现零额外推理开销。
+
+## 记忆要点
+
+- 4bit冻结+16bit训练：NF4量化冻结原权重，仅训练fp16的LoRA低秩矩阵。
+- NF4契合正态分布：传统INT4均匀划分导致0附近精度差，NF4按正态分位点信息论最优。
+- 显存极限压榨：NF4减存储+Double Quant减常量+Paged Optim防峰值溢出。
+

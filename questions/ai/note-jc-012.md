@@ -15,7 +15,7 @@ feynman:
   analogy: 像四个人互相传东西必须同时给同时收——如果 A 先给 B 再收 C，但 B 先收 A 再给 C，顺序不一致就互相干等。或者一个人突然手抖（报错），其他三个人拿着东西等他，永远传不下去。
   first_principle: 分布式训练用 collective op（all-reduce 等）同步，这些 op 要求所有 rank 同时参与。任何一个 rank 的顺序错乱、卡住、报错，都会让其他 rank 在 collective 处无限等待 → 死锁。
   key_points:
-  - '死锁=多个GPU互相等待对方释放资源，全部卡住'
+  - 死锁=多个GPU互相等待对方释放资源，全部卡住
   - '原因1: NCCL collective 顺序不一致（部分先发后收）'
   - '原因2: 负载不均导致同步点干等'
   - '原因3: 异常处理不当（一个挂起其他无限等）'
@@ -29,6 +29,12 @@ follow_up:
 - NCCL 的 all-reduce 怎么实现？
 - 怎么检测死锁？
 - 怎么避免 collective 死锁？
+memory_points:
+- 核心定义：多进程或流互相等待资源，导致 GPU 利用率掉 0 且不报错卡死
+- 首要原因：各 rank 的 NCCL 集合通信调用顺序不一致，导致互相等待
+- 其他诱因：负载不均干等、异常处理跳过同步点、单卡内 CUDA 流成环
+- 排查手段：NCCL_DEBUG=INFO 查通信卡点，py-spy dump 看死锁堆栈
+- 预防机制：保证代码路径一致，设置超时时间，异常时同步退出
 ---
 
 # 【阶跃星辰面经】GPU 死锁是什么情况
@@ -186,3 +192,12 @@ sampler = DistributedSampler(dataset, drop_last=True)
 - **NCCL（NVIDIA Collective Communications Library）**：GPU 间集合通信库，all-reduce 的底层实现（Ring 或 Tree 算法）
 - **gloo**：CPU 的集合通信后端，比 NCCL 慢但更稳
 - **Elastic Training（torchrun）**：自动处理 rank 挂掉重启，防止单点故障导致死锁
+
+## 记忆要点
+
+- 核心定义：多进程或流互相等待资源，导致 GPU 利用率掉 0 且不报错卡死
+- 首要原因：各 rank 的 NCCL 集合通信调用顺序不一致，导致互相等待
+- 其他诱因：负载不均干等、异常处理跳过同步点、单卡内 CUDA 流成环
+- 排查手段：NCCL_DEBUG=INFO 查通信卡点，py-spy dump 看死锁堆栈
+- 预防机制：保证代码路径一致，设置超时时间，异常时同步退出
+

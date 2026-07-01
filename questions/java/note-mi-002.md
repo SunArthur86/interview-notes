@@ -4,28 +4,33 @@ difficulty: L3
 category: java
 subcategory: 并发编程
 tags:
-  - 小米
-  - 面经
-  - 线程池
-  - Java
+- 小米
+- 面经
+- 线程池
+- Java
 feynman:
-  essence: "线程池不是背公式配置参数，而是根据业务场景( CPU密集/IO密集)选核心线程数、队列类型和拒绝策略，核心是防止OOM和保证关键链路不被拖垮"
-  analogy: "线程池像餐厅后厨——核心线程是常驻厨师，队列是等单架，最大线程是高峰临时工，拒绝策略是客流爆满时的处理方式(拒绝接单/老板亲自上/转其他店)"
-  first_principle: "线程池的本质是资源池化+流量控制，核心矛盾是吞吐量和稳定性之间的权衡"
+  essence: 线程池不是背公式配置参数，而是根据业务场景( CPU密集/IO密集)选核心线程数、队列类型和拒绝策略，核心是防止OOM和保证关键链路不被拖垮
+  analogy: 线程池像餐厅后厨——核心线程是常驻厨师，队列是等单架，最大线程是高峰临时工，拒绝策略是客流爆满时的处理方式(拒绝接单/老板亲自上/转其他店)
+  first_principle: 线程池的本质是资源池化+流量控制，核心矛盾是吞吐量和稳定性之间的权衡
   key_points:
-    - 'CPU密集型: 核心线程=CPU核数+1(+1防偶发page fault)'
-    - 'IO密集型: 核心线程=CPU核数×2或更多(线程等待IO时让出CPU)'
-    - '禁用无界队列LinkedBlockingQueue → 极易OOM'
-    - '支付核心链路: AbortPolicy抛异常+告警'
-    - '异步通知: CallerRunsPolicy主线程兜底'
+  - 'CPU密集型: 核心线程=CPU核数+1(+1防偶发page fault)'
+  - 'IO密集型: 核心线程=CPU核数×2或更多(线程等待IO时让出CPU)'
+  - 禁用无界队列LinkedBlockingQueue → 极易OOM
+  - '支付核心链路: AbortPolicy抛异常+告警'
+  - '异步通知: CallerRunsPolicy主线程兜底'
 first_principle:
-  essence: "线程池配置的本质是CPU利用率和内存安全的平衡"
-  derivation: "线程太少 → CPU利用率低 → 线程太多 → 上下文切换开销 + 内存OOM → 需要根据任务类型( CPU/IO)和业务重要性(核心/非核心)分别配置"
-  conclusion: "没有万能配置，关键是结合业务场景做trade-off"
+  essence: 线程池配置的本质是CPU利用率和内存安全的平衡
+  derivation: 线程太少 → CPU利用率低 → 线程太多 → 上下文切换开销 + 内存OOM → 需要根据任务类型( CPU/IO)和业务重要性(核心/非核心)分别配置
+  conclusion: 没有万能配置，关键是结合业务场景做trade-off
 follow_up:
-  - "如何动态调整线程池参数？"
-  - "线程池满了之后新来的任务怎么监控？"
-  - "ForkJoinPool和ThreadPoolExecutor有什么区别？"
+- 如何动态调整线程池参数？
+- 线程池满了之后新来的任务怎么监控？
+- ForkJoinPool和ThreadPoolExecutor有什么区别？
+memory_points:
+- 公式口诀：CPU密集型配置核数+1，而IO密集型配置核数×2（或除以计算占比）
+- 队列选型：因为无界队列会OOM，所以线上必须强制使用有界队列
+- 拒绝策略：核心链路用Abort防积压，可降级异步用CallerRuns主线程背压
+- 容灾监控：不可丢任务用自定义Kafka兜底补偿，线上必须监控队列积压与拒绝率
 ---
 
 # 线程池怎么配置？线上拒绝策略怎么选？
@@ -138,3 +143,11 @@ executor.setMaximumPoolSize(newMax);   // 运行时修改
   - 日志线程池(2核) → 挂了不影响订单
   → 故障隔离
 ```
+
+## 记忆要点
+
+- 公式口诀：CPU密集型配置核数+1，而IO密集型配置核数×2（或除以计算占比）
+- 队列选型：因为无界队列会OOM，所以线上必须强制使用有界队列
+- 拒绝策略：核心链路用Abort防积压，可降级异步用CallerRuns主线程背压
+- 容灾监控：不可丢任务用自定义Kafka兜底补偿，线上必须监控队列积压与拒绝率
+

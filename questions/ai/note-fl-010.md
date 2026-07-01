@@ -14,11 +14,11 @@ feynman:
   analogy: String 像便签纸（一条信息），Hash 像表格（一行多列可单独改），List 像排队队列（先进先出），Set 像标签云（去重），ZSet 像带分数的排行榜（自动排序）。
   first_principle: 数据结构的选择 = 访问模式 + 性能特征的匹配。字段级读写选 Hash（O(1) 改单字段），排队选 List（O(1) 头尾操作），排序选 ZSet（O(logN) 排序）。
   key_points:
-  - 'String：计数器(INCR)/缓存对象JSON/分布式锁'
-  - 'Hash：对象字段级读写，Agent 会话状态首选'
-  - 'List：消息队列(左进右出)/操作日志'
-  - 'Set：去重(已处理tool_call_id)/标签'
-  - 'ZSet：排行榜/按时间戳排序/延时队列'
+  - String：计数器(INCR)/缓存对象JSON/分布式锁
+  - Hash：对象字段级读写，Agent 会话状态首选
+  - List：消息队列(左进右出)/操作日志
+  - Set：去重(已处理tool_call_id)/标签
+  - ZSet：排行榜/按时间戳排序/延时队列
 first_principle:
   essence: 数据结构 = 访问模式的函数
   derivation: 不同访问模式（字段读写/排队/去重/排序）→ 匹配不同底层结构（Hash/SkipList/HashTable）→ 性能特征不同 → 按访问模式选结构
@@ -27,6 +27,11 @@ follow_up:
 - Hash 字段太多（>1000）会不会有问题？
 - ZSet 实现底层是 SkipList + HashTable，为什么这么设计？
 - Agent 会话状态什么时候用 JSON 存 String 比 Hash 好？
+memory_points:
+- Agent状态首选Hash：支持字段级update省带宽，整体设TTL，优于String频繁全量读写
+- 状态结构若需深度嵌套(如消息列表)，退而求其次序列化为JSON存String
+- 状态去重用Set，事件流/日志用List，延时队列(按时间戳)用ZSet
+- 加分点：ZSet底层是跳表+哈希表双结构，Hash字段少时用ziplist省内存
 ---
 
 # 【字节飞连面经】Redis 数据结构：String/Hash/List/Set/ZSet 各适合什么？Agent 会话状态用哪种？
@@ -94,3 +99,11 @@ EXPIRE session:{user_id}:{conv_id} 1800   # 30 min
 - **Hash 字段过多**：超过 `hash-max-ziplist-entries`（默认 128）会从 ziplist 转 hashtable，内存占用上升但性能不变
 - **大 Key 问题**：单个 Hash/Set 元素过多（>10万）会阻塞 Redis（操作是 O(N)），需要拆分
 - **Redis 7.0 引入 Stream**：比 List 更适合消息队列，支持消费组和 ACK
+
+## 记忆要点
+
+- Agent状态首选Hash：支持字段级update省带宽，整体设TTL，优于String频繁全量读写
+- 状态结构若需深度嵌套(如消息列表)，退而求其次序列化为JSON存String
+- 状态去重用Set，事件流/日志用List，延时队列(按时间戳)用ZSet
+- 加分点：ZSet底层是跳表+哈希表双结构，Hash字段少时用ziplist省内存
+

@@ -4,28 +4,33 @@ difficulty: L3
 category: database
 subcategory: MySQL
 tags:
-  - 字节
-  - 面经
-  - MySQL
-  - Redis
-  - 索引
+- 字节
+- 面经
+- MySQL
+- Redis
+- 索引
 feynman:
   essence: MySQL面向磁盘优化用B+树(减少随机IO)，Redis面向内存优化用SkipList(内存随机访问快)
-  analogy: '去图书馆找书——图书馆(MySQL)按书架分区整理走过去拿(B+树页组织减少走路)，电子书(Redis)全文搜索点一下就到(内存随机访问快)'
-  first_principle: '数据结构的选择由存储介质决定——磁盘随机IO慢(毫秒级)，内存随机IO快(纳秒级)'
+  analogy: 去图书馆找书——图书馆(MySQL)按书架分区整理走过去拿(B+树页组织减少走路)，电子书(Redis)全文搜索点一下就到(内存随机访问快)
+  first_principle: 数据结构的选择由存储介质决定——磁盘随机IO慢(毫秒级)，内存随机IO快(纳秒级)
   key_points:
-    - MySQL面向磁盘，B+树按页组织，树低IO少
-    - Redis面向内存，SkipList指针跳转成本低
-    - 磁盘随机IO比顺序IO慢1000倍
-    - 内存随机IO和顺序IO差异不大
+  - MySQL面向磁盘，B+树按页组织，树低IO少
+  - Redis面向内存，SkipList指针跳转成本低
+  - 磁盘随机IO比顺序IO慢1000倍
+  - 内存随机IO和顺序IO差异不大
 first_principle:
   essence: 索引数据结构必须匹配存储介质的访问特性
-  derivation: '磁盘随机IO≈10ms，顺序IO≈0.01ms(差1000倍)→需要减少随机IO→B+树(页组织+顺序链表)。内存随机IO≈100ns→指针跳转代价低→SkipList够用'
+  derivation: 磁盘随机IO≈10ms，顺序IO≈0.01ms(差1000倍)→需要减少随机IO→B+树(页组织+顺序链表)。内存随机IO≈100ns→指针跳转代价低→SkipList够用
   conclusion: 磁盘上B+树的页组织减少随机IO，内存中SkipList的多级指针直接高效
 follow_up:
-  - 'Redis如果数据量到TB级还会用SkipList吗？'
-  - 'B+树的页大小为什么是16KB？'
-  - 'SSD是否改变了索引结构的选择？'
+- Redis如果数据量到TB级还会用SkipList吗？
+- B+树的页大小为什么是16KB？
+- SSD是否改变了索引结构的选择？
+memory_points:
+- 一句话核心：MySQL面向磁盘极力减少随机IO，而Redis纯内存操作指针跳转无瓶颈
+- B+树优势：按页组织（16KB）且Fanout极大（约1170），三层就能存千万数据，IO仅2-3次
+- 跳表劣势：节点随机分配致空间局部性差，树高约20层，若放磁盘将导致不可接受的20+次随机IO
+- 范围查询对比：B+树叶子链表契合磁盘顺序预读，而跳表链表跳跃更适合内存范围扫描
 ---
 
 # 为什么MySQL索引用B+树，而不是Redis跳表这类结构？
@@ -149,3 +154,11 @@ SkipList：
 2. **具体数字**：B+树fanout~1170，树高2-3层，IO次数2-3次
 3. **SSD的影响**：SSD随机IO比HDD快100倍，但仍然比顺序IO慢10倍，B+树仍然更优
 4. **混合方案**：有些数据库(如RocksDB)用LSM-Tree，针对SSD进一步优化写性能
+
+## 记忆要点
+
+- 一句话核心：MySQL面向磁盘极力减少随机IO，而Redis纯内存操作指针跳转无瓶颈
+- B+树优势：按页组织（16KB）且Fanout极大（约1170），三层就能存千万数据，IO仅2-3次
+- 跳表劣势：节点随机分配致空间局部性差，树高约20层，若放磁盘将导致不可接受的20+次随机IO
+- 范围查询对比：B+树叶子链表契合磁盘顺序预读，而跳表链表跳跃更适合内存范围扫描
+

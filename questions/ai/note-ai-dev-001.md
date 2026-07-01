@@ -4,25 +4,29 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 面经
-  - AI应用开发
-  - 工程化
+- 面经
+- AI应用开发
+- 工程化
 feynman:
   essence: Function Calling的工程容错需要三层防御——输入层Schema校验、模型层重试+修复、输出层降级兜底
-  analogy: '像快递分拣系统——先检查包裹信息是否完整(校验)，分拣出错就重新扫描(重试)，实在不行就走人工通道(降级)'
-  first_principle: 'LLM输出是非确定性的，Function Calling的JSON可能有格式错误、字段缺失、类型不匹配。工程上必须假设"每次输出都可能出错"来设计兜底'
+  analogy: 像快递分拣系统——先检查包裹信息是否完整(校验)，分拣出错就重新扫描(重试)，实在不行就走人工通道(降级)
+  first_principle: LLM输出是非确定性的，Function Calling的JSON可能有格式错误、字段缺失、类型不匹配。工程上必须假设"每次输出都可能出错"来设计兜底
   key_points:
-    - '输入层: JSON Schema校验 + 参数类型检查'
-    - '模型层: 自动重试 + Few-shot修复 + 格式约束Prompt'
-    - '输出层: 降级方案 + 默认值 + 人工介入触发'
+  - '输入层: JSON Schema校验 + 参数类型检查'
+  - '模型层: 自动重试 + Few-shot修复 + 格式约束Prompt'
+  - '输出层: 降级方案 + 默认值 + 人工介入触发'
 first_principle:
   essence: Function Calling的可靠性 = 模型能力 × 工程容错率
-  derivation: '即使GPT-4的Function Calling准确率约95%，在1万次调用中仍有500次失败。生产系统需要将99.99%的可靠性目标通过工程手段弥补模型的不确定性'
+  derivation: 即使GPT-4的Function Calling准确率约95%，在1万次调用中仍有500次失败。生产系统需要将99.99%的可靠性目标通过工程手段弥补模型的不确定性
   conclusion: 好的Function Calling系统不是靠"模型更强"，而是靠"工程更健壮"
 follow_up:
-  - 除了Function Calling还有哪些结构化输出方法？
-  - 如何监控Function Calling的线上成功率？
-  - 流式输出如何处理Function Calling？
+- 除了Function Calling还有哪些结构化输出方法？
+- 如何监控Function Calling的线上成功率？
+- 流式输出如何处理Function Calling？
+memory_points:
+- 核心是构建三层容错架构：输入层校验、中间层修复重试、输出层降级兜底。
+- 输入层做Schema校验挡住非法JSON；中间层附加报错和Few-shot让大模型修复重试。
+- 输出层做降级兜底，若多次重试失败则返回默认值、走规则引擎或直接转人工。
 ---
 
 # Function Calling工程实现：如何设计容错机制？
@@ -248,3 +252,10 @@ class RobustFunctionCaller:
 | 幻觉参数 | 2% | schema additionalProperties:false |
 
 **面试加分点**：提到OpenAI的Structured Outputs（2024）通过约束解码保证JSON格式100%合法；提到Pydantic做Python原生的参数校验比JSON Schema更简洁；提到在生产环境中应该监控Function Calling的P99延迟和成功率，设置告警阈值（如成功率<95%触发告警）；提到Prompt中加入few-shot示例可以提高首次调用成功率10-20%。
+
+## 记忆要点
+
+- 核心是构建三层容错架构：输入层校验、中间层修复重试、输出层降级兜底。
+- 输入层做Schema校验挡住非法JSON；中间层附加报错和Few-shot让大模型修复重试。
+- 输出层做降级兜底，若多次重试失败则返回默认值、走规则引擎或直接转人工。
+

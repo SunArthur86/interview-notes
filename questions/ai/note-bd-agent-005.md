@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Agent
-  - Harness
+- 字节
+- 面经
+- Agent
+- Harness
 feynman:
   essence: Agent Harness是Agent的生产运行时框架，解决评测、观测、回放和安全四大工程问题
-  analogy: 'Agent Harness就像飞机的黑匣子+自动驾驶测试台——记录每一步操作、实时监控状态、出事了能回放复现'
-  first_principle: 'Agent有随机性，不能只看一次输出——工程上要看任务完成率、Tool调用成功率、延迟、成本和错误链路'
+  analogy: Agent Harness就像飞机的黑匣子+自动驾驶测试台——记录每一步操作、实时监控状态、出事了能回放复现
+  first_principle: Agent有随机性，不能只看一次输出——工程上要看任务完成率、Tool调用成功率、延迟、成本和错误链路
   key_points:
-    - 评测：任务完成率、Tool成功率、延迟和成本度量
-    - 观测：全链路Trace，记录每步Prompt和输出
-    - 回放：从检查点恢复和复现执行过程
-    - 安全：权限控制、超时熔断、资源限制
+  - 评测：任务完成率、Tool成功率、延迟和成本度量
+  - 观测：全链路Trace，记录每步Prompt和输出
+  - 回放：从检查点恢复和复现执行过程
+  - 安全：权限控制、超时熔断、资源限制
 first_principle:
   essence: Agent的本质不确定性要求必须有完善的工程基础设施来保证可靠性
-  derivation: 'LLM输出不可预测→单次测试无法评估质量→需要系统化评测+全链路观测+可回放的执行日志→Harness'
+  derivation: LLM输出不可预测→单次测试无法评估质量→需要系统化评测+全链路观测+可回放的执行日志→Harness
   conclusion: 没有Harness的Agent就像没有日志和监控的微服务——出了问题完全无法定位
 follow_up:
-  - 'Agent评测的Golden Set怎么构建？'
-  - 'Trace数据量很大怎么存储和检索？'
-  - 'Harness和LangSmith/Langfuse的关系？'
+- Agent评测的Golden Set怎么构建？
+- Trace数据量很大怎么存储和检索？
+- Harness和LangSmith/Langfuse的关系？
+memory_points:
+- 核心四能力：Eval(评测)、Trace(全链路观测)、Replay(回放)、Safety(安全控制)
+- 评测防随机：因为Agent输出有随机性，所以单测例必须跑多次(n_runs)取平均统计
+- Trace查节点：记录Prompt到Tool调用的树形Span结构，用于定位错误链路和Token成本
+- 核心监控指标：任务完成率、工具调用成功率、P99延迟和Token成本追踪
 ---
 
 # 从工程化角度看，Agent Harness主要解决哪些问题？
@@ -184,3 +189,11 @@ class ReplayEngine:
 2. **具体指标**：能说出P95延迟、Token成本、Tool成功率等量化指标
 3. **对标工具**：提到LangSmith、Langfuse等开源Trace工具
 4. **生产思维**：Trace数据量很大→需要采样+异步写入
+
+## 记忆要点
+
+- 核心四能力：Eval(评测)、Trace(全链路观测)、Replay(回放)、Safety(安全控制)
+- 评测防随机：因为Agent输出有随机性，所以单测例必须跑多次(n_runs)取平均统计
+- Trace查节点：记录Prompt到Tool调用的树形Span结构，用于定位错误链路和Token成本
+- 核心监控指标：任务完成率、工具调用成功率、P99延迟和Token成本追踪
+

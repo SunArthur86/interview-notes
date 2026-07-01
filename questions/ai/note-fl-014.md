@@ -18,7 +18,7 @@ feynman:
   - 'Multi-Head: 切h份并行注意力，不同子空间关注不同信息，concat+线性融合'
   - 'GPT: Decoder-only+因果mask，next token prediction，适合生成'
   - 'BERT: Encoder-only+双向，MLM+NSP，适合理解/分类/抽取'
-  - '现代主流(Claude/GPT/豆包)全 Decoder-only，生成上限高且能 zero-shot 理解'
+  - 现代主流(Claude/GPT/豆包)全 Decoder-only，生成上限高且能 zero-shot 理解
 first_principle:
   essence: 注意力 = 加权聚合信息
   derivation: 序列建模需让每个 token 看到其他 token → 全连接参数爆炸 → 用 Q·K 算相关性权重 → 用 V 聚合 → 多头并行提升表达力
@@ -27,6 +27,11 @@ follow_up:
 - 为什么除√d_k 不除d_k？方差推导
 - Multi-Head 每个 head 的 d_k 怎么算？head 数怎么选？
 - Decoder-only 为什么能 zero-shot 做理解任务？
+memory_points:
+- 公式核心：Attention = softmax(Q·K^T / √d_k) · V，除以√d_k是为防点积过大导致梯度消失。
+- 多头机制：把 Q/K/V 切成 h 份（如 8 头）并行算，让模型在不同子空间学不同特征。
+- GPT vs BERT：GPT 是 Decoder 做单向生成（续写），BERT 是 Encoder 做双向理解（完形填空）。
+- 主流原因：现代大模型全用 Decoder-only，因其生成上限高、支持 Zero-shot 理解且 Scaling 表现好。
 ---
 
 # 【字节飞连面经】Transformer 基础：Self-Attention / 多头 / GPT vs BERT
@@ -91,3 +96,11 @@ d_model = 512, h = 8
 - **Flash Attention**：通过分块计算减少 HBM 读写，把 attention 速度提升 2-4 倍（不改变数学结果）
 - **MQA / GQA**：Multi-Query Attention / Grouped-Query Attention，多个 head 共享 K/V，减少 KV cache 内存，提升推理速度
 - **KV Cache**：自回归生成时缓存已计算的 K/V，避免重复计算，是 LLM 推理优化的核心
+
+## 记忆要点
+
+- 公式核心：Attention = softmax(Q·K^T / √d_k) · V，除以√d_k是为防点积过大导致梯度消失。
+- 多头机制：把 Q/K/V 切成 h 份（如 8 头）并行算，让模型在不同子空间学不同特征。
+- GPT vs BERT：GPT 是 Decoder 做单向生成（续写），BERT 是 Encoder 做双向理解（完形填空）。
+- 主流原因：现代大模型全用 Decoder-only，因其生成上限高、支持 Zero-shot 理解且 Scaling 表现好。
+

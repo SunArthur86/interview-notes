@@ -4,28 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - ReAct
-  - RAG
-  - Agent
-  - 认知框架
+- B站面经
+- ReAct
+- RAG
+- Agent
+- 认知框架
 feynman:
   essence: ReAct RAG Agent=把RAG(检索)变成Agent的"工具"，让Agent自主决定何时检索、检索什么、检索后如何推理。区别于固定流程的Naive RAG，它动态决策检索策略。
   analogy: 普通RAG像自动售货机（投币出货，固定流程），ReAct RAG像导购员（听需求→找商品→不够再找→推荐）。
   first_principle: Naive RAG是"一次性检索"，复杂问题需要多次检索/拆分检索。把检索作为Agent工具，让LLM动态决定检索策略，能解决多跳问答等问题。
   key_points:
-    - 把retrieval作为Agent的一个tool
-    - Agent自主决定：检索时机/查询构造/是否再次检索
-    - 解决多跳问答（需多次检索串联）
-    - 比Naive RAG更智能，比Agentic RAG更轻量
+  - 把retrieval作为Agent的一个tool
+  - Agent自主决定：检索时机/查询构造/是否再次检索
+  - 解决多跳问答（需多次检索串联）
+  - 比Naive RAG更智能，比Agentic RAG更轻量
 first_principle:
   essence: 复杂问题的信息需求是动态的——无法一次性构造完美query。
-  derivation: 'Naive RAG假设：query一次检索就能找到答案。但多跳问题（A公司的CEO的母校）需要先查A公司→再查CEO→再查母校。ReAct让Agent在推理过程中按需检索，每次基于已有信息构造下一个query。'
+  derivation: Naive RAG假设：query一次检索就能找到答案。但多跳问题（A公司的CEO的母校）需要先查A公司→再查CEO→再查母校。ReAct让Agent在推理过程中按需检索，每次基于已有信息构造下一个query。
   conclusion: ReAct RAG = 把检索变成可反复调用的工具，让Agent动态规划检索路径
 follow_up:
-  - 怎么评估ReAct RAG效果？——多跳问答数据集（HotpotQA/MuSiQue）
-  - 检索多次会不会太慢？——并行检索+缓存+检索次数限制
-  - 和Self-RAG什么区别？——Self-RAG训练模型自带检索门控，ReAct RAG靠prompt引导
+- 怎么评估ReAct RAG效果？——多跳问答数据集（HotpotQA/MuSiQue）
+- 检索多次会不会太慢？——并行检索+缓存+检索次数限制
+- 和Self-RAG什么区别？——Self-RAG训练模型自带检索门控，ReAct RAG靠prompt引导
+memory_points:
+- 对比Naive RAG：Naive是固定单次检索，ReAct RAG是动态按需多次检索
+- 工具化：将向量数据库的检索功能封装为 retrieve 工具供Agent调用
+- 核心优势：解决复杂多跳问答，如A买了B，B的创始人是谁的链式推理
 ---
 
 # ReAct RAG Agent 如何实现？
@@ -213,3 +217,10 @@ ReAct RAG局限：
 1. **强调"动态决策"**：ReAct RAG 的核心是让 Agent 自主决定检索时机和 query，而非固定流程
 2. **用多跳问答举例**：这是最能体现 ReAct RAG 价值的场景，Naive RAG 做不到
 3. **提"检索即工具"**：把 retrieval 抽象为 tool，自然融入 ReAct 框架，设计优雅
+
+## 记忆要点
+
+- 对比Naive RAG：Naive是固定单次检索，ReAct RAG是动态按需多次检索
+- 工具化：将向量数据库的检索功能封装为 retrieve 工具供Agent调用
+- 核心优势：解决复杂多跳问答，如A买了B，B的创始人是谁的链式推理
+

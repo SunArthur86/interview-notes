@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: RAG
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: Chunk切分是RAG的"颗粒度调节器"——太大召回噪声多，太小丢失上下文。最优策略取决于文档结构和业务需求
-  analogy: '像切蛋糕——切太大一坨吃不下（检索噪声多），切太小碎渣到处是（语义不完整）。要沿着蛋糕的"自然纹理"（段落边界）切，每块大小正好一口吃'
-  first_principle: 'RAG检索的基本单位是chunk。chunk大小决定检索精度和上下文完整性的trade-off：小chunk定位精准但缺乏上下文，大chunk信息完整但引入噪声'
+  analogy: 像切蛋糕——切太大一坨吃不下（检索噪声多），切太小碎渣到处是（语义不完整）。要沿着蛋糕的"自然纹理"（段落边界）切，每块大小正好一口吃
+  first_principle: RAG检索的基本单位是chunk。chunk大小决定检索精度和上下文完整性的trade-off：小chunk定位精准但缺乏上下文，大chunk信息完整但引入噪声
   key_points:
-    - '固定切分: 简单但可能切断语义'
-    - '语义切分: 按段落/句子边界，保留语义完整性'
-    - '常见范围: 256-512 tokens，overlap 10-20%'
-    - '过大: 噪声多、embedding不精确、Token浪费'
-    - '过小: 上下文断裂、检索到碎片化信息'
+  - '固定切分: 简单但可能切断语义'
+  - '语义切分: 按段落/句子边界，保留语义完整性'
+  - '常见范围: 256-512 tokens，overlap 10-20%'
+  - '过大: 噪声多、embedding不精确、Token浪费'
+  - '过小: 上下文断裂、检索到碎片化信息'
 first_principle:
   essence: Embedding模型对输入长度有最优范围，过长则语义被稀释，过短则信息不足
-  derivation: 'Embedding本质是将文本压缩为稠密向量。固定维度的向量有信息容量上限：256-512 tokens的文本段能产生语义最集中的向量表示。超出这个范围，embedding开始"平均化"，检索精度下降'
+  derivation: Embedding本质是将文本压缩为稠密向量。固定维度的向量有信息容量上限：256-512 tokens的文本段能产生语义最集中的向量表示。超出这个范围，embedding开始"平均化"，检索精度下降
   conclusion: Chunk大小应该匹配embedding模型的最优输入范围（通常256-512 tokens），并用overlap保证跨chunk的语义连续性
 follow_up:
-  - 如何处理表格和图片的切分？
-  - 递归切分(Recursive Splitting)是什么？
-  - 如何评估chunk质量对RAG效果的影响？
+- 如何处理表格和图片的切分？
+- 递归切分(Recursive Splitting)是什么？
+- 如何评估chunk质量对RAG效果的影响？
+memory_points:
+- 策略对比：固定切分易破坏语义，递归切分按段落-句子-逗号降级寻找最佳边界
+- Chunk过大的坑：嵌入稀释导致召回降准，且极易超出LLM上下文窗口限制
+- Chunk过小的坑：全局语义割裂，上下文碎片化导致推理缺乏连贯性
+- 保底策略：设置重叠区，在切断语义与丢失上下文之间寻找平衡
 ---
 
 # 如何确定Chunk的大小和切分策略？过大或过小分别会带来什么问题？
@@ -236,3 +241,11 @@ class KnowledgeUpdatePipeline:
 ```
 
 **面试加分点**：提到Post5原文中的RAG优化技巧——结构化语义切分+上下文桥接、Query扩写+语义相似度阈值、混合检索用LambdaMART做分数归一化；提到Contextual Retrieval(Anthropic 2024)在切分时给每个chunk加上文档级摘要作为上下文；提到评估chunk质量可以用RAGAS的Context Precision和Context Recall指标；提到Late Chunking（先对整文档做embedding再切分）是2024年新方向。
+
+## 记忆要点
+
+- 策略对比：固定切分易破坏语义，递归切分按段落-句子-逗号降级寻找最佳边界
+- Chunk过大的坑：嵌入稀释导致召回降准，且极易超出LLM上下文窗口限制
+- Chunk过小的坑：全局语义割裂，上下文碎片化导致推理缺乏连贯性
+- 保底策略：设置重叠区，在切断语义与丢失上下文之间寻找平衡
+

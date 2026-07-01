@@ -4,27 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Text2SQL
-  - Agent
-  - NL2SQL
+- B站面经
+- Text2SQL
+- Agent
+- NL2SQL
 feynman:
   essence: Text2SQL在Agent里=把"自然语言查数据"封装为Agent的一个Skill/工具。Agent负责理解意图，Text2SQL负责生成SQL查数据库，再由Agent解读结果。
   analogy: 像有个翻译员——你用大白话说"查上月销量"，翻译员(Text2SQL)转成SQL去数据库查，再把结果翻译回你能懂的话。
   first_principle: 用户不懂SQL但需要查数据。Text2SQL桥接"自然语言"和"结构化查询"，Agent提供意图理解和结果解读。
   key_points:
-    - 定位：Text2SQL作为Agent的数据查询工具
-    - 流程：意图理解→SQL生成→执行→结果解读
-    - 难点：复杂SQL/多表/业务语义
-    - 增强：Schema RAG+SQL校验+结果验证
+  - 定位：Text2SQL作为Agent的数据查询工具
+  - 流程：意图理解→SQL生成→执行→结果解读
+  - 难点：复杂SQL/多表/业务语义
+  - 增强：Schema RAG+SQL校验+结果验证
 first_principle:
   essence: Text2SQL是"语言翻译"问题——自然语言→SQL。
-  derivation: '用户要查数据但不会SQL。Text2SQL用LLM把"上月销量top10"翻译成SQL，执行后返回数据。Agent负责理解用户到底要什么(可能需要追问)，Text2SQL负责精准翻译。'
+  derivation: 用户要查数据但不会SQL。Text2SQL用LLM把"上月销量top10"翻译成SQL，执行后返回数据。Agent负责理解用户到底要什么(可能需要追问)，Text2SQL负责精准翻译。
   conclusion: Text2SQL在Agent中 = 自然语言到SQL的翻译工具 + 结果解读
 follow_up:
-  - Text2SQL准确率怎么提升？——Schema感知+few-shot+SQL校验
-  - 复杂查询怎么办？——分步查询+中间结果+Agent编排
-  - 怎么防SQL注入？——参数化+只读权限+沙箱
+- Text2SQL准确率怎么提升？——Schema感知+few-shot+SQL校验
+- 复杂查询怎么办？——分步查询+中间结果+Agent编排
+- 怎么防SQL注入？——参数化+只读权限+沙箱
+memory_points:
+- 定位：作为Agent的数据查询技能，将自然语言转为SQL查询并解读结果。
+- 执行五步：Schema检索找相关表→LLM生成SQL→SQL校验(防错/注入)→只读执行→结构化返回。
+- 安全底线：必须限制数据库为只读权限，且执行前必须进行SQL合法性校验。
 ---
 
 # Text2SQL 在 Agent 里怎么用？
@@ -279,3 +283,10 @@ class Text2SQLSecurity:
 1. **定位为 Skill/工具**：Text2SQL 不是独立的，而是 Agent 的数据查询能力——Agent 负责意图理解和结果解读
 2. **Schema RAG**：表多时只给相关的，而非全塞——这是准确率的关键
 3. **安全治理**：只读权限+SQL 校验+脱敏，体现生产级思维
+
+## 记忆要点
+
+- 定位：作为Agent的数据查询技能，将自然语言转为SQL查询并解读结果。
+- 执行五步：Schema检索找相关表→LLM生成SQL→SQL校验(防错/注入)→只读执行→结构化返回。
+- 安全底线：必须限制数据库为只读权限，且执行前必须进行SQL合法性校验。
+

@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Plan-and-Execute
-  - 认知框架
-  - Agent
+- B站面经
+- Plan-and-Execute
+- 认知框架
+- Agent
 feynman:
   essence: Plan-and-Execute=先全局规划再逐步执行。规划器把大目标拆成有序步骤，执行器逐步完成，必要时回溯重规划。解决ReAct"只见树木不见森林"的问题。
   analogy: 像旅行计划——先做完整攻略(Day1去哪Day2去哪)，再按计划执行。比ReAct的"走一步看一步"更有全局观，遇到封路再调整。
   first_principle: ReAct每步只看当前，缺乏全局规划，导致步骤冗余或方向偏差。先做全局Plan能提升效率和准确性，执行时遇到偏差再局部调整。
   key_points:
-    - 两阶段：Planner全局规划 + Executor逐步执行
-    - 解决ReAct的局部视角问题
-    - 规划与执行解耦，可用不同模型
-    - 失败时支持Replan（重新规划）
+  - 两阶段：Planner全局规划 + Executor逐步执行
+  - 解决ReAct的局部视角问题
+  - 规划与执行解耦，可用不同模型
+  - 失败时支持Replan（重新规划）
 first_principle:
   essence: 复杂任务需要"自顶向下"的层次化分解，而非"自底向上"的逐步试探。
-  derivation: 'ReAct是贪心的（每步局部最优），Plan-Execute是全局的（先看整体再行动）。对于步骤间有依赖的任务，先规划能避免走弯路。类比：盖楼先画图纸再施工，而非边想边盖。'
+  derivation: ReAct是贪心的（每步局部最优），Plan-Execute是全局的（先看整体再行动）。对于步骤间有依赖的任务，先规划能避免走弯路。类比：盖楼先画图纸再施工，而非边想边盖。
   conclusion: Plan-Execute = 全局规划（减少返工） + 局部调整（应对变化）的平衡
 follow_up:
-  - Planner和Executor用同一个模型吗？——可以不同，Planner用强模型，Executor用便宜的
-  - 计划错了怎么办？——Replan机制，执行失败或偏差大时重新规划
-  - 和ReAct怎么选？——任务可分解用Plan-Execute，需探索用ReAct
+- Planner和Executor用同一个模型吗？——可以不同，Planner用强模型，Executor用便宜的
+- 计划错了怎么办？——Replan机制，执行失败或偏差大时重新规划
+- 和ReAct怎么选？——任务可分解用Plan-Execute，需探索用ReAct
+memory_points:
+- 核心思想：先全局规划，后逐步执行，必要时重新规划
+- 两阶段：Phase1 Planner生成步骤列表，Phase2 Executor逐步执行
+- 对比ReAct：ReAct走一步看一步，Plan-Execute有全局视角避免局部贪心
+- 模型搭配：Planner可用强模型，Executor可用便宜模型
 ---
 
 # Plan-and-Execute（计划-执行）认知框架怎么工作？
@@ -212,3 +217,11 @@ def hybrid_agent(goal):
 1. **强调"全局视角"**：Plan-Execute 解决 ReAct 的局部贪心问题，适合步骤明确的复杂任务
 2. **提"模型分工"**：Planner 用强模型，Executor 用小模型，体现成本意识
 3. **混合更实用**：生产中常用"Plan 骨架 + ReAct 节点"，兼顾全局规划和局部灵活
+
+## 记忆要点
+
+- 核心思想：先全局规划，后逐步执行，必要时重新规划
+- 两阶段：Phase1 Planner生成步骤列表，Phase2 Executor逐步执行
+- 对比ReAct：ReAct走一步看一步，Plan-Execute有全局视角避免局部贪心
+- 模型搭配：Planner可用强模型，Executor可用便宜模型
+

@@ -4,26 +4,31 @@ difficulty: L3
 category: ai
 subcategory: 推理优化
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: OOM排查从"谁在吃显存"出发——模型权重、KV Cache、激活值、框架开销四步定位
-  analogy: '像水管爆裂排查——先关总阀(确认模型大小)，再查各支管(KV Cache/激活值/并发数)，最后找泄漏点(框架泄漏/碎片化)'
-  first_principle: 'GPU显存是有限资源，OOM意味着总需求超过供给。逐项排查每个显存消费者，找到最大的一项优化'
+  analogy: 像水管爆裂排查——先关总阀(确认模型大小)，再查各支管(KV Cache/激活值/并发数)，最后找泄漏点(框架泄漏/碎片化)
+  first_principle: GPU显存是有限资源，OOM意味着总需求超过供给。逐项排查每个显存消费者，找到最大的一项优化
   key_points:
-    - '第一优先: 确认模型大小是否匹配GPU'
-    - '第二优先: KV Cache随序列长度线性增长'
-    - '第三优先: 并发请求 × 每请求KV Cache'
-    - '第四优先: 框架开销(PagedAttention/激活值)'
+  - '第一优先: 确认模型大小是否匹配GPU'
+  - '第二优先: KV Cache随序列长度线性增长'
+  - '第三优先: 并发请求 × 每请求KV Cache'
+  - '第四优先: 框架开销(PagedAttention/激活值)'
 first_principle:
   essence: 推理显存 = 模型权重 + KV Cache + 激活值 + 框架开销
-  derivation: '模型权重是固定开销，KV Cache = f(seq_len × batch)，激活值 = g(seq_len × batch)。当batch或seq_len增大时，KV Cache是主要增长项'
+  derivation: 模型权重是固定开销，KV Cache = f(seq_len × batch)，激活值 = g(seq_len × batch)。当batch或seq_len增大时，KV Cache是主要增长项
   conclusion: OOM排查应按"权重→KV Cache→并发→激活值"的优先级逐项优化
 follow_up:
-  - 如何监控推理过程中的显存使用？
-  - PagedAttention如何减少KV Cache碎片？
-  - 长文本推理如何控制KV Cache显存？
+- 如何监控推理过程中的显存使用？
+- PagedAttention如何减少KV Cache碎片？
+- 长文本推理如何控制KV Cache显存？
+memory_points:
+- 排查顺口溜：权重定大小，KV吃变量，并发最吃紧，最后查激活
+- 优先级1(模型权重)：模型装不下直接量化(INT8/INT4最立竿见影)
+- 优先级2(KV Cache)：随并发和Seq_len呈倍数增长，是OOM最大变量
+- 优先级3(并发控制)：通过限制batch_size和降低gpu_memory_utilization缓解
 ---
 
 # 大模型推理时遇到OOM问题，你会从哪些方面入手排查和解决？
@@ -183,3 +188,11 @@ print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
 ```
 
 **面试加分点**：提到 `torch.cuda.memory_summary()` 获取详细显存分配报告；提到vLLM的profile_run功能可以自动测量显存峰值并设置安全余量；提到KV Cache量化(FP8/INT8)是最新的研究方向（如KIVI、FlexGen）；提到推理框架选择也很关键——vLLM和SGLang对显存管理远优于原生HuggingFace Transformers。
+
+## 记忆要点
+
+- 排查顺口溜：权重定大小，KV吃变量，并发最吃紧，最后查激活
+- 优先级1(模型权重)：模型装不下直接量化(INT8/INT4最立竿见影)
+- 优先级2(KV Cache)：随并发和Seq_len呈倍数增长，是OOM最大变量
+- 优先级3(并发控制)：通过限制batch_size和降低gpu_memory_utilization缓解
+

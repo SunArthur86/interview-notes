@@ -15,10 +15,10 @@ feynman:
   first_principle: JSON 校验本质是"用 schema 约束 + 分层校验"。先格式后字段后业务，每层 catch 不同错误，分类返回让模型能修正。
   key_points:
   - '五类错误: 字段缺失/类型错误/枚举越界/多余字段/格式错误'
-  - 'Pydantic 定义schema自动校验，捕ValidationError分类返回'
+  - Pydantic 定义schema自动校验，捕ValidationError分类返回
   - '校验流程: json.loads解析 → Pydantic字段校验 → 业务校验'
-  - '失败让模型重写(错误塞回prompt)，最多重试2次'
-  - '错误信息要具体(哪个字段、期望什么、实际什么)'
+  - 失败让模型重写(错误塞回prompt)，最多重试2次
+  - 错误信息要具体(哪个字段、期望什么、实际什么)
 first_principle:
   essence: JSON 校验 = schema 约束 + 分层校验
   derivation: 模型输出可能错 → 用 schema 约束 → 但错误多样 → 分层校验(格式/字段/业务) → 分类返回 → 让模型能修正
@@ -27,6 +27,10 @@ follow_up:
 - Pydantic v1 和 v2 的 ValidationError 区别？
 - 枚举字段模糊匹配（"中国"→"China"）怎么做？
 - 怎么设计错误信息让模型最容易修正？
+memory_points:
+- 校验三层：先json.loads查格式，再查工具名是否越界，最后用Pydantic查参数
+- Pydantic设计：用Literal约束枚举，extra='forbid'拒绝多余字段，写validator校验业务逻辑
+- 错误分类：精准捕获缺失、类型错误、枚举越界等异常并返回，非简单抛出报错
 ---
 
 # 【某讯面经】算法题：实现函数校验模型输出的 tool_call JSON 合法性
@@ -198,3 +202,10 @@ def call_with_validation(prompt, allowed_tools, max_retries=2):
 - **Pydantic v2**：性能比 v1 快 5-50 倍，ValidationError 结构更清晰
 - **模糊匹配**：枚举字段用 fuzzy match（"中国"→"China"），ratidio 库
 - **Schema 热更新**：工具 schema 存配置中心，校验器动态加载，不改代码加新工具
+
+## 记忆要点
+
+- 校验三层：先json.loads查格式，再查工具名是否越界，最后用Pydantic查参数
+- Pydantic设计：用Literal约束枚举，extra='forbid'拒绝多余字段，写validator校验业务逻辑
+- 错误分类：精准捕获缺失、类型错误、枚举越界等异常并返回，非简单抛出报错
+

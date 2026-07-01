@@ -4,28 +4,33 @@ difficulty: L4
 category: ai
 subcategory: LLM
 tags:
-  - 智谱
-  - 面经
-  - SFT
-  - 后训练
+- 智谱
+- 面经
+- SFT
+- 后训练
 feynman:
-  essence: "判断SFT是否做到头不能只看loss，而要看继续训练是否还能提升hard set、OOD set和真实任务指标，以及pass@k多样性和RL probe gain"
-  analogy: "SFT像健身练基础体能——当你力量不再增长但柔韧性/爆发力还能提升时，说明基础训练够了，该转专项训练(RL)了"
-  first_principle: "SFT的目标不是训练成最终最优策略，而是获得格式稳定、能力不退化、适合继续RL优化的初始策略"
+  essence: 判断SFT是否做到头不能只看loss，而要看继续训练是否还能提升hard set、OOD set和真实任务指标，以及pass@k多样性和RL probe gain
+  analogy: SFT像健身练基础体能——当你力量不再增长但柔韧性/爆发力还能提升时，说明基础训练够了，该转专项训练(RL)了
+  first_principle: SFT的目标不是训练成最终最优策略，而是获得格式稳定、能力不退化、适合继续RL优化的初始策略
   key_points:
-    - '不能只看train/validation loss下降'
-    - '关键信号: OOD/hard set不涨 + 输出模板化 = SFT进入低收益区'
-    - 'pass@k高但pass@1低 → 应优先RL而非继续堆SFT'
-    - '过度SFT压缩策略分布，削弱后续RL探索空间'
-    - '最终checkpoint选RL probe gain明确的版本，而非SFT分数最高的'
+  - 不能只看train/validation loss下降
+  - '关键信号: OOD/hard set不涨 + 输出模板化 = SFT进入低收益区'
+  - pass@k高但pass@1低 → 应优先RL而非继续堆SFT
+  - 过度SFT压缩策略分布，削弱后续RL探索空间
+  - 最终checkpoint选RL probe gain明确的版本，而非SFT分数最高的
 first_principle:
-  essence: "SFT解决会不会按正确方式做，RL解决多个可行行为中哪个更优"
-  derivation: "SFT是模仿学习(imitation) → 能学到格式和能力 → 但只能复刻样本 → 遇到样本没覆盖的场景就退化 → 需要RL探索更优策略 → 过度SFT会压缩策略分布 → 削弱RL探索空间"
-  conclusion: "SFT的停止时机是在RL收益开始超过SFT收益的拐点"
+  essence: SFT解决会不会按正确方式做，RL解决多个可行行为中哪个更优
+  derivation: SFT是模仿学习(imitation) → 能学到格式和能力 → 但只能复刻样本 → 遇到样本没覆盖的场景就退化 → 需要RL探索更优策略 → 过度SFT会压缩策略分布 → 削弱RL探索空间
+  conclusion: SFT的停止时机是在RL收益开始超过SFT收益的拐点
 follow_up:
-  - "SFT数据按能力分桶怎么构建？"
-  - "pass@k中k取多少合适？"
-  - "RL probe gain具体怎么测？"
+- SFT数据按能力分桶怎么构建？
+- pass@k中k取多少合适？
+- RL probe gain具体怎么测？
+memory_points:
+- 核心认知：SFT只为求初始策略，并非最终最优，切莫死磕Loss下降
+- 停止信号1：Loss虽降，但困难题(Hard)和OOD泛化集准确率不再提升
+- 停止信号2：输出模板化(Distinct-2下降)，pass@1不高但pass@16高
+- 判断金标准：从当前权重做100步RL/DPO，收益明显说明SFT该停了
 ---
 
 # 如何判断 SFT 已经做到头了？
@@ -171,3 +176,11 @@ def rl_probe(sft_checkpoint, steps=100):
   - pass@k保持: pass@16没有显著下降
   - RL probe gain: 做100步RL后reward有明显提升
 ```
+
+## 记忆要点
+
+- 核心认知：SFT只为求初始策略，并非最终最优，切莫死磕Loss下降
+- 停止信号1：Loss虽降，但困难题(Hard)和OOD泛化集准确率不再提升
+- 停止信号2：输出模板化(Distinct-2下降)，pass@1不高但pass@16高
+- 判断金标准：从当前权重做100步RL/DPO，收益明显说明SFT该停了
+

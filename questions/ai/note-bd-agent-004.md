@@ -4,28 +4,33 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Agent
-  - MCP
-  - Skill
+- 字节
+- 面经
+- Agent
+- MCP
+- Skill
 feynman:
   essence: Skill定义能力边界和触发条件，MCP做标准化工具接入，Agent按需动态调用
-  analogy: 'Skill像招聘JD（描述能力+触发条件），MCP像标准化的API网关（统一接入+权限控制），Agent像HR（按需调用）'
-  first_principle: 'Agent能力扩展需要标准化协议——Skill定义What（做什么），MCP定义How（怎么接入），Runtime定义When（何时调用）'
+  analogy: Skill像招聘JD（描述能力+触发条件），MCP像标准化的API网关（统一接入+权限控制），Agent像HR（按需调用）
+  first_principle: Agent能力扩展需要标准化协议——Skill定义What（做什么），MCP定义How（怎么接入），Runtime定义When（何时调用）
   key_points:
-    - Skill定义能力边界、输入输出和触发条件
-    - Tool是Skill的具体实现
-    - MCP做标准化接入和Schema暴露
-    - 执行时限制权限和超时
+  - Skill定义能力边界、输入输出和触发条件
+  - Tool是Skill的具体实现
+  - MCP做标准化接入和Schema暴露
+  - 执行时限制权限和超时
 first_principle:
   essence: Agent要接入外部能力，需要统一的接口协议和安全管理
-  derivation: '每个外部能力接口各异→集成成本高→需要标准化协议(MCP)→定义统一Schema→Agent Runtime动态注册和调用'
+  derivation: 每个外部能力接口各异→集成成本高→需要标准化协议(MCP)→定义统一Schema→Agent Runtime动态注册和调用
   conclusion: MCP是Agent生态的USB-C接口——标准化接入、统一管理、即插即用
 follow_up:
-  - 'MCP和Function Calling有什么区别？'
-  - 'Skill的版本管理怎么做？'
-  - '如何防止Agent调用恶意Tool？'
+- MCP和Function Calling有什么区别？
+- Skill的版本管理怎么做？
+- 如何防止Agent调用恶意Tool？
+memory_points:
+- 核心架构：Agent Runtime挂载Skill，底层通过MCP Client连接标准化外部Server
+- 接入四步走：定义边界(Schema) -> 封装Tool(执行) -> 注册Client(动态发现) -> 规范通信(JSON-RPC)
+- Skill定义核心三要素：触发条件、输入/输出Schema、执行约束(超时与频控)
+- 安全与控制：MCP接入必须配套动态注册、权限校验和超时熔断机制
 ---
 
 # 如何给Agent生成Skill并通过MCP接入外部能力？
@@ -216,3 +221,11 @@ async def agent_execute(task: str):
 2. **安全意识**：提到权限校验、超时控制、速率限制
 3. **动态注册**：Agent不需要预先知道所有Tool，运行时通过MCP发现
 4. **与Function Calling对比**：MCP是协议层标准，Function Calling是调用机制
+
+## 记忆要点
+
+- 核心架构：Agent Runtime挂载Skill，底层通过MCP Client连接标准化外部Server
+- 接入四步走：定义边界(Schema) -> 封装Tool(执行) -> 注册Client(动态发现) -> 规范通信(JSON-RPC)
+- Skill定义核心三要素：触发条件、输入/输出Schema、执行约束(超时与频控)
+- 安全与控制：MCP接入必须配套动态注册、权限校验和超时熔断机制
+

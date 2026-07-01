@@ -4,32 +4,37 @@ difficulty: L4
 category: ai
 subcategory: Agent
 tags:
-  - 淘天
-  - 面经
-  - 二面
-  - 状态机
-  - Planner
-  - Executor
-  - Reflector
-  - 容错
+- 淘天
+- 面经
+- 二面
+- 状态机
+- Planner
+- Executor
+- Reflector
+- 容错
 feynman:
   essence: Planner-Executor-Reflector闭环 = 规划任务→执行→反思校验→修复，用状态机管控重试/超时/异常兜底，实现Agent自我纠错
   analogy: 就像装修工程——设计师出图（Planner）→工人施工（Executor）→质检员验收（Reflector）→不合格返工（回到Planner调整）→验收通过交付
   first_principle: 单次LLM执行错误率随步骤数指数增长。闭环+反思将错误率从指数级降为多项式级——每步独立校验+修复阻断错误传播
   key_points:
-    - Planner拆分任务为子步骤，输出结构化执行计划
-    - Executor按计划逐步执行，调用工具/API
-    - Reflector检查结果质量，决定通过/修复/放弃
-    - 状态机管控：重试上限、超时熔断、异常兜底
-    - 每步独立校验阻断错误传播
+  - Planner拆分任务为子步骤，输出结构化执行计划
+  - Executor按计划逐步执行，调用工具/API
+  - Reflector检查结果质量，决定通过/修复/放弃
+  - 状态机管控：重试上限、超时熔断、异常兜底
+  - 每步独立校验阻断错误传播
 first_principle:
   essence: 串行执行n步的错误率为1-(1-p)^n，加入反思修复后变为1-(1-p·r)^n，其中r为修复成功率
-  derivation: '设单步错误率p=0.15，5步串行准确率=(0.85)^5=44%。加入Reflector（检出率0.9）+Repair（修复率0.8）后，等效错误率=0.15×0.1+0.15×0.9×0.2=0.042，5步准确率=(0.958)^5=81%'
+  derivation: 设单步错误率p=0.15，5步串行准确率=(0.85)^5=44%。加入Reflector（检出率0.9）+Repair（修复率0.8）后，等效错误率=0.15×0.1+0.15×0.9×0.2=0.042，5步准确率=(0.958)^5=81%
   conclusion: 闭环架构的核心价值不是让每步更准，而是阻断错误传播链
 follow_up:
-  - Reflector用什么模型？需要和Executor不同吗？
-  - 状态机中"放弃"后怎么兜底？降级策略有哪些？
-  - 闭环增加的延迟和成本如何控制？
+- Reflector用什么模型？需要和Executor不同吗？
+- 状态机中"放弃"后怎么兜底？降级策略有哪些？
+- 闭环增加的延迟和成本如何控制？
+memory_points:
+- 口诀法：规划Planner、执行Executor、反思Reflector构成核心闭环状态机
+- 因果句：因为大模型存在幻觉且不可控，所以必须引入Reflector节点做结果校验
+- 对比句：反思通过则状态流转至完成，反思失败且重试超限则转入降级兜底状态
+- 口诀法：状态机管理节点流转，精准控制重试次数超时限制与人工接管
 ---
 
 # 简述Agent的Planner-Executor-Reflector闭环实现，工程如何用状态机管控？
@@ -196,3 +201,11 @@ async def _fallback(self, intent, plan, failed_step):
 2. **Reflector设计**：不只是"对不对"，还要检查"是否完整"、"是否一致"、"是否安全"
 3. **状态机优势**：可观测（每步有明确状态）、可恢复（崩溃后可从断点继续）、可审计（完整执行日志）
 4. **成本控制**：Repair只改有问题的步骤而非全部重做，Token消耗降低60%+
+
+## 记忆要点
+
+- 口诀法：规划Planner、执行Executor、反思Reflector构成核心闭环状态机
+- 因果句：因为大模型存在幻觉且不可控，所以必须引入Reflector节点做结果校验
+- 对比句：反思通过则状态流转至完成，反思失败且重试超限则转入降级兜底状态
+- 口诀法：状态机管理节点流转，精准控制重试次数超时限制与人工接管
+

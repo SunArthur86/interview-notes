@@ -14,11 +14,11 @@ feynman:
   analogy: 像超市结账——1000 个顾客里 999 个买几件东西，1 个买了整车。如果按"顾客ID"分到不同收银台，那个买整车的收银台排队1小时，其他收银台闲死。解法：把那个大客户的商品拆到多个收银台（加盐打散），最后再合并。
   first_principle: 分布式计算的瓶颈是最慢的 task。Shuffle 按 key 分配，key 数据量不均导致 task 负载不均。倾斜解法的本质是"打散热点 key 再聚合"，用两阶段换负载均衡。
   key_points:
-  - '倾斜本质：Shuffle 时某 key 数据量远超其他，少数 task 成为瓶颈'
-  - '三类常见key：空值/null、热点业务key(大V用户ID)、GroupBy高频key'
-  - '空值解法：过滤掉 或 用随机值打散'
-  - '热点key解法：加盐(salting)加随机前缀打散，两阶段聚合'
-  - 'GroupBy倾斜：两阶段聚合（局部+全局）'
+  - 倾斜本质：Shuffle 时某 key 数据量远超其他，少数 task 成为瓶颈
+  - 三类常见key：空值/null、热点业务key(大V用户ID)、GroupBy高频key
+  - 空值解法：过滤掉 或 用随机值打散
+  - 热点key解法：加盐(salting)加随机前缀打散，两阶段聚合
+  - GroupBy倾斜：两阶段聚合（局部+全局）
 first_principle:
   essence: 倾斜 = Shuffle key 不均 → task 负载不均
   derivation: 分布式按 key 分区 → 某 key 数据量是其他100倍 → 该分区task成为瓶颈 → 解法是打散key再聚合 → 用两阶段换负载均衡
@@ -27,6 +27,10 @@ follow_up:
 - 怎么定位是哪个 key 倾斜？
 - 加盐后聚合结果怎么保证正确？
 - MapJoin 适合什么场景？
+memory_points:
+- 本质是Shuffle时某Key数据量极大，导致99%任务完成而个别Task极慢
+- 空值倾斜直接过滤或赋予随机Key打散，小表Join倾斜用MapJoin广播避免Shuffle
+- 热点Key倾斜用加盐法（扩容加随机前缀），GroupBy倾斜用两阶段聚合（局部加全局）
 ---
 
 # 【神州专车面经】数据倾斜怎么处理？
@@ -163,3 +167,10 @@ LIMIT 10;
 - **Skew Join（自适应倾斜处理）**：Spark 3.0 的 AQE（自适应查询执行）能自动检测倾斜并拆分，开启 `spark.sql.adaptive.skewJoin.enabled=true`
 - **倾斜监控**：在任务里加 metric，监控各 task 处理数据量的标准差，超阈值告警
 - **业务侧规避**：和业务方沟通，热点 key 提前预聚合或拆分（如大V单独走链路）
+
+## 记忆要点
+
+- 本质是Shuffle时某Key数据量极大，导致99%任务完成而个别Task极慢
+- 空值倾斜直接过滤或赋予随机Key打散，小表Join倾斜用MapJoin广播避免Shuffle
+- 热点Key倾斜用加盐法（扩容加随机前缀），GroupBy倾斜用两阶段聚合（局部加全局）
+

@@ -14,11 +14,11 @@ feynman:
   analogy: 就像图书馆找书——先用书名关键词（BM25）+ 内容相似度（向量）各扫一遍把候选搬出来（召回，宁多勿漏），再请馆员逐本翻看挑出真正相关的（Rerank，精排，宁少勿滥）。最终给读者几本精选的。
   first_principle: 召回和精排的目标相反。召回阶段优先 Recall@K（漏了后面救不回来），精排阶段优先 Precision@K（LLM context 有限，喂进去的每条都该有用）。两阶段模型架构也不同：召回用 bi-encoder（省算力），精排用 cross-encoder（精度高但贵）。
   key_points:
-  - '查询改写 + 混合检索（BM25+向量）+ Rerank + 动态Top-K'
-  - '召回用 bi-encoder（query/doc 分别编码算余弦），精排用 cross-encoder（拼一起进模型）'
-  - '召回 K 大（50-100）保 Recall，Rerank 选 top-5 保 Precision'
-  - 'Top-K 按 query 长度 + chunk 大小 + Rerank 分数阈值动态算'
-  - 'BM25 词面命中强，向量同义近义强，hybrid 用 RRF 融合'
+  - 查询改写 + 混合检索（BM25+向量）+ Rerank + 动态Top-K
+  - 召回用 bi-encoder（query/doc 分别编码算余弦），精排用 cross-encoder（拼一起进模型）
+  - 召回 K 大（50-100）保 Recall，Rerank 选 top-5 保 Precision
+  - Top-K 按 query 长度 + chunk 大小 + Rerank 分数阈值动态算
+  - BM25 词面命中强，向量同义近义强，hybrid 用 RRF 融合
 first_principle:
   essence: RAG = 召回（高 Recall）+ 精排（高 Precision）两阶段
   derivation: 单阶段无法同时优化 Recall 和 Precision → 拆成两阶段 → 召回用便宜模型宁多勿漏 → 精排用贵模型宁少勿滥 → 两阶段配合达成"不漏 + 不噪"
@@ -27,6 +27,11 @@ follow_up:
 - Late Interaction（ColBERT v2）相比 bi-encoder 和 cross-encoder 优势在哪？
 - chunk 策略（按语义切 vs 按 token 切）对 RAG 上限的影响？
 - 怎么算 Recall@K 和 Precision@K？需要什么标注数据？
+memory_points:
+- RAG四件套：Query Rewrite改写、混合检索(BM25+向量)、Rerank精排、动态Top-K
+- 加Rerank因模型架构不同：召回用Bi-encoder保Recall，精排用Cross-encoder保Precision
+- 召回保Recall防漏，Rerank保Precision防噪，矛盾时大K召回小K精排
+- BM25擅长精确词面匹配(代码/专名)，向量擅长语义泛化，混合用RRF算法融合排名
 ---
 
 # 【字节飞连面经】RAG 做过哪些优化？为什么加 Rerank？BM25 够好向量还有必要吗？
@@ -105,3 +110,11 @@ RRF_score(d) = Σ 1 / (k + rank_i(d))   # k 通常取 60
 - **Rerank 模型当前事实标准**：BGE-Reranker（开源）、Cohere Rerank-v3（商用）
 - **混合检索权重**：除了 RRF，还可以加权（`α·BM25 + (1-α)·Vector`），α 按场景调
 - **多跳查询**：复杂问题（"A 公司的 CEO 的母校在哪"）需要拆成子问题分别检索，即 Agentic RAG
+
+## 记忆要点
+
+- RAG四件套：Query Rewrite改写、混合检索(BM25+向量)、Rerank精排、动态Top-K
+- 加Rerank因模型架构不同：召回用Bi-encoder保Recall，精排用Cross-encoder保Precision
+- 召回保Recall防漏，Rerank保Precision防噪，矛盾时大K召回小K精排
+- BM25擅长精确词面匹配(代码/专名)，向量擅长语义泛化，混合用RRF算法融合排名
+

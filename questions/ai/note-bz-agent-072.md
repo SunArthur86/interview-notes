@@ -4,27 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Prompt
 tags:
-  - B站面经
-  - Prompt工程
-  - JSON
-  - 结构化输出
+- B站面经
+- Prompt工程
+- JSON
+- 结构化输出
 feynman:
   essence: 让LLM稳定输出JSON/XML=格式约束(明确schema)+Few-shot示例+后处理校验+重试机制。核心是"约束+验证+兜底"三层保障。
   analogy: 像让小学生填表——给模板(格式约束)、示范怎么填(示例)、检查填对没(校验)、填错重来(重试)。
   first_principle: LLM是概率模型，不保证格式正确。需要约束降低错误率+校验捕获错误+重试修复错误。
   key_points:
-    - 约束：明确schema+Few-shot
-    - 原生：Function Calling/Structured Output
-    - 校验：JSON Schema验证
-    - 兜底：解析失败重试/修复
+  - 约束：明确schema+Few-shot
+  - 原生：Function Calling/Structured Output
+  - 校验：JSON Schema验证
+  - 兜底：解析失败重试/修复
 first_principle:
   essence: 结构化输出=概率生成+确定性约束的结合。
-  derivation: 'LLM生成是概率的，可能输出非法JSON。解法：1.用约束(明确格式)降低错误率 2.用校验(JSON Schema)捕获错误 3.用重试/修复处理错误。三层保障达到稳定。'
+  derivation: LLM生成是概率的，可能输出非法JSON。解法：1.用约束(明确格式)降低错误率 2.用校验(JSON Schema)捕获错误 3.用重试/修复处理错误。三层保障达到稳定。
   conclusion: 稳定结构化输出 = 约束（降低错误） + 校验（捕获错误） + 兜底（修复错误）
 follow_up:
-  - 哪个模型JSON输出最稳？——GPT-4/Claude支持Structured Output
-  - XML还是JSON？——JSON更主流，XML适合带标签的文档
-  - 解析失败率多少正常？——约束好后<1%
+- 哪个模型JSON输出最稳？——GPT-4/Claude支持Structured Output
+- XML还是JSON？——JSON更主流，XML适合带标签的文档
+- 解析失败率多少正常？——约束好后<1%
+memory_points:
+- 口诀「约束+原生+兜底」三层保障：Prompt约束，原生API，后处理校验
+- 最可靠方案：调用底层原生Function Calling或JSON模式，而非纯指望Prompt
+- 兜底防线：程序解析必须正则清洗去冗余词，并搭配JSON Repair修复格式
 ---
 
 # 如何稳定地让大模型输出符合业务规范的 JSON/XML 格式？
@@ -240,3 +244,10 @@ def parse_xml(raw):
 1. **三层保障**：约束(降错误)+校验(捕错误)+兜底(修错误)，系统性
 2. **原生 Structured Output**：能用模型原生能力就用，比纯 Prompt 约束可靠
 3. **错误反馈重试**：把解析错误告诉 LLM 让它修——这是"让 LLM 自我纠正"的实用技巧
+
+## 记忆要点
+
+- 口诀「约束+原生+兜底」三层保障：Prompt约束，原生API，后处理校验
+- 最可靠方案：调用底层原生Function Calling或JSON模式，而非纯指望Prompt
+- 兜底防线：程序解析必须正则清洗去冗余词，并搭配JSON Repair修复格式
+

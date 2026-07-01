@@ -4,28 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Reflexion
-  - 自我反思
-  - 认知框架
-  - Agent
+- B站面经
+- Reflexion
+- 自我反思
+- 认知框架
+- Agent
 feynman:
   essence: Reflexion=失败后反思总结，把经验存入记忆，下次避免重蹈覆辙。本质是给Agent装了"错题本"，让它从错误中学习。
   analogy: 像做题——做错了不只看答案，还写"我为什么错/下次怎么避免"，下次遇到类似题不再犯。
   first_principle: 普通Agent失败后重新尝试但不会总结，可能反复犯同样错。Reflexion增加反思环节，把失败原因抽象成可复用的经验，提升后续成功率。
   key_points:
-    - 三步循环：Act→Evaluate→Reflect
-    - 反思存入记忆，指导下次尝试
-    - 在复杂推理/代码任务上显著提升成功率
-    - 本质是Agent层面的"经验学习"
+  - 三步循环：Act→Evaluate→Reflect
+  - 反思存入记忆，指导下次尝试
+  - 在复杂推理/代码任务上显著提升成功率
+  - 本质是Agent层面的"经验学习"
 first_principle:
   essence: 智能的本质之一是从失败中学习。Agent缺乏这个能力会导致重复犯错。
-  derivation: 'LLM是stateless的，每次调用独立。普通Agent每次尝试都"从零开始"。Reflexion通过外部记忆（反思文本）把失败经验显式化，让下一次尝试能看到"上次为什么失败"，相当于给Agent加了一个会积累的经验库。'
+  derivation: LLM是stateless的，每次调用独立。普通Agent每次尝试都"从零开始"。Reflexion通过外部记忆（反思文本）把失败经验显式化，让下一次尝试能看到"上次为什么失败"，相当于给Agent加了一个会积累的经验库。
   conclusion: Reflexion = 试错 + 反思 + 经验记忆，让Agent具备"吃一堑长一智"的能力
 follow_up:
-  - 反思会不会反思错？——会，可用环境反馈（ground truth）校准
-  - 反思多少轮合适？——通常3-5轮，过多会陷入循环
-  - 和RL什么关系？——Reflexion是用自然语言做"策略更新"，RL是用梯度
+- 反思会不会反思错？——会，可用环境反馈（ground truth）校准
+- 反思多少轮合适？——通常3-5轮，过多会陷入循环
+- 和RL什么关系？——Reflexion是用自然语言做"策略更新"，RL是用梯度
+memory_points:
+- 核心机制：Act(行动) -> Eval(评估) -> Reflect(反思)，失败后总结经验重试
+- 对比普通Agent：普通Agent失败盲目重试，Reflexion会将反思存入记忆指导下轮
+- 适用场景：有明确成败反馈且可验证的任务，如代码生成和Bug修复
 ---
 
 # Thinking and Self-Reflection（思考与自我反思）框架？
@@ -224,3 +228,10 @@ Trial 3:
 1. **类比"错题本"**：Reflexion 就是给 Agent 装了个错题本，把失败经验显式化积累
 2. **强调"经验记忆"**：关键是反思结果存入记忆，跨尝试复用，这是普通重试做不到的
 3. **知道适用边界**：适合有明确反馈的任务（代码/数学），不适合主观任务——评估器是瓶颈
+
+## 记忆要点
+
+- 核心机制：Act(行动) -> Eval(评估) -> Reflect(反思)，失败后总结经验重试
+- 对比普通Agent：普通Agent失败盲目重试，Reflexion会将反思存入记忆指导下轮
+- 适用场景：有明确成败反馈且可验证的任务，如代码生成和Bug修复
+

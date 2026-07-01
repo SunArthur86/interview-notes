@@ -4,26 +4,30 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - MCP
-  - 工具协议
+- B站面经
+- MCP
+- 工具协议
 feynman:
   essence: 搭MCP服务=定义工具(Server)→实现标准接口→配置到Agent(Client)。核心是"把你的能力用MCP标准暴露，让任何支持MCP的Agent都能调用"。
   analogy: 像开餐厅接入外卖平台——把菜品(能力)按平台标准(菜单格式)上架，所有平台的骑手(各种Agent)都能来取餐(调用)。
   first_principle: MCP的价值是"一次封装，处处可用"。标准化接口后，你的工具不再绑定特定Agent框架。
   key_points:
-    - MCP架构：Server(工具提供方)+Client(Agent)
-    - 搭建步骤：定义工具→实现Server→注册到Client
-    - 核心：JSON-RPC标准协议
-    - 价值：工具复用、框架无关
+  - MCP架构：Server(工具提供方)+Client(Agent)
+  - 搭建步骤：定义工具→实现Server→注册到Client
+  - 核心：JSON-RPC标准协议
+  - 价值：工具复用、框架无关
 first_principle:
   essence: MCP是工具的"通用适配器"——定义统一接口，解耦工具和Agent。
-  derivation: '没有MCP：每个Agent框架有自己的工具格式，工具要适配N个框架。有MCP：工具实现MCP接口，任何MCP客户端都能用。一次实现，处处可用。'
+  derivation: 没有MCP：每个Agent框架有自己的工具格式，工具要适配N个框架。有MCP：工具实现MCP接口，任何MCP客户端都能用。一次实现，处处可用。
   conclusion: MCP服务搭建 = 按标准协议暴露工具能力 + 注册到Agent使用
 follow_up:
-  - MCP用什么协议？——JSON-RPC 2.0 over stdio/SSE
-  - 怎么保证安全？——权限控制+沙箱+审计
-  - 支持哪些语言？——Python/TypeScript SDK官方支持
+- MCP用什么协议？——JSON-RPC 2.0 over stdio/SSE
+- 怎么保证安全？——权限控制+沙箱+审计
+- 支持哪些语言？——Python/TypeScript SDK官方支持
+memory_points:
+- 通信架构：Client(Agent侧)与Server(工具侧)基于JSON-RPC 2.0协议通信。
+- 传输方式：本地用stdio，远程用SSE。
+- 开发三步：1.定义工具(参数与Schema)；2.用SDK实现Server(@list_tools与@call_tool)；3.配置Agent连接。
 ---
 
 # 如何从 0 搭建一个专属 MCP 服务？
@@ -283,3 +287,10 @@ class ProductionMCPServer:
 1. **四步走**：定义工具→实现 Server→注册 Client→测试，流程清晰
 2. **强调"一次实现处处可用"**：MCP 的核心价值是解耦，工具不绑定框架
 3. **提生产要点**：权限/限流/审计/错误处理，体现工程化思维
+
+## 记忆要点
+
+- 通信架构：Client(Agent侧)与Server(工具侧)基于JSON-RPC 2.0协议通信。
+- 传输方式：本地用stdio，远程用SSE。
+- 开发三步：1.定义工具(参数与Schema)；2.用SDK实现Server(@list_tools与@call_tool)；3.配置Agent连接。
+

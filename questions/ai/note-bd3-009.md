@@ -4,25 +4,30 @@ difficulty: L3
 category: ai
 subcategory: 推理优化
 tags:
-  - 字节跳动
-  - 面经
-  - 二面
+- 字节跳动
+- 面经
+- 二面
 feynman:
   essence: GPTQ用二阶信息(Hessian)逐层做最优化量化，AWQ发现保护"重要"权重(salient channels)就能大幅提升量化质量
-  analogy: 'GPTQ像精打细算的裁缝——用尺子(Hessian)量每一处再裁剪，追求整体最优。AWQ像有经验的画师——先找出画面的关键部分保护起来，其他部分随意压缩'
-  first_principle: '量化损失不均匀——不是所有权重对模型输出的贡献相同。识别并保护高影响权重是保持量化精度的关键'
+  analogy: GPTQ像精打细算的裁缝——用尺子(Hessian)量每一处再裁剪，追求整体最优。AWQ像有经验的画师——先找出画面的关键部分保护起来，其他部分随意压缩
+  first_principle: 量化损失不均匀——不是所有权重对模型输出的贡献相同。识别并保护高影响权重是保持量化精度的关键
   key_points:
-    - 'GPTQ: 基于Hessian矩阵的逐列量化补偿，需要校准数据'
-    - 'AWQ: 通过激活值感知找到重要权重通道，只对重要通道保持FP16'
-    - 'GPTQ精度稍高但速度稍慢，AWQ推理速度更快但精度略低'
+  - 'GPTQ: 基于Hessian矩阵的逐列量化补偿，需要校准数据'
+  - 'AWQ: 通过激活值感知找到重要权重通道，只对重要通道保持FP16'
+  - GPTQ精度稍高但速度稍慢，AWQ推理速度更快但精度略低
 first_principle:
   essence: 量化误差对不同权重的影响不同，取决于该权重对输出的敏感度
-  derivation: '量化误差 ε = |w - Q(w)|。误差对输出的影响取决于权重在计算链中的位置。Hessian矩阵H的逆可以量化这种敏感度（GPTQ），而激活值大小可以近似表示权重重要性（AWQ）'
+  derivation: 量化误差 ε = |w - Q(w)|。误差对输出的影响取决于权重在计算链中的位置。Hessian矩阵H的逆可以量化这种敏感度（GPTQ），而激活值大小可以近似表示权重重要性（AWQ）
   conclusion: 保护高敏感/高重要性权重可以将量化损失降低80%以上
 follow_up:
-  - 为什么AWQ不需要反向传播？
-  - SmoothQuant和AWQ有什么区别？
-  - 量化后模型推理速度能提升多少？
+- 为什么AWQ不需要反向传播？
+- SmoothQuant和AWQ有什么区别？
+- 量化后模型推理速度能提升多少？
+memory_points:
+- 原理对比：GPTQ靠Hessian矩阵补偿误差，AWQ靠缩放因子保护1%显著权重
+- 速度对比：因为AWQ无需复杂矩阵运算，所以量化极快(2分vs30分)且推理最快
+- 精度对比：GPTQ精度最优，而AWQ接近GPTQ且优于普通RTN
+- 生态对比：GPTQ代表实现为AutoGPTQ，而AWQ主推vLLM和TensorRT-LLM
 ---
 
 # 请对比GPTQ和AWQ两种量化方法的原理、量化精度和推理速度差异
@@ -183,3 +188,11 @@ model.save_quantized("llama-2-7b-gptq")
 | 生产推理服务 | **AWQ + vLLM** | 生态最成熟 |
 
 **面试加分点**：提到AWQ论文(Lin et al., 2023)的关键洞察——只有0.1%的权重是"saliency"的；提到GPTQ基于OBQ(Observation-Based Quantization)发展而来；提到GGUF(llama.cpp)是另一种量化格式，用k-quants方法更适合CPU推理；提到W4A16(仅权重量化)在A100上可以靠tensor core加速反量化，实际推理速度快于W8A8。
+
+## 记忆要点
+
+- 原理对比：GPTQ靠Hessian矩阵补偿误差，AWQ靠缩放因子保护1%显著权重
+- 速度对比：因为AWQ无需复杂矩阵运算，所以量化极快(2分vs30分)且推理最快
+- 精度对比：GPTQ精度最优，而AWQ接近GPTQ且优于普通RTN
+- 生态对比：GPTQ代表实现为AutoGPTQ，而AWQ主推vLLM和TensorRT-LLM
+

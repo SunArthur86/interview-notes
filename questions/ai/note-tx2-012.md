@@ -17,7 +17,7 @@ feynman:
   - 'FAISS: 单机向量检索库，算法强，无服务，适合离线/嵌入式'
   - 'Chroma: 轻量级，开发友好，适合原型/小规模'
   - 'Milvus: 分布式向量数据库，水平扩展+高可用，大规模生产'
-  - '大规模生产选Milvus，原型选Chroma，算法实验选FAISS'
+  - 大规模生产选Milvus，原型选Chroma，算法实验选FAISS
   - '看维度: 规模/分布式/运维成本/功能(过滤/混合检索/多向量)'
 first_principle:
   essence: 向量库选型 = 规模 × 运维 × 功能
@@ -27,6 +27,11 @@ follow_up:
 - Milvus 的分片和副本怎么设计？
 - 向量索引选哪个（IVF/HNSW/Flat）？
 - 向量库的数据更新怎么做？
+memory_points:
+- 定位对比：FAISS是单机算法库，Chroma是轻量数据库，Milvus是分布式云原生数据库
+- 大规模生产首选Milvus：因为支持多副本高可用、水平扩展、实时更新与标量混合检索
+- FAISS缺陷：无服务化API无高可用，数据更新难，仅适合离线实验或嵌入式单机
+- 索引选择：HNSW是综合平衡首选，超大规模且内存不足时选DiskANN
 ---
 
 # 【某讯面经】Milvus/FAISS/Chroma 线上选型差异，大规模生产用哪个？
@@ -184,3 +189,11 @@ results = collection.search(
 - **Qdrant / Weaviate / pgvector**：其他主流向量库。pgvector 直接用 Postgres 扩展（适合已有 PG 的团队）
 - **多向量检索**：ColBERT 风格（每个 token 一个向量），Milvus 2.4+ 支持
 - **向量库 + 关系库联动**：向量库做召回，Postgres 存结构化数据，按 id 关联
+
+## 记忆要点
+
+- 定位对比：FAISS是单机算法库，Chroma是轻量数据库，Milvus是分布式云原生数据库
+- 大规模生产首选Milvus：因为支持多副本高可用、水平扩展、实时更新与标量混合检索
+- FAISS缺陷：无服务化API无高可用，数据更新难，仅适合离线实验或嵌入式单机
+- 索引选择：HNSW是综合平衡首选，超大规模且内存不足时选DiskANN
+

@@ -847,5 +847,173 @@
       ],
       "rebuild": "从症状出发定位工具：CPU高->top+jstack找线程栈；内存涨->jmap -histo找大对象；GC频繁->jstat看分代使用率。arthas提供更强大的在线诊断能力。"
     }
+  },
+  {
+    "id": "note-xhs-java-001",
+    "category": "java",
+    "subcategory": "集合",
+    "difficulty": "L2",
+    "tags": [
+      "ArrayList",
+      "LinkedList",
+      "集合",
+      "数据结构"
+    ],
+    "question": "ArrayList 和 LinkedList 的区别与使用场景？（华为od Java一面）",
+    "answer": "## 一、核心对比表\n\n| 维度 | ArrayList | LinkedList |\n|------|-----------|------------|\n| 底层结构 | 动态数组（Object[]） | 双向链表（Node{prev, item, next}） |\n| 随机访问 | O(1) — 下标直接定位 | O(n) — 需从头/尾遍历 |\n| 头部插入 | O(n) — 需数组搬移 | O(1) — 修改指针 |\n| 尾部插入 | 均摊 O(1) | O(1) |\n| 中间插入 | O(n) | O(n) — 定位O(n) + 插入O(1) |\n| 内存开销 | 连续内存，紧凑 | 每个Node额外36字节（prev+item+next） |\n| 实现接口 | List, RandomAccess | List, Deque, Queue |\n\n## 二、ArrayList 扩容机制\n\n```\n初始容量: 10（首次add时创建）\n         │\n         ▼\n    add(e) → size == capacity?\n         │              │\n        否              是\n         │              │\n    直接赋值        grow(): newCapacity = oldCapacity + oldCapacity >> 1\n    array[size++]        即扩容 1.5 倍\n                         Arrays.copyOf → 新数组\n```\n\n**关键**：扩容时调用 `Arrays.copyOf` 创建新数组，旧数组被 GC 回收。频繁扩容会触发大量数组拷贝。\n\n## 三、LinkedList 双向链表结构\n\n```\nfirst → [Node A] ⇄ [Node B] ⇄ [Node C] ← last\n          │            │            │\n        prev=null     prev=A       prev=B\n        next=B        next=C       next=null\n```\n\n每个 Node 对象包含：\n- `E item` — 实际数据\n- `Node<E> prev` — 前驱指针\n- `Node<E> next` — 后继指针\n\n## 四、使用场景选择\n\n```java\n// ✅ 用 ArrayList：读多写少、随机访问频繁\nList<String> configList = new ArrayList<>();  // 配置项、字典数据\n\n// ✅ 用 LinkedList：频繁头尾插入、实现队列/双端队列\nDeque<Task> taskQueue = new LinkedList<>();  // 任务调度\n```\n\n**面试加分**：\n1. 实际开发中 95% 场景用 ArrayList — CPU 缓存命中率高（连续内存），LinkedList 的 Node 对象分散在堆中，cache miss 严重\n2. LinkedList 实现了 Deque 接口，可当队列/栈使用\n3. ArrayList 的 `subList()` 返回的是视图（view），修改会影响原列表",
+    "follow_up": [
+      "ArrayList 扩容 1.5 倍的原因是什么？为什么不是 2 倍？",
+      "LinkedList 能用 fori 遍历吗？为什么实际中不推荐？",
+      "Arrays.asList() 返回的 List 有什么坑？"
+    ],
+    "feynman": {
+      "essence": "ArrayList 是连续排列的书架（找书快但中间插书要搬动），LinkedList 是手拉手的小朋友队伍（插队快但找特定位置要数过去）。",
+      "analogy": "想象排队买奶茶：ArrayList 像固定座位的影院（第5排第3座直接走过去），LinkedList 像手拉手的人群（找第5个人要从第1个开始数）。",
+      "key_points": [
+        "ArrayList=数组+1.5倍扩容，随机访问O(1)",
+        "LinkedList=双向链表，头尾插入O(1)",
+        "实际开发95%用ArrayList（CPU缓存友好）",
+        "LinkedList额外实现Deque接口可当队列用"
+      ]
+    },
+    "first_principle": {
+      "problem": "线性表需要支持动态扩容、随机访问、任意位置插入删除，不同的物理存储方式决定了各操作的时间复杂度。",
+      "axioms": [
+        "连续内存（数组）→ 随机访问O(1)，但插入需搬移",
+        "离散内存（链表）→ 插入O(1)，但访问需遍历",
+        "CPU缓存对连续内存更友好（空间局部性原理）"
+      ],
+      "rebuild": "从数据结构第一性原理出发：需要频繁随机访问→数组(ArrayList)；需要频繁头尾增删→链表(LinkedList)；但现代CPU缓存使数组在大多数场景下性能更优"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-java-002",
+    "category": "java",
+    "subcategory": "集合",
+    "difficulty": "L4",
+    "tags": [
+      "HashMap",
+      "红黑树",
+      "扩容",
+      "哈希冲突",
+      "集合"
+    ],
+    "question": "HashMap 底层原理及扩容机制？（华为od Java一面）",
+    "answer": "## 一、JDK 1.8 HashMap 数据结构\n\n```\ntable[] (Node<K,V>数组，长度始终为2的幂)\n  [0] → null\n  [1] → Node(hash, key, value, next) → Node → ... (链表，长度<8)\n  [2] → null\n  [3] → TreeNode(红黑树，链表长度≥8 && table.length≥64)\n  ...\n  [15] → Node → Node → Node\n```\n\n**核心字段**：\n- `DEFAULT_INITIAL_CAPACITY = 16` — 默认初始容量\n- `DEFAULT_LOAD_FACTOR = 0.75f` — 负载因子\n- `TREEIFY_THRESHOLD = 8` — 链表转红黑树阈值\n- `UNTREEIFY_THRESHOLD = 6` — 红黑树退链表阈值\n- `MIN_TREEIFY_CAPACITY = 64` — 树化前数组最小长度\n\n## 二、put 流程（核心考点）\n\n```\nput(key, value)\n    │\n    ▼\n① hash = (h = key.hashCode()) ^ (h >>> 16)  ← 扰动函数（减少冲突）\n    │\n    ▼\n② index = (n - 1) & hash  ← 桶定位（位运算代替取模，前提n是2的幂）\n    │\n    ▼\n③ 桶为空？ → 直接放入新Node\n    │ 否\n    ▼\n④ 第一个Node的key相等？ → 替换value\n    │ 否\n    ▼\n⑤ 是TreeNode？ → 红黑树插入\n    │ 否\n    ▼\n⑥ 遍历链表尾部插入 → 链表长度≥8？ → treeifyBin()树化\n    │                    （但table.length<64时优先扩容）\n    ▼\n⑦ ++size > threshold(容量×0.75)？ → resize()扩容\n```\n\n## 三、扩容机制（resize）\n\n```\n扩容前: table[16], threshold=12\n         │\n         ▼\n    newCapacity = oldCapacity << 1  // 翻倍：16→32\n    newThreshold = newCapacity * 0.75  // 24\n         │\n         ▼\n    创建newTab[32]，遍历oldTab：\n         │\n    ┌────┴────┐\n    │         │\n  单节点    链表/树\n    │         │\n  直接迁移   rehash：e.hash & oldCap == 0?\n              │           │\n             是(原位置)    否(原位置+oldCap)\n              │           │\n           低位链表      高位链表\n```\n\n**扩容时元素位置规律**：原位置 或 原位置 + oldCapacity（二进制高位bit决定）\n\n## 四、为什么链表转红黑树阈值是 8？\n\nHashMap 源码注释：理想情况下 hash 分布均匀，桶中元素个数服从泊松分布 λ=0.5：\n\n| 桶中元素数 | 概率 |\n|-----------|------|\n| 0 | 0.60653 |\n| 1 | 0.30327 |\n| 2 | 0.07582 |\n| ... | ... |\n| 8 | 0.00000006 |\n\n概率极低（千万分之六），说明 hash 函数正常时几乎不会树化。阈值选 8 是防止恶意 hash 碰撞攻击。\n\n## 五、线程不安全的表现\n\n1. **JDK 1.7**：扩容时头插法导致链表成环 → 死循环（CPU 100%）\n2. **JDK 1.8**：尾插法解决了死循环，但多线程 put 仍可能数据覆盖丢失\n\n```java\n// 多线程下 size++ 非原子操作 → size 不准确\n// 解决方案：ConcurrentHashMap\n```",
+    "follow_up": [
+      "HashMap 的 key 可以为 null 吗？value 呢？",
+      "为什么负载因子是 0.75 而不是 1 或 0.5？",
+      "HashMap 和 Hashtable 的区别？",
+      "如何设计一个好的 hashCode() 方法？"
+    ],
+    "feynman": {
+      "essence": "HashMap 是一个「数组+链表/红黑树」的哈希表。用hash函数算出位置放入数组，冲突了就在那个位置挂链表，链表太长就变红黑树。",
+      "analogy": "想象一个有16格的储物柜。你用名字的首字母算出放哪个格子（hash）。如果两个人首字母相同（冲突），就在那个格子挂一个挂钩链（链表）。挂钩链超过8个就改成更高效的标签系统（红黑树）。",
+      "key_points": [
+        "数组+链表/红黑树，默认容量16负载因子0.75",
+        "扰动函数：(h=key.hashCode())^(h>>>16)减少冲突",
+        "链表≥8且数组≥64才树化，泊松分布概率千万分之六",
+        "扩容翻倍，元素位置=原位置或原位置+oldCap",
+        "线程不安全，多线程用ConcurrentHashMap"
+      ]
+    },
+    "first_principle": {
+      "problem": "需要一种能根据 key 快速定位 value 的数据结构。哈希函数将无限key映射到有限数组，必然产生冲突，如何高效处理冲突？",
+      "axioms": [
+        "哈希表平均O(1)查找的前提是冲突率低",
+        "冲突处理有两种主流方式：链地址法(HashMap)和开放寻址法(ThreadLocalMap)",
+        "空间换时间：负载因子越低冲突越少但内存浪费越多",
+        "红黑树将最坏情况从O(n)优化到O(log n)"
+      ],
+      "rebuild": "从哈希表第一性原理出发：hash函数→桶定位→冲突处理(链表)→极端冲突优化(红黑树)→动态扩容(2倍)。每一步都在权衡时间与空间"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-java-003",
+    "category": "java",
+    "subcategory": "并发",
+    "difficulty": "L4",
+    "tags": [
+      "ConcurrentHashMap",
+      "CAS",
+      "synchronized",
+      "并发",
+      "线程安全"
+    ],
+    "question": "ConcurrentHashMap JDK 1.7 和 1.8 的差异与优化？（华为od Java一面）",
+    "answer": "## 一、架构对比\n\n```\nJDK 1.7: 分段锁（Segment）\n┌───────────────────────────────────┐\n│  ConcurrentHashMap                │\n│  ┌──────┐ ┌──────┐ ┌──────┐      │\n│  │Seg 0 │ │Seg 1 │ │Seg 2 │ ...  │  ← 每个Segment是一把锁\n│  │ReentrantLock                    │\n│  │┌────┐│ │┌────┐│ │┌────┐│      │\n│  ││HashEntry[]←链表               │\n│  │└────┘│ │└────┘│ │└────┘│      │\n│  └──────┘ └──────┘ └──────┘      │\n└───────────────────────────────────┘\n默认16个Segment → 最大并发度16\n\nJDK 1.8: CAS + synchronized\n┌───────────────────────────────────┐\n│  ConcurrentHashMap                │\n│  Node[] table (同一把锁的粒度=桶)  │\n│  [0] → null                        │\n│  [1] → Node → Node → ... (链表)   │  ← 锁单个桶头节点\n│  [2] → TreeBin (红黑树)           │\n│  ...                               │\n│  [15] → Node                      │\n└───────────────────────────────────┘\n并发度 = 桶数量（远大于16）\n```\n\n## 二、JDK 1.8 put 流程\n\n```\nput(key, value)\n    │\n    ▼\n① key/value 非空检查（CHM不允许null）\n    │\n    ▼\n② hash = spread(key.hashCode())  ← (h ^ (h>>>16)) & HASH_BITS\n    │\n    ▼\n③ tab == null → initTable() (CAS初始化)\n    │\n    ▼\n④ f = tabAt(tab, i)  // CAS读桶头\n    f == null?\n    │        │\n   是        否\n    │        ▼\n    │     ⑤ synchronized(f) {  // 锁住桶头节点\n    │        链表→遍历插入/替换\n    │        红黑树→putTreeVal\n    │        }\n    │        │\n    ▼        ▼\n⑥ casTabAt(tab, i, new Node)   addCount(1L) // CAS更新baseCount\n   CAS放入空桶                 判断是否扩容\n```\n\n## 三、核心优化对比\n\n| 维度 | JDK 1.7 | JDK 1.8 |\n|------|---------|---------|\n| 锁粒度 | Segment（段） | 桶头节点（更细粒度） |\n| 锁实现 | ReentrantLock | synchronized + CAS |\n| 数据结构 | HashEntry[] + 链表 | Node[] + 链表/红黑树 |\n| 并发度 | 固定16（segments） | 等于桶数（动态扩展） |\n| 查询复杂度 | O(n) 链表 | O(log n) 红黑树（≥8） |\n| size() | 先尝试无锁累加，最多重试2次后加锁 | baseCount + CounterCell[] CAS累加 |\n\n## 四、为什么 1.8 用 synchronized 而不是 ReentrantLock？\n\n1. **锁粒度降低**：1.8 锁的是单个桶头节点，冲突概率极低\n2. **JVM 优化**：偏向锁→轻量级锁→重量级锁的锁升级，无竞争时几乎零开销\n3. **内存占用少**：不需要额外的 AQS 对象（每个 Segment 都是 ReentrantLock）\n4. **CAS 处理空桶**：无竞争时直接 CAS 写入，连 synchronized 都不需要\n\n## 五、size() 实现原理（1.8）\n\n```java\n// 类似 LongAdder 的思想\nprivate transient volatile long baseCount;\nprivate transient volatile CounterCell[] counterCells;\n\n// put/remove 时调用 addCount()\n// 1. 先 CAS 更新 baseCount\n// 2. 失败则 CAS 更新随机 CounterCell\n// 3. size = baseCount + Σ counterCells[i].value\n```",
+    "follow_up": [
+      "ConcurrentHashMap 的 get() 需要加锁吗？为什么？",
+      "ConcurrentHashMap 的 put 为什么不允许 null key/value？",
+      "CounterCell 和 LongAdder 的关系是什么？",
+      "1.8 的 ConcurrentHashMap 在扩容时如何支持并发？"
+    ],
+    "feynman": {
+      "essence": "ConcurrentHashMap 是线程安全的HashMap。1.7用分段锁（把数据切成16段每段一把锁），1.8改为锁单个桶头节点+CAS，粒度更细并发更高。",
+      "analogy": "想象一个大食堂：1.7 版本是分成16个独立小餐厅每个有自己的门锁（最多16人同时吃饭）；1.8 版本是开放大食堂，每张桌子有自己的锁（几百人同时吃不同桌）。",
+      "key_points": [
+        "1.7=Segment+ReentrantLock，并发度固定16",
+        "1.8=CAS+synchronized锁桶头，并发度=桶数",
+        "1.8引入红黑树优化最坏O(n)为O(log n)",
+        "synchronized经过JVM锁升级优化后性能不输ReentrantLock",
+        "size()用baseCount+CounterCell分散CAS热点"
+      ]
+    },
+    "first_principle": {
+      "problem": "多线程并发读写HashMap需要保证线程安全，但全局锁（Hashtable）并发度太低，如何实现高并发安全哈希表？",
+      "axioms": [
+        "锁粒度越细，并发度越高",
+        "无锁（CAS）比有锁性能更好但只适用于简单操作",
+        "锁升级（偏向→轻量→重量）可以兼顾无竞争和有竞争场景",
+        "分散热点（CounterCell）比单点CAS在高并发下吞吐量更高"
+      ],
+      "rebuild": "从并发安全哈希表需求出发：全局锁→分段锁(1.7)→桶级锁+CAS(1.8)，每次演进都在降低锁粒度，同时利用JVM锁优化和CPU原子指令减少开销"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-java-004",
+    "category": "java",
+    "subcategory": "Spring",
+    "difficulty": "L4",
+    "tags": [
+      "Spring",
+      "IOC",
+      "AOP",
+      "依赖注入",
+      "动态代理"
+    ],
+    "question": "Spring IOC、AOP 原理及依赖注入实现方式？（华为od Java一面）",
+    "answer": "## 一、IOC（控制反转）\n\n### 本质：对象创建权从代码转移到容器\n\n```\n传统方式（正向控制）：               IOC方式（控制反转）：\n┌─────────────┐                   ┌──────────────┐\n│ class User { │                   │ @Component    │\n│   Dao dao =  │                   │ class User {  │\n│   new Dao(); │  ← 自己new         │   @Autowired  │\n│ }            │                   │   Dao dao;    │ ← 容器注入\n└─────────────┘                   │ }             │\n                                  └──────────────┘\n                                    Spring Container\n```\n\n### Bean 生命周期（核心12步）\n\n```\n1. 实例化 (instantiateBean)\n      ↓\n2. 属性填充 (populateBean) ← @Autowired/@Value 注入\n      ↓\n3. Aware回调 (BeanNameAware/BeanFactoryAware)\n      ↓\n4. BeanPostProcessor.postProcessBeforeInitialization\n      ↓\n5. @PostConstruct\n      ↓\n6. InitializingBean.afterPropertiesSet()\n      ↓\n7. 自定义 init-method\n      ↓\n8. BeanPostProcessor.postProcessAfterInitialization  ← AOP代理在这里创建\n      ↓\n9. Bean 就绪，放入单例池\n      ↓\n10. 容器关闭 → @PreDestroy\n      ↓\n11. DisposableBean.destroy()\n      ↓\n12. 自定义 destroy-method\n```\n\n## 二、依赖注入（DI）实现方式\n\n### 三种注入方式\n\n```java\n// 1. 字段注入（不推荐，无法final）\n@Autowired\nprivate UserDao userDao;\n\n// 2. Setter注入（可选依赖）\n@Autowired\npublic void setUserDao(UserDao userDao) {\n    this.userDao = userDao;\n}\n\n// 3. 构造器注入（推荐！Spring 4.3+单构造器可省略@Autowired）\nprivate final UserDao userDao;\n\npublic UserService(UserDao userDao) {\n    this.userDao = userDao;\n}\n```\n\n### @Autowired 注入流程\n\n```\n1. byType：从容器找 UserDao 类型的 Bean\n2. 多个？→ byName：用字段名匹配 Bean name\n3. 仍然多个？→ @Qualifier(\"userDao\") 指定\n4. 找不到？→ required=true 抛 NoSuchBeanDefinitionException\n```\n\n### 三级缓存解决循环依赖（面试高频）\n\n```\nsingletonObjects (一级缓存)  ← 完整的Bean（初始化完成）\nearlySingletonObjects (二级) ← 提前暴露的半成品Bean（实例化但未初始化）\nsingletonFactories (三级)    ← ObjectFactory（可创建代理对象）\n\nA 依赖 B，B 依赖 A：\n① 创建A → A实例化 → A的ObjectFactory放入三级缓存\n② A填充属性 → 发现需要B → 去创建B\n③ B实例化 → B填充属性 → 需要A\n④ 从三级缓存拿到A的ObjectFactory → 调用getObject()得到早期A引用\n⑤ 早期A放入二级缓存 → B拿到A引用 → B完成初始化 → B放入一级缓存\n⑥ A拿到完成的B → A完成初始化 → A放入一级缓存\n```\n\n**为什么三级缓存？** 处理AOP代理：ObjectFactory.getObject() 会检查是否需要代理，保证循环依赖时注入的是代理对象。\n\n## 三、AOP（面向切面编程）\n\n### JDK 动态代理 vs CGLIB\n\n```\n┌─────────────────────────────────────┐\n│  Spring AOP 代理选择                 │\n│                                      │\n│  目标类实现了接口？                   │\n│     ├── 是 → JDK动态代理 (Proxy)     │\n│     │        基于接口生成代理类        │\n│     └── 否 → CGLIB代理               │\n│              基于继承生成子类          │\n│                                      │\n│  强制CGLIB: @EnableAspectJAutoProxy  │\n│  (proxyTargetClass=true)             │\n└─────────────────────────────────────┘\n```\n\n### AOP 核心概念\n\n```java\n@Aspect\n@Component\npublic class LogAspect {\n    \n    // 切入点：哪些方法被拦截\n    @Pointcut(\"execution(* com.example.service.*.*(..))\")\n    public void servicePointcut() {}\n    \n    // 前置通知\n    @Before(\"servicePointcut()\")\n    public void before(JoinPoint jp) { ... }\n    \n    // 环绕通知（最强大，可控制是否执行目标方法）\n    @Around(\"servicePointcut()\")\n    public Object around(ProceedingJoinPoint pjp) throws Throwable {\n        // 前置逻辑\n        Object result = pjp.proceed(); // 执行目标方法\n        // 后置逻辑\n        return result;\n    }\n}\n```\n\n### AOP 失效场景（面试陷阱）\n\n```java\n@Service\npublic class UserService {\n    \n    @Transactional\n    public void methodA() { ... }\n    \n    public void methodB() {\n        // ⚠️ 内部调用，不经过代理对象 → AOP失效！\n        methodA();  // 事务不会生效\n    }\n    \n    // 解决：注入自身代理\n    @Autowired\n    @Lazy\n    private UserService self;\n    \n    public void methodBFixed() {\n        self.methodA();  // ✅ 通过代理调用，事务生效\n    }\n}\n```",
+    "follow_up": [
+      "Spring 三级缓存为什么不能是两级缓存？",
+      "@Autowired 和 @Resource 的区别？",
+      "Spring AOP 和 AspectJ 的区别？",
+      "Bean 的作用域有哪些？prototype 的循环依赖能解决吗？"
+    ],
+    "feynman": {
+      "essence": "IOC是「别人帮你创建对象」，AOP是「不改动原代码就能加功能」。依赖注入就是容器主动把依赖塞给你，而不是你自己去new。",
+      "analogy": "IOC像住酒店不用自己打扫（服务员=容器帮你搞定）；AOP像给所有方法都装了监控摄像头（不用改每个方法，统一拦截）。三级缓存解决循环依赖就像：A和B互相等对方（循环依赖），酒店先给A一个临时房卡（半成品），等B办好了再换正式卡。",
+      "key_points": [
+        "IOC=对象创建权交给容器，DI=容器自动注入依赖",
+        "构造器注入最推荐（可final、不可变、强制依赖）",
+        "三级缓存解决singleton循环依赖+AOP代理问题",
+        "AOP默认JDK代理(有接口)/CGLIB(无接口)",
+        "内部方法调用绕过代理→AOP失效，需注入自身代理"
+      ]
+    },
+    "first_principle": {
+      "problem": "软件系统中对象之间的依赖关系管理复杂，且横切关注点（日志/事务/权限）散布在各业务方法中。如何解耦对象创建和功能增强？",
+      "axioms": [
+        "控制反转：对象不应自己创建依赖，应由容器统一管理",
+        "单一职责：业务逻辑不应混入日志/事务等横切关注点",
+        "动态代理：运行时生成代理对象可以在不修改源码的前提下增强功能",
+        "提前暴露：循环依赖可通过暴露半成品引用来解决"
+      ],
+      "rebuild": "从对象依赖管理出发：工厂模式→IOC容器(统一管理)→DI(自动注入)→三级缓存(解决循环依赖)→AOP(代理增强)→AOP失效场景(内部调用绕过代理)"
+    },
+    "images": []
   }
 ]

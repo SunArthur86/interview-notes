@@ -24,9 +24,14 @@ first_principle:
   derivation: 早期每个工具都要为每个LLM单独写适配代码（M×N问题）。MCP定义了统一协议，工具只需实现一次，所有支持MCP的LLM都能用（M+N问题）。Skill在工具之上封装"如何完成某类任务"，让Agent不用从零规划复杂流程。
   conclusion: Function Call是基础，MCP是生态，Skill是体验，三者协同构成现代Agent工具体系
 follow_up:
-  - MCP和传统的Plugin/API有什么区别？
-  - 如何开发一个MCP Server？
-  - Skill和Agent模板(如AutoGPT的prompt)有什么区别？
+- MCP和传统的Plugin/API有什么区别？
+- 如何开发一个MCP Server？
+- Skill和Agent模板(如AutoGPT的prompt)有什么区别？
+memory_points:
+- 抽象层级：Function Call是底层能力，而Skill和MCP是上层的标准封装协议
+- Function Call：LLM原生能力，直接输出结构化JSON指令替代文本解析
+- MCP协议：Client与Server解耦，把M×N适配降维成M+N的标准化工具生态
+- Skill侧重：Agent内化的业务流，MCP侧重跨模型跨平台的外部工具通信规范
 ---
 
 # 【八股总结】MCP、Skill、Function Call 的关系与区别
@@ -402,3 +407,11 @@ class CodeReviewExecution:
 - **Claude Skills**：Anthropic的Skill系统，用SKILL.md定义
 - **Cursor/Cline的MCP集成**：实际IDE Agent如何使用MCP接入工具
 - **OpenAI的Function Calling演进**：从tools到parallel_function_calling到computer_use
+
+## 记忆要点
+
+- 抽象层级：Function Call是底层能力，而Skill和MCP是上层的标准封装协议
+- Function Call：LLM原生能力，直接输出结构化JSON指令替代文本解析
+- MCP协议：Client与Server解耦，把M×N适配降维成M+N的标准化工具生态
+- Skill侧重：Agent内化的业务流，MCP侧重跨模型跨平台的外部工具通信规范
+

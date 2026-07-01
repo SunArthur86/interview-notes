@@ -357,5 +357,179 @@
     },
     "images": [],
     "source": "小红书帖子《字节Java后端一面面经 MySQL底层+SQL优化专项》"
+  },
+  {
+    "id": "note-xhs-db-009",
+    "category": "database",
+    "subcategory": "Redis",
+    "difficulty": "L3",
+    "tags": [
+      "Redis",
+      "Bitmap",
+      "位图",
+      "签到",
+      "位操作"
+    ],
+    "question": "Redis Bitmap 是怎么实现的？set/get 一个 bit 底层做了什么？（小红书Java一面）",
+    "answer": "## 一、Bitmap 本质\n\nRedis Bitmap **不是一种独立的数据类型**，而是基于 String 类型的位操作扩展。一个 String 最大 512MB，可存储 2^32 ≈ 42.9 亿个 bit。\n\n```\nString key = \"user:sign:1001:202607\"\n     ↓ 底层是 SDS (Simple Dynamic String)\n字节: [byte0]  [byte1]  [byte2]  ...\n位:    76543210 76543210 76543210\n       ↓↓↓↓↓↓↓↓ ↓↓↓↓↓↓↓↓ ↓↓↓↓↓↓↓↓\n       每个bit代表某天是否签到(1=签到, 0=未签)\n```\n\n## 二、setbit 底层逻辑\n\n```\nSETBIT key offset value\n         │\n         ▼\n① byte = offset / 8     ← 计算在第几个字节\n   bit = offset % 8      ← 计算在字节内的第几位\n         │\n         ▼\n② 检查 SDS 长度是否足够\n   不够 → sdsgrowzero() 扩展SDS并用0填充新增部分\n         │\n         ▼\n③ 位操作：\n   value=1 → sds[byte] |= (1 << (7 - bit))   ← 置1\n   value=0 → sds[byte] &= ~(1 << (7 - bit))  ← 清0\n         │\n         ▼\n④ 更新 SDS 的长度、空闲空间元数据\n```\n\n**注意**：位序是从高位（MSB）到低位（LSB），即 byte 的第 0 位是最高位。\n\n```bash\n# 示例：用户1001在7月第1天和第3天签到\nSETBIT user:sign:1001:202607 0 1   # 第1天\nSETBIT user:sign:1001:202607 2 1   # 第3天\n# 底层 byte0 = 10100000 = 0xA0\n\nGETBIT user:sign:1001:202607 0     # 返回1\nGETBIT user:sign:1001:202607 1     # 返回0\n```\n\n## 三、getbit 底层逻辑\n\n```\nGETBIT key offset\n    │\n    ▼\n① byte = offset / 8\n   bit = offset % 8\n    │\n    ▼\n② SDS长度检查：offset超出范围直接返回0\n    │\n    ▼\n③ return (sds[byte] >> (7 - bit)) & 1\n```\n\n**时间复杂度**：O(1) — 直接数组下标访问 + 位运算\n\n## 四、常用统计命令\n\n```bash\n# 统计签到天数（值为1的bit数）\nBITCOUNT user:sign:1001:202607\n\n# 计算连续签到：位运算获取从offset开始的连续1\nBITFIELD user:sign:1001:202607 GET u7 0\n# 获取从第0位开始7个无符号位 → 返回一个数值\n\n# 多用户活跃统计：N个用户同时在线人数\nBITOP AND active_both user:active:20260701 user:active:20260702\n# 两天都活跃的用户数\nBITCOUNT active_both\n```\n\n## 五、典型应用场景\n\n```\n场景1：用户签到（1亿用户 × 365天 = 365亿bit ≈ 4.3GB）\n  key = \"sign:uid:202607\"  ← 每月一个key\n\n场景2：活跃用户统计\n  key = \"active:20260701\"  ← 每天一个key\n  SETBIT active:20260701 {uid} 1\n  BITCOUNT active:20260701      ← 当日活跃用户数\n\n场景3：用户在线状态\n  SETBIT online {uid} 1/0\n```",
+    "follow_up": [
+      "Bitmap 和 Set 的内存对比？1亿用户签到各占多少内存？",
+      "BITFIELD 命令的作用是什么？能做什么位运算？",
+      "如果 offset 非常大（如 2^31），会有什么问题？",
+      "Redis 的 HyperLogLog 和 Bitmap 在统计UV场景下怎么选？"
+    ],
+    "feynman": {
+      "essence": "Bitmap就是用String的每个bit来表示一个布尔值。setbit就是定位到某个字节再通过位运算（与/或）修改某一位，getbit就是读出来再移位取值。",
+      "analogy": "想象一排灯泡开关（每个开关=1个bit=1个位置）。setbit(3, 1)就是找到第3个开关把它打开。底层是先算出第几个字节（开关在哪排），再用位运算精确控制那一个开关。",
+      "key_points": [
+        "Bitmap不是独立类型，基于String的位操作",
+        "setbit: 定位byte→位运算置1/清0，O(1)",
+        "getbit: 定位byte→移位取值，O(1)",
+        "BITCOUNT统计1的个数，BITOP做位运算",
+        "1亿用户签到仅需~12MB（1亿bit/8/1024/1024）"
+      ]
+    },
+    "first_principle": {
+      "problem": "海量布尔状态（签到/在线/活跃）需要高效存储和查询，用传统数据结构（Set/Hash）内存开销太大。",
+      "axioms": [
+        "1个布尔值只需要1个bit（0或1）",
+        "1字节=8bit，1MB可存800万个布尔值",
+        "位运算是CPU原生操作，O(1)且极快",
+        "bit offset到byte offset的映射：byte=offset/8, bit=offset%8"
+      ],
+      "rebuild": "从布尔值存储需求出发：用String的字节数组→每个bit代表一个布尔值→位运算(set/get)实现高效读写→BITCOUNT做统计→BITOP做多集合运算。Bitmap是空间最优的布尔值存储方案"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-db-010",
+    "category": "database",
+    "subcategory": "Redis",
+    "difficulty": "L3",
+    "tags": [
+      "Redis",
+      "数据类型",
+      "String",
+      "Hash",
+      "List",
+      "Set",
+      "ZSet"
+    ],
+    "question": "Redis 数据类型有哪些？各自的应用场景？（华为od Java一面）",
+    "answer": "## 一、五大基础数据类型\n\n| 类型 | 底层结构 | 特点 | 典型场景 |\n|------|---------|------|---------|\n| **String** | SDS | 二进制安全，最大512MB | 缓存、计数器、分布式锁 |\n| **Hash** | ziplist / hashtable | 字段-值映射 | 对象存储、商品信息 |\n| **List** | quicklist (ziplist+链表) | 有序、可重复、双端操作 | 消息队列、最新列表 |\n| **Set** | intset / hashtable | 无序、不可重复 | 标签、共同好友、去重 |\n| **ZSet** | ziplist / skiplist+hash | 有序、不可重复、带分数 | 排行榜、延迟队列 |\n\n## 二、String — 最常用\n\n```bash\n# 基本操作\nSET key value [EX seconds]    # 设值+过期\nGET key                       # 取值\nINCR / DECR key               # 原子计数\nSETEX key seconds value       # 设值+过期（原子）\n\n# 应用场景\nSET token:{token} {userId} EX 7200  # 会话管理\nINCR article:read:{id}              # 阅读计数\nSET lock:{resource} {uuid} NX EX 30 # 分布式锁\n```\n\n**底层 SDS (Simple Dynamic String)**：\n```\nstruct sdshdr {\n    int len;      // 已使用长度\n    int free;     // 剩余空间\n    char buf[];   // 字符数组（二进制安全）\n}\n```\n\n## 三、Hash — 对象存储\n\n```bash\n# 基本操作\nHSET user:1001 name \"张三\" age 25\nHGET user:1001 name\nHGETALL user:1001\nHINCRBY user:1001 age 1\n\n# 应用场景\nHSET product:1001 name \"iPhone\" price 9999 stock 100  # 商品信息\n```\n\n**编码转换**：\n- 元素数 ≤ 128 且单个值 ≤ 64字节 → **ziplist**（紧凑连续内存）\n- 超过阈值 → **hashtable**（两层数组+链表）\n\n## 四、List — 有序列表\n\n```bash\n# 基本操作\nLPUSH list a b c    # 左插入 → [c, b, a]\nRPUSH list d e      # 右插入 → [c, b, a, d, e]\nLPOP list           # 左弹出 → c\nLRANGE list 0 -1    # 查看全部\nBLPOP list 30       # 阻塞左弹出（30秒超时）\n\n# 应用场景\nLPUSH messages:{uid} {msg}      # 消息队列\nLRANGE messages:{uid} 0 9       # 最新10条消息\n```\n\n**底层 quicklist**：双向链表，每个节点是一个 ziplist，兼顾内存紧凑和快速增删。\n\n## 五、Set — 集合运算\n\n```bash\n# 基本操作\nSADD tags:1001 \"Java\" \"Redis\" \"MySQL\"\nSMEMBERS tags:1001\nSINTER set1 set2     # 交集\nSUNION set1 set2     # 并集\nSDIFF set1 set2      # 差集\n\n# 应用场景\nSADD user:tags:1001 \"科技\" \"数码\"        # 用户标签\nSINTER user:tags:1001 user:tags:1002     # 共同标签\nSADD daily:active:20260701 {uid}         # 日活去重\nSCARD daily:active:20260701              # 日活人数\n```\n\n## 六、ZSet — 有序集合（高频考点）\n\n```bash\n# 基本操作\nZADD rank 100 \"user1\" 200 \"user2\" 150 \"user3\"\nZREVRANGE rank 0 2 WITHSCORES   # Top3\nZINCRBY rank 10 \"user1\"         # 加分\n\n# 应用场景\nZADD leaderboard:game 9999 \"player1\"   # 排行榜\nZADD delay:tasks {timestamp} {taskId}  # 延迟队列\nZRANGEBYSCORE delay:tasks 0 {now}      # 获取到期任务\n```\n\n**底层 skiplist（跳表）**：\n```\nLevel 3:  head ──────────────→ [20] ──────→ null\nLevel 2:  head ────→ [10] ──→ [20] ────→ [30] → null\nLevel 1:  head → [5] → [10] → [15] → [20] → [25] → [30] → null\n\n查询 O(log n)，每个节点随机层数（概率p=0.25晋升）\n同时维护 hash(dict) 实现O(1)查找成员→分数\n```\n\n## 七、三种特殊类型（了解）\n\n| 类型 | 用途 |\n|------|------|\n| Bitmap | 签到、在线状态、布隆过滤器 |\n| HyperLogLog | 基数统计（UV，误差0.81%，固定12KB） |\n| Geo | 地理位置（基于ZSet，GeoHash编码） |",
+    "follow_up": [
+      "ZSet 为什么用跳表而不是红黑树？",
+      "ziplist 和 hashtable 的转换阈值是什么？为什么有这个设计？",
+      "Redis 的 Stream 和 List 做消息队列有什么区别？",
+      "如何用 Redis 实现延迟队列？有哪些方案？"
+    ],
+    "feynman": {
+      "essence": "Redis有5种核心数据结构，每种都针对特定场景优化了底层编码。String是最通用的，Hash适合存对象，List适合队列，Set适合集合运算，ZSet适合排行榜。",
+      "analogy": "想象一个工具箱：String是万能刀（啥都能干），Hash是收纳盒（分格放东西），List是传送带（有序进出），Set是筛子（去重+交集），ZSet是奖牌榜（排序+带分数）。",
+      "key_points": [
+        "5大基础类型：String/Hash/List/Set/ZSet",
+        "每种类型有小编码(ziplist/intset)和大编码(hashtable/skiplist)两种",
+        "String=缓存/计数/锁；Hash=对象；List=队列；Set=去重/集合运算；ZSet=排行榜/延迟队列",
+        "ZSet底层=跳表+字典，跳表O(logN)范围查询+字典O(1)成员查找",
+        "特殊类型：Bitmap(签到)、HyperLogLog(UV去重)、Geo(位置)"
+      ]
+    },
+    "first_principle": {
+      "problem": "内存数据库需要高效存储和操作不同类型的数据，如何在有限内存中为不同数据形态选择最优结构？",
+      "axioms": [
+        "数据量小时紧凑编码(ziplist)更省内存",
+        "数据量大时标准结构(hashtable/skiplist)更高效",
+        "有序+带分数的需求需要跳表(平衡查询和范围扫描)",
+        "集合运算(交并差)需要hash表O(1)查找支撑"
+      ],
+      "rebuild": "从内存数据存储需求出发：K/V(String)→字段映射(Hash)→有序序列(List)→无序去重(Set)→有序带分(ZSet)，每种类型都提供了小数据量紧凑编码+大数据量高效编码的自适应切换"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-db-011",
+    "category": "database",
+    "subcategory": "MySQL",
+    "difficulty": "L3",
+    "tags": [
+      "MySQL",
+      "Redis",
+      "选型",
+      "场景设计",
+      "数据存储"
+    ],
+    "question": "场景题：笔记类型数据（直播/图文/视频，有类型关联关系）应该用 MySQL 还是 Redis 存？什么场景必须用 MySQL？（小红书Java一面）",
+    "answer": "## 一、场景分析：笔记类型数据\n\n```\n数据特征：\n  - 笔记有类型（直播、图文、视频）\n  - 类型之间有关联关系\n  - 需要查询某类型的所有笔记\n  - 可能需要范围查询、聚合统计\n```\n\n### 推荐方案：MySQL 主存储 + Redis 缓存\n\n```\n用户请求\n    │\n    ▼\nRedis 缓存命中？ ──是──→ 直接返回\n    │ 否\n    ▼\nMySQL 查询（带类型条件、JOIN、聚合）\n    │\n    ▼\n结果写入Redis缓存（TTL过期）\n    │\n    ▼\n返回结果\n```\n\n### 为什么选 MySQL 做主存储？\n\n| 需求 | MySQL能力 | Redis局限 |\n|------|----------|-----------|\n| 类型关联关系 | 外键、JOIN查询 | 无关联查询能力 |\n| 复杂条件查询 | WHERE type='video' AND status=1 | 需要额外维护索引结构 |\n| 范围查询 | WHERE create_time BETWEEN ... | ZSet只能按score范围 |\n| 事务一致性 | ACID事务 | 仅Lua脚本保证原子性 |\n| 数据持久可靠 | redo log + binlog 双保险 | RDB/AOF有窗口期 |\n| 聚合统计 | GROUP BY、COUNT、SUM | 需要SCAN全量遍历 |\n\n## 二、什么场景必须用 MySQL 不能用 Redis？\n\n### 场景1：范围查询（面试官追问点）\n\n```sql\n-- 这类查询 Redis 基本无法实现\nSELECT * FROM notes \nWHERE type = 'video' \n  AND create_time BETWEEN '2026-06-01' AND '2026-06-30'\n  AND author_id IN (1001, 1002, 1003)\nORDER BY like_count DESC\nLIMIT 20 OFFSET 0;\n```\n\nRedis 的 ZSet 只能按一个 score 排序，多维度范围+排序+分页几乎无法实现。\n\n### 场景2：复杂关联查询\n\n```sql\n-- 三表JOIN：笔记←笔记类型←类型属性\nSELECT n.*, t.type_name, t.icon_url, a.author_name\nFROM notes n\nJOIN note_types t ON n.type_id = t.id\nJOIN authors a ON n.author_id = a.id\nWHERE t.category = 'live_streaming'\n  AND n.status = 1;\n```\n\n### 场景3：事务一致性\n\n```sql\n-- 发布笔记同时更新计数，必须事务保证\nBEGIN;\nINSERT INTO notes (title, content, type_id) VALUES (...);\nUPDATE note_stats SET total_count = total_count + 1 WHERE type_id = ?;\nCOMMIT;\n```\n\n### 场景4：精确计数的财务/订单场景\n\n```sql\n-- 订单金额计算、对账等不允许任何误差\nSELECT SUM(amount) FROM orders \nWHERE merchant_id = 1001 \n  AND DATE(create_time) = '2026-07-01';\n```\n\nRedis 的 INCR 虽然原子但无法做复杂聚合，且数据可靠性不如MySQL。\n\n## 三、Redis 的优势场景（反面对比）\n\n```\n✅ Redis 适合：\n  - 热点笔记的列表缓存（ZSet排行榜）\n  - 点赞计数（INCR原子操作）\n  - 用户最近浏览历史（List）\n  - 全局唯一ID生成（INCR）\n  - 实时在线状态（Bitmap/Set）\n\n❌ Redis 不适合做主存储：\n  - 无复杂查询能力\n  - 内存成本远高于磁盘\n  - 持久化不如关系数据库可靠\n  - 数据一致性保障弱\n```\n\n## 四、面试加分：正确架构设计\n\n```\n                        ┌─────────────┐\n                        │   客户端     │\n                        └──────┬──────┘\n                               │\n                    ┌──────────▼──────────┐\n                    │   应用层 (Service)    │\n                    │   读写分离 + 缓存策略  │\n                    └──┬───────────────┬──┘\n                       │               │\n              ┌────────▼───┐    ┌─────▼─────┐\n              │  Redis     │    │  MySQL    │\n              │  (缓存层)  │    │ (主存储)  │\n              │            │    │           │\n              │ 热点列表    │    │ 笔记CRUD  │\n              │ 计数器     │    │ 类型关联   │\n              │ 会话      │    │ 事务操作   │\n              └────────────┘    └───────────┘\n```",
+    "follow_up": [
+      "如何保证 MySQL 和 Redis 的数据一致性？",
+      "缓存击穿、缓存穿透、缓存雪崩怎么解决？",
+      "MySQL 的复合索引和 Redis 的 ZSet 各自适合什么查询？",
+      "什么场景下 Redis 也可以做主存储？（如纯计数场景）"
+    ],
+    "feynman": {
+      "essence": "笔记类型数据有关联关系、需要复杂查询和事务保证，所以主存储用MySQL。Redis只做缓存和计数。当需要范围查询、多表JOIN、事务一致性时必须用MySQL。",
+      "analogy": "MySQL像图书馆（有分类目录、能按条件搜书、借还书有记录），Redis像你桌上的书架（放常看的书拿取快但容量有限、不适合做正式档案）。需要查「某月所有视频笔记按点赞排序」这种复杂操作，只能去图书馆。",
+      "key_points": [
+        "关联数据+复杂查询→MySQL主存储",
+        "Redis做缓存/计数/排行榜，不做主存储",
+        "必须用MySQL：范围查询、多表JOIN、事务一致性、精确聚合",
+        "正确架构：MySQL主存+Redis缓存，保证最终一致性",
+        "Redis内存成本是磁盘的100倍以上"
+      ]
+    },
+    "first_principle": {
+      "problem": "不同数据存储引擎有根本性的能力差异。如何根据数据特征（关联性、查询复杂度、一致性要求、读写比例）选择正确的存储方案？",
+      "axioms": [
+        "关系数据库的核心价值是关系（关联查询）+ ACID（事务一致性）",
+        "内存数据库的核心价值是速度（O(1)读写）但牺牲了复杂查询能力",
+        "CAP理论：分布式环境下一致性(C)和可用性(A)不可兼得",
+        "缓存模式是空间换时间：用内存存储热数据加速访问"
+      ],
+      "rebuild": "从数据存储需求出发：数据有关联关系和复杂查询→必须用MySQL；有高速读写需求→加Redis缓存层；有事务要求→MySQL事务保证。两者不是替代关系而是互补关系，通过Cache-Aside模式协作"
+    },
+    "images": []
+  },
+  {
+    "id": "note-xhs-db-012",
+    "category": "database",
+    "subcategory": "MySQL优化",
+    "difficulty": "L5",
+    "tags": [
+      "分库分表",
+      "分片键",
+      "ShardingSphere",
+      "水平拆分",
+      "分布式事务"
+    ],
+    "question": "分库分表设计、分片键如何选择？（华为od Java二面）",
+    "answer": "## 一、为什么要分库分表？\n\n```\n单表性能瓶颈：\n  - 数据量 > 1000万行 → B+树层数从3层→4层，IO增加\n  - 写入QPS > 5000 → 单库连接数/IO打满\n  - 单表文件 > 50GB → DDL变更锁表时间长\n\n垂直拆分：                     水平拆分：\n┌─────────┐                  ┌──────┐ ┌──────┐ ┌──────┐\n│  Order   │                  │DB_0   │ │DB_1   │ │DB_2   │\n│  Table   │                  │order_0│ │order_1│ │order_2│\n│(50+字段)  │  ──→             │       │ │       │ │       │\n└────┬────┘                  │user_0 │ │user_1 │ │user_2 │\n     │                        └──────┘ └──────┘ └──────┘\n     ▼\n┌─────────┐  ┌──────────┐\n│ Order    │  │OrderItem │   每个库表结构相同\n│ (核心)   │  │(明细)     │   数据按分片键分散\n└─────────┘  └──────────┘\n```\n\n## 二、分片键选择（核心考点）\n\n### 选择原则\n\n| 原则 | 说明 |\n|------|------|\n| **高基数** | 分片键取值范围大，数据分布均匀 |\n| **查询频率** | 大部分查询条件包含此字段 |\n| **不可变** | 值不随时间变化，避免数据迁移 |\n| **单调性** | 避免热点（如自增ID可能集中在最后一个分片） |\n\n### 常见分片键对比\n\n```\n1. user_id（推荐⭐）\n   ✅ 大部分查询带userId（我的订单、我的文章）\n   ✅ 高基数，分布均匀\n   ❌ 不带userId的查询需要广播所有分片\n\n2. order_id（含userId编码）\n   ✅ orderId = timestamp + userId_hash + seq\n   ✅ 订单查询直接定位\n   ❌ 设计复杂\n\n3. create_time（不推荐）\n   ❌ 热点问题：最新数据集中在最后一个分片\n   ❌ 范围查询仍需跨分片\n\n4. hash(user_id) % N\n   ✅ 数据均匀分布\n   ❌ 扩容时需要重新hash迁移数据（一致性Hash可缓解）\n```\n\n### 分片策略\n\n```\n┌─────────────────────────────────────────┐\n│           分片算法                        │\n├──────────────┬──────────────────────────┤\n│  Range分片    │ id: 1-1000→DB0          │\n│  (范围)       │ id: 1001-2000→DB1       │\n│               │ ✅范围查询友好            │\n│               │ ❌可能热点               │\n├──────────────┼──────────────────────────┤\n│  Hash分片     │ hash(userId) % 4 → DB0-3│\n│  (哈希)       │ ✅分布均匀               │\n│               │ ❌扩容需迁移              │\n├──────────────┼──────────────────────────┤\n│  一致性Hash   │ 虚拟节点环               │\n│  (Consistent)│ ✅扩容只影响相邻节点      │\n│               │ ❌实现复杂               │\n└──────────────┴──────────────────────────┘\n```\n\n## 三、分库分表带来的问题\n\n### 1. 跨库 JOIN 不可用\n\n```java\n// ❌ 无法跨库JOIN\nSELECT o.*, u.name FROM order_0 o JOIN user_1 u ON o.uid = u.id;\n\n// ✅ 解决方案：\n// 方案A：应用层组装（分别查询再合并）\nList<Order> orders = orderMapper.selectByUid(uid);\nList<Long> uids = orders.stream().map(Order::getUid).collect();\nList<User> users = userMapper.selectByIds(uids);\n// 手动组装\n\n// 方案B：宽表冗余（订单表冗余存储用户名）\n// 方案C：Elasticsearch做联合查询\n```\n\n### 2. 分布式事务\n\n```java\n// ❌ 单库事务失效\n// DB0: INSERT INTO order_0 ...\n// DB1: UPDATE stock_1 ... \n\n// ✅ 解决方案：\n// 1. Seata AT模式（最终一致性，自动补偿）\n// 2. TCC（Try-Confirm-Cancel）\n// 3. 本地消息表 + MQ重试（最终一致性）\n// 4. Saga模式（长事务）\n```\n\n### 3. 全局唯一ID\n\n```\n分库后自增ID会冲突，需要全局ID方案：\n\n1. Snowflake雪花算法（推荐⭐）\n   │ 1bit符号位 │ 41bit时间戳 │ 10bit机器ID │ 12bit序列号 │\n   ✅ 趋势递增、不依赖DB、高性能\n   ❌ 时钟回拨问题\n\n2. 号段模式（Leaf-Segment）\n   ✅ 简单可靠、ID递增\n   ❌ 依赖DB、有波峰风险\n\n3. Redis INCR\n   ✅ 简单\n   ❌ 依赖Redis可用性、ID不连续\n```\n\n### 4. 分页查询\n\n```\n-- ❌ OFFSET分页需要跨库合并\nSELECT * FROM order LIMIT 10000, 20;\n-- 需要每个分片都查10020条再全局排序取20条\n\n-- ✅ 解决方案：\n-- 1. 禁止深度分页（限制最大页数）\n-- 2. 游标分页（WHERE id > last_id LIMIT 20）\n-- 3. ES辅助查询\n```\n\n## 四、主流中间件对比\n\n| 中间件 | 类型 | 特点 |\n|--------|------|------|\n| **ShardingSphere-JDBC** | Client端 | 无Proxy开销，Java原生，支持事务 |\n| **ShardingSphere-Proxy** | Proxy端 | 多语言支持，透明代理 |\n| **MyCat** | Proxy端 | 老牌方案，社区维护减少 |\n| **Vitess** | Proxy端 | YouTube出品，云原生 |\n\n## 五、分库分表 vs 其他方案\n\n```\n问题：单表数据量过大\n     │\n     ├── 先尝试：读写分离 + 索引优化（< 1000万行）\n     │\n     ├── 再尝试：冷热分离（历史表归档）\n     │\n     ├── 再尝试：分区表（PARTITION BY RANGE）\n     │\n     └── 最后：分库分表（> 5000万行，QPS > 10000）\n```",
+    "follow_up": [
+      "ShardingSphere-JDBC 和 Proxy 模式怎么选？",
+      "Snowflake 时钟回拨问题怎么解决？",
+      "分库分表后如何做数据迁移（双写方案）？",
+      "一致性 Hash 和普通 Hash 分片在扩容时的区别？"
+    ],
+    "feynman": {
+      "essence": "分库分表就是把一张大表按某个字段（分片键）拆到多个数据库的多张表中。分片键选得好，大部分查询都能定位到单个分片；选不好，查询要广播到所有分片。",
+      "analogy": "想象一个巨型图书馆书太多放不下，分成4个分馆。分片键就是「读者卡号末位」（0-3分别去不同分馆）。查「我的借书记录」直接去对应分馆（快），但查「全馆最热门的书」需要4个分馆都查一遍再汇总（慢）。",
+      "key_points": [
+        "垂直拆分按业务/字段拆，水平拆分按数据行拆",
+        "分片键选user_id（高基数+查询频率高+不可变）",
+        "分片算法：Range(范围友好但可能热点)、Hash(均匀但扩容难)",
+        "带来的问题：跨库JOIN失效、分布式事务、全局ID、分页",
+        "先读写分离→冷热分离→分区表→最后才分库分表"
+      ]
+    },
+    "first_principle": {
+      "problem": "单机数据库的存储容量和并发能力有物理上限，如何通过水平扩展突破瓶颈？",
+      "axioms": [
+        "B+树索引在单表数据量超过一定阈值后性能非线性下降",
+        "分布式系统的核心问题是数据分区(partitioning)和数据复制(replication)",
+        "分片键决定数据分布，数据分布决定查询效率",
+        "分布式事务代价远高于单机事务，应尽量避免跨分片事务"
+      ],
+      "rebuild": "从数据增长瓶颈出发：单表→分区表(同机分块)→分库分表(多机分片)。关键是选对分片键让大部分查询局部化，同时用分布式事务/全局ID/ES辅助等手段解决跨分片问题。分库分表是最后的手段而非首选"
+    },
+    "images": []
   }
 ]

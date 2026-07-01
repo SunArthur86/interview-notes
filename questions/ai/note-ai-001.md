@@ -15,10 +15,14 @@ feynman:
   - 除以根号d_k后方差=1
   - 防止softmax饱和
   - 保证梯度有效传播
-first_principle:
+first_principle: null
 follow_up:
 - 为什么是根号d_k不是d_k？
 - Multi-Head Attention中每个head的d_k怎么算？
+memory_points:
+- 因为点积方差随$d_k$线性增长，导致Softmax进入饱和区引发梯度消失，所以需除以根号$d_k$。
+- 除以根号$d_k$刚好使点积方差缩放回1，而除以$d_k$会导致区分度不足退化为均值。
+- 口诀：根号缩放保方差，大维不惧梯度降。
 ---
 
 # Self-Attention 为什么除以根号 d_k？
@@ -226,3 +230,10 @@ for d_k in d_k_values:
 4. **Llama / GPT-4 等模型的选择：** 现代大模型（GPT、LLaMA、Qwen 等）无一例外都保留了 $\sqrt{d_k}$ 缩放，说明这个设计经受住了大规模实践的检验。但一些变体如 MQA（Multi-Query Attention）、GQA（Grouped-Query Attention）虽然改变了 K/V 的 head 结构，但缩放因子仍然是 $\sqrt{d_k}$。
 
 5. **从第一性原理理解：** 面试官追问深层问题时，可以从信息论角度补充——Softmax 温度参数和 $\sqrt{d_k}$ 缩放在数学上等价，都是调节输出分布的"锐度"。注意力分布的熵应在适当范围内：太尖锐（退化为 hard attention）则梯度差，太平坦（退化为 mean pooling）则表达力弱。
+
+## 记忆要点
+
+- 因为点积方差随$d_k$线性增长，导致Softmax进入饱和区引发梯度消失，所以需除以根号$d_k$。
+- 除以根号$d_k$刚好使点积方差缩放回1，而除以$d_k$会导致区分度不足退化为均值。
+- 口诀：根号缩放保方差，大维不惧梯度降。
+

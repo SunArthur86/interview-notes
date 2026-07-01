@@ -13,15 +13,21 @@ feynman:
   essence: 手动设计Skill=精确控制每个能力的行为，自动生成Skill=快但不稳定。生产环境优先手动，原型阶段可以用自动。
   analogy: 手动设计Skill像请专业厨师写菜谱（精确可控），Skill Creator像让AI生成菜谱（快但可能味道奇怪，需要试菜调整）。
   key_points:
-  - '手动:可控/安全/可维护'
-  - '自动:快但不稳定/难调试'
+  - 手动:可控/安全/可维护
+  - 自动:快但不稳定/难调试
   - 生产环境优先手动
   - Skill Creator适合原型验证
-first_principle:
+first_principle: null
 follow_up:
 - Skill Creator具体是什么？——让LLM根据自然语言描述自动生成工具定义和代码
 - 怎么评估Skill质量？——调用成功率+执行时间+用户满意度+错误率
 - Skill和Function Calling什么关系？——Skill封装了多个Tools+Prompt+流程
+memory_points:
+- 层级定位：Skill是高于Tool、低于Agent的复合能力工作流编排。
+- 对比区分：Function是单次签名，Tool是单一能力，Skill是含多步异常处理的完整流程。
+- 设计原则：单一职责（只做一件事）与明确边界（严格的输入输出Schema）。
+- 不用Creator原因：自动生成缺乏对边界case处理与异常降级的工程级可控性。
+- 手设流程：需求分析→Schema定义→Prompt工程→工具依赖→异常测试。
 ---
 
 # 【腾讯面经】Skill 怎么设计的？为什么不用 Skill Creator（自动生成工具）？
@@ -416,3 +422,12 @@ def evaluate_skill(skill: BaseSkill, test_cases: list) -> SkillMetrics:
 4. **生产环境的 Skill 管理平台：** 大厂面试会追问"100+ Skill 怎么管理"。需要考虑：Skill 注册中心、版本管理、灰度发布、调用监控、自动降级、权限审计。这已经是一个完整的工程系统。
 
 5. **面试加分点：** 提到 MCP（Model Context Protocol）——Skill 的工具依赖声明可以基于 MCP 标准化，实现跨 Agent 框架的 Skill 复用。这是 Agent 生态的发展方向。
+
+## 记忆要点
+
+- 层级定位：Skill是高于Tool、低于Agent的复合能力工作流编排。
+- 对比区分：Function是单次签名，Tool是单一能力，Skill是含多步异常处理的完整流程。
+- 设计原则：单一职责（只做一件事）与明确边界（严格的输入输出Schema）。
+- 不用Creator原因：自动生成缺乏对边界case处理与异常降级的工程级可控性。
+- 手设流程：需求分析→Schema定义→Prompt工程→工具依赖→异常测试。
+

@@ -17,8 +17,8 @@ feynman:
   - 'SFT 阶段: (指令+工具schema, 正确调用JSON) 监督微调'
   - 'RLHF 辅助: 偏好数据(正确调用>错误调用)优化选最优'
   - '本质: 自然语言→结构化意图 的映射，通过SFT+RLHF固化进权重'
-  - 'JSON Schema 约束生成空间到合法结构'
-  - '推理时用 constrained decoding 强制合法JSON'
+  - JSON Schema 约束生成空间到合法结构
+  - 推理时用 constrained decoding 强制合法JSON
 first_principle:
   essence: 结构化输出 = 约束生成空间
   derivation: 自然语言空间无限 → JSON Schema 约束到合法结构 → SFT 学会约束 → RLHF 在约束内选最优 → 推理时 constrained decoding 强制合法
@@ -27,6 +27,12 @@ follow_up:
 - Structured Output（response_format json_schema）和 Function Calling 区别？
 - Constrained Decoding（如 outlines/guidance）怎么实现？
 - 没有 SFT 的小模型怎么做 Function Calling？
+memory_points:
+- 本质澄清：FC并非理解语义，而是学会了将自然语言按schema映射为结构化JSON
+- SFT的作用：用海量问答对数据，让模型学会合法JSON格式与参数字段抽取
+- RLHF的作用：在SFT基础上，用偏好排序优化参数质量（如绝对日期优于相对词）
+- 双保险机制：模型侧靠SFT学格式，推理侧靠约束解码(Constrained Decoding)兜底
+- 底层实现：约束解码常将JSON结构转化为有限状态机(FSM)限制token生成空间
 ---
 
 # 【某讯面经】Function Calling 底层原理：模型如何学会输出结构化工具参数？SFT/RLHF 起什么作用
@@ -158,3 +164,12 @@ OpenAI/Anthropic/混元 的 function calling 接口：
 - **MCP（Model Context Protocol）**：标准化工具描述和发现，让 Function Calling 跨厂商复用
 - **Parallel Function Calling**：一次生成多个 tool_call 并行执行（GPT-4 Turbo 支持）
 - **Multi-turn Function Calling**：工具返回结果后，模型继续调下一个工具（ReAct 的基础）
+
+## 记忆要点
+
+- 本质澄清：FC并非理解语义，而是学会了将自然语言按schema映射为结构化JSON
+- SFT的作用：用海量问答对数据，让模型学会合法JSON格式与参数字段抽取
+- RLHF的作用：在SFT基础上，用偏好排序优化参数质量（如绝对日期优于相对词）
+- 双保险机制：模型侧靠SFT学格式，推理侧靠约束解码(Constrained Decoding)兜底
+- 底层实现：约束解码常将JSON结构转化为有限状态机(FSM)限制token生成空间
+

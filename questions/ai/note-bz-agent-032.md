@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Tool Use
-  - Function Calling
-  - 工具调用
+- B站面经
+- Tool Use
+- Function Calling
+- 工具调用
 feynman:
   essence: LLM工具调用=让模型输出结构化的"调用指令"(工具名+参数)，程序解析后执行真实工具，再把结果喂回模型。本质是"LLM决策+代码执行"的协作。
   analogy: 像医生开处方——医生(LLM)写药方(调用指令)，药师(程序)配药执行，病人吃药后反馈(结果)。
   first_principle: LLM只能生成文本，不能执行代码。工具调用通过"LLM生成指令→程序执行→结果回传"的循环，让LLM间接获得执行能力。
   key_points:
-    - 流程：LLM生成tool_call → 程序执行 → 结果回传 → LLM继续
-    - 两种实现：原生Function Calling / Prompt工程
-    - 关键：工具描述(JSON Schema)+参数校验+错误处理
-    - 安全：沙箱执行+权限控制
+  - 流程：LLM生成tool_call → 程序执行 → 结果回传 → LLM继续
+  - 两种实现：原生Function Calling / Prompt工程
+  - 关键：工具描述(JSON Schema)+参数校验+错误处理
+  - 安全：沙箱执行+权限控制
 first_principle:
   essence: LLM是文本生成器，工具调用通过结构化输出+外部执行，突破LLM的能力边界。
-  derivation: 'LLM不能直接调API/查数据库/执行代码。但LLM能理解工具描述并生成结构化指令。程序解析指令→执行→返回结果→LLM基于结果继续。这赋予LLM"间接行动"能力。'
+  derivation: LLM不能直接调API/查数据库/执行代码。但LLM能理解工具描述并生成结构化指令。程序解析指令→执行→返回结果→LLM基于结果继续。这赋予LLM"间接行动"能力。
   conclusion: 工具调用 = LLM决策（生成指令） + 程序执行（真实效果） + 结果反馈（闭环）
 follow_up:
-  - Function Calling和ReAct什么关系？——Function Calling是ReAct的"Action"的工程实现
-  - 工具调用失败怎么办？——重试/换工具/降级/告知用户
-  - 怎么保证参数正确？——JSON Schema校验+类型检查+默认值
+- Function Calling和ReAct什么关系？——Function Calling是ReAct的"Action"的工程实现
+- 工具调用失败怎么办？——重试/换工具/降级/告知用户
+- 怎么保证参数正确？——JSON Schema校验+类型检查+默认值
+memory_points:
+- 核心机制闭环：LLM决策生成tool_call → 程序解析并真实执行 → 结果作为tool角色回传 → LLM总结生成最终回复
+- 推荐原生Function Calling：大模型原生输出结构化JSON，参数提取稳定可靠
+- 对比Prompt硬解：对于不支持FC的旧模型，只能通过提示词约束并正则强行解析输出
+- 面试一句话：Tool Use本质是赋予了LLM调用外部API与动态获取实时数据的能力
 ---
 
 # LLM 工具调用（Tool Use）机制是什么？如何实践？
@@ -238,3 +243,11 @@ Function Calling（技术实现）：
 1. **四步流程**：决策→执行→回传→继续，讲清闭环
 2. **原生 vs Prompt**：优先用原生 FC（更准更稳），不支持才用 prompt 工程
 3. **错误回传**：工具失败时把错误信息回传给 LLM，让它自主决定重试/换方案——这是"智能"的体现
+
+## 记忆要点
+
+- 核心机制闭环：LLM决策生成tool_call → 程序解析并真实执行 → 结果作为tool角色回传 → LLM总结生成最终回复
+- 推荐原生Function Calling：大模型原生输出结构化JSON，参数提取稳定可靠
+- 对比Prompt硬解：对于不支持FC的旧模型，只能通过提示词约束并正则强行解析输出
+- 面试一句话：Tool Use本质是赋予了LLM调用外部API与动态获取实时数据的能力
+

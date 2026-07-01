@@ -4,27 +4,32 @@ difficulty: L2
 category: database
 subcategory: Redis
 tags:
-  - 字节
-  - 面经
-  - Redis
-  - ZSet
+- 字节
+- 面经
+- Redis
+- ZSet
 feynman:
   essence: ZSet大数据量用HashTable+SkipList，小数据量用ListPack压缩存储省内存
-  analogy: '就像新华字典——HashTable是拼音索引(快速查字)，SkipList是页码排序(按序浏览)，薄字典用压缩排版(ListPack省空间)'
-  first_principle: '有序集合需要同时满足O(1)精确查找和O(logN)范围查询，单一数据结构无法兼顾，需要组合'
+  analogy: 就像新华字典——HashTable是拼音索引(快速查字)，SkipList是页码排序(按序浏览)，薄字典用压缩排版(ListPack省空间)
+  first_principle: 有序集合需要同时满足O(1)精确查找和O(logN)范围查询，单一数据结构无法兼顾，需要组合
   key_points:
-    - HashTable负责member→score的O(1)查找
-    - SkipList负责按score排序和范围查询O(logN)
-    - 小数据量用ListPack(Redis 7.0+)压缩省内存
-    - 数据量超阈值自动升级为HashTable+SkipList
+  - HashTable负责member→score的O(1)查找
+  - SkipList负责按score排序和范围查询O(logN)
+  - 小数据量用ListPack(Redis 7.0+)压缩省内存
+  - 数据量超阈值自动升级为HashTable+SkipList
 first_principle:
   essence: 有序集合需要两种正交查询能力——按member查找和按score范围查找
-  derivation: '只HashTable→无法按score排序。只SkipList→按member查找O(logN)。组合→两种查询都高效'
+  derivation: 只HashTable→无法按score排序。只SkipList→按member查找O(logN)。组合→两种查询都高效
   conclusion: ZSet底层=HashTable(member→score) + SkipList(score排序)，空间换时间
 follow_up:
-  - 'SkipList为什么用多级链表而不是平衡树？'
-  - 'ListPack和ziplist有什么区别？'
-  - 'ZSet的zadd时间复杂度是多少？'
+- SkipList为什么用多级链表而不是平衡树？
+- ListPack和ziplist有什么区别？
+- ZSet的zadd时间复杂度是多少？
+memory_points:
+- 一句话总结：ZSet底层是Hash表加跳表的组合，小数据量下退化用Listpack紧凑存储
+- 双核职责：Hash表负责O(1)快速查分数，跳表负责O(logN)范围排名查询
+- 关键阈值：元素数>128或单元素>64字节时触发底层结构升级（Listpack升级为Hash+跳表）
+- 跳表优势：相较于红黑树，跳表实现更简单，且范围查询直接通过层级链表顺序遍历，天然高效
 ---
 
 # Redis的ZSet底层是怎么实现的？
@@ -156,3 +161,11 @@ Redis作者Antirez选择SkipList的理由：**实现简单 + 范围查询高效 
 2. **编码切换**：知道ListPack和HashTable+SkipList的切换阈值
 3. **SkipList vs B+Tree**：SkipList偏内存(指针跳转)，B+Tree偏磁盘(页组织)
 4. **ListPack进化**：Redis 7.0用ListPack替代了ziplist，解决了级联更新问题
+
+## 记忆要点
+
+- 一句话总结：ZSet底层是Hash表加跳表的组合，小数据量下退化用Listpack紧凑存储
+- 双核职责：Hash表负责O(1)快速查分数，跳表负责O(logN)范围排名查询
+- 关键阈值：元素数>128或单元素>64字节时触发底层结构升级（Listpack升级为Hash+跳表）
+- 跳表优势：相较于红黑树，跳表实现更简单，且范围查询直接通过层级链表顺序遍历，天然高效
+

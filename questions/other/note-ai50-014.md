@@ -4,29 +4,33 @@ difficulty: L2
 category: other
 subcategory: Python
 tags:
-  - 某厂
-  - 面经
-  - Python
-  - 异步编程
-  - asyncio
-  - Agent
+- 某厂
+- 面经
+- Python
+- 异步编程
+- asyncio
+- Agent
 feynman:
-  essence: '异步编程让Agent在等待LLM/工具响应时不阻塞，可以同时处理多个请求或并行调用多个工具'
-  analogy: '就像服务员点餐——同步是等一道菜做完才点下一道(串行)，异步是同时点完所有菜然后等上菜(并发)，厨房(服务器)效率最大化'
-  first_principle: 'Agent的每一步都涉及I/O等待(LLM API调用、数据库查询、Web搜索)，CPU在此期间空闲。异步编程利用这些空闲时间处理其他任务，将I/O等待时间重叠'
+  essence: 异步编程让Agent在等待LLM/工具响应时不阻塞，可以同时处理多个请求或并行调用多个工具
+  analogy: 就像服务员点餐——同步是等一道菜做完才点下一道(串行)，异步是同时点完所有菜然后等上菜(并发)，厨房(服务器)效率最大化
+  first_principle: Agent的每一步都涉及I/O等待(LLM API调用、数据库查询、Web搜索)，CPU在此期间空闲。异步编程利用这些空闲时间处理其他任务，将I/O等待时间重叠
   key_points:
-    - 'asyncio是Python异步编程的标准库'
-    - 'Agent中必须用异步的场景: 并行工具调用、流式输出、多用户并发'
-    - '关键: await是"让出控制权"，不是"等待"'
-    - '注意: CPU密集型任务不适合asyncio，要用多进程'
+  - asyncio是Python异步编程的标准库
+  - 'Agent中必须用异步的场景: 并行工具调用、流式输出、多用户并发'
+  - '关键: await是"让出控制权"，不是"等待"'
+  - '注意: CPU密集型任务不适合asyncio，要用多进程'
 first_principle:
-  essence: 'I/O等待是Agent系统的主要延迟来源，异步编程通过重叠这些等待提升吞吐量'
+  essence: I/O等待是Agent系统的主要延迟来源，异步编程通过重叠这些等待提升吞吐量
   derivation: 'Agent调用3个工具，每个耗时1s。同步: 3×1=3s。异步并行: max(1,1,1)=1s。3倍提速。工具越多，加速比越大'
-  conclusion: 'Agent系统天然适合异步编程，因为其工作负载是I/O密集型(LLM API + 工具调用)'
+  conclusion: Agent系统天然适合异步编程，因为其工作负载是I/O密集型(LLM API + 工具调用)
 follow_up:
-  - 'asyncio和threading在Agent场景下怎么选？'
-  - '异步代码中如何处理异常和超时？'
-  - 'FastAPI为什么天然支持异步？'
+- asyncio和threading在Agent场景下怎么选？
+- 异步代码中如何处理异常和超时？
+- FastAPI为什么天然支持异步？
+memory_points:
+- 因为Agent常遇网络I/O，所以用异步避免串行阻塞，大幅降低总耗时。
+- 核心API：async def定义协程，await挂起等待，asyncio.gather并发调用。
+- 核心场景：并行工具调用提效，流式输出（astream）提升前端交互体验。
 ---
 
 # Python异步编程在Agent开发中的应用
@@ -251,3 +255,10 @@ async def cpu_heavy_correct():
 | 并行10工具 | 10.0s | 1.0s | 10× |
 | 100并发用户 | 排队 | 同时处理 | 100× |
 | LLM流式输出 | 等完整响应 | 逐token返回 | 感知延迟↓90% |
+
+## 记忆要点
+
+- 因为Agent常遇网络I/O，所以用异步避免串行阻塞，大幅降低总耗时。
+- 核心API：async def定义协程，await挂起等待，asyncio.gather并发调用。
+- 核心场景：并行工具调用提效，流式输出（astream）提升前端交互体验。
+

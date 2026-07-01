@@ -24,9 +24,14 @@ first_principle:
   derivation: Policy gradient ∇J = E[∇logπ(a|s)·R]。在序列建模中，每个token是一个动作a_t，前面的所有token是状态s_t。工具返回的observation是由环境（外部API）产生的，不是从π中采样的，因此∇logπ=0，自然不参与梯度。强行加入会让loss计算错误。
   conclusion: Token mask规则=模型生成的token算loss，环境返回的token不算loss，这是Agent RL训练正确性的基础
 follow_up:
-  - 如果工具返回的observation也参与loss会怎样？
-  - 多轮Agent中，reward应该给每一轮还是只给最终结果？
-  - Agent陷入死循环（反复调用同一工具）怎么处理？
+- 如果工具返回的observation也参与loss会怎样？
+- 多轮Agent中，reward应该给每一轮还是只给最终结果？
+- Agent陷入死循环（反复调用同一工具）怎么处理？
+memory_points:
+- 核心口诀：模型生成token算Loss，环境返回observation全Mask掉
+- Agent Loop闭环：模型生成动作→解析工具→环境执行→拼接结果→继续生成
+- Loss Mask设计：因工具结果由系统产生，非模型能力，故必须置为False不参与反传
+- 架构特点：通过上下文拼接把多轮交互展平，形成有监督的连续生成序列
 ---
 
 # 【八股总结】Agentic RL 的 Agent loop 如何运行？哪些 token 参与 loss？
@@ -380,3 +385,11 @@ def agentic_rl_training(model, tools, tasks, reward_model):
 - **ReAct论文**：Reasoning+Acting范式，定义了Agent loop的基本结构
 - **ToolFormer**：Meta的工作，教模型自主学会调用工具
 - **Reinforcement Fine-tuning (RFT)**：OpenAI o1/R1的训练范式，Agentic RL的具体实现
+
+## 记忆要点
+
+- 核心口诀：模型生成token算Loss，环境返回observation全Mask掉
+- Agent Loop闭环：模型生成动作→解析工具→环境执行→拼接结果→继续生成
+- Loss Mask设计：因工具结果由系统产生，非模型能力，故必须置为False不参与反传
+- 架构特点：通过上下文拼接把多轮交互展平，形成有监督的连续生成序列
+

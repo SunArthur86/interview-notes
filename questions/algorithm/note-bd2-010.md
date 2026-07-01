@@ -4,30 +4,35 @@ difficulty: L3
 category: algorithm
 subcategory: 设计
 tags:
-  - 字节
-  - 面经
-  - 算法
-  - 设计题
-  - 哈希表
-  - 双向链表
-  - LeetCode146
+- 字节
+- 面经
+- 算法
+- 设计题
+- 哈希表
+- 双向链表
+- LeetCode146
 feynman:
-  essence: 'HashMap提供O(1)查找，双向链表维护访问顺序，两者结合实现O(1)的get和put'
-  analogy: '就像书架上找书——HashMap是书名目录(O(1)找到位置)，双向链表是按"最近阅读"排列的书架。每次看书就把它移到最前面，满了就丢最后那本'
+  essence: HashMap提供O(1)查找，双向链表维护访问顺序，两者结合实现O(1)的get和put
+  analogy: 就像书架上找书——HashMap是书名目录(O(1)找到位置)，双向链表是按"最近阅读"排列的书架。每次看书就把它移到最前面，满了就丢最后那本
   first_principle: 'LRU(Least Recently Used)要求: (1) O(1)查找 (2) O(1)更新访问顺序。HashMap解决查找，双向链表解决顺序维护'
   key_points:
-    - 'HashMap: key→链表节点，O(1)查找'
-    - '双向链表: 维护访问顺序，最近访问在head，最久未访问在tail'
-    - 'get: 查HashMap→移到链表head→返回值'
-    - 'put: 存在则更新+移到head，不存在则新建+判断容量淘汰tail'
+  - 'HashMap: key→链表节点，O(1)查找'
+  - '双向链表: 维护访问顺序，最近访问在head，最久未访问在tail'
+  - 'get: 查HashMap→移到链表head→返回值'
+  - 'put: 存在则更新+移到head，不存在则新建+判断容量淘汰tail'
 first_principle:
-  essence: 'LRU的数据结构设计 = O(1)查找 + O(1)顺序维护'
+  essence: LRU的数据结构设计 = O(1)查找 + O(1)顺序维护
   derivation: '单独用HashMap: 查找O(1)但无法维护顺序。单独用链表: 顺序O(1)但查找O(n)。HashMap+双向链表: 两者都O(1)'
-  conclusion: 'HashMap+双向链表是LRU的最优数据结构组合'
+  conclusion: HashMap+双向链表是LRU的最优数据结构组合
 follow_up:
-  - '为什么用双向链表而不是单向链表？'
-  - '如何实现LFU(最不经常使用)缓存？'
-  - 'Redis的LRU淘汰策略和这个实现有什么区别？'
+- 为什么用双向链表而不是单向链表？
+- 如何实现LFU(最不经常使用)缓存？
+- Redis的LRU淘汰策略和这个实现有什么区别？
+memory_points:
+- 核心结构：HashMap + 双向链表。因为要O(1)读写，所以用Map查位置，用链表保顺序。
+- 顺序维护：链表头部存最近访问，尾部存最久未使用（LRM）。
+- 操作口诀：读/写先移至表头，容量满则删尾结点。
+- 必须用虚拟头尾：因为能避免空指针判断，所以大幅简化边界处理。
 ---
 
 # 手撕：力扣146.LRU缓存（带输入输出版本）
@@ -219,3 +224,11 @@ def delete_doubly(node):
 | LFU | 访问频率 | 保留真正热点 | 新数据容易被淘汰(冷启动问题) |
 | LRU-K | 最近K次访问 | 平衡 | 实现复杂 |
 | ARC | 自适应LRU+LFU | 自动调优 | 实现最复杂 |
+
+## 记忆要点
+
+- 核心结构：HashMap + 双向链表。因为要O(1)读写，所以用Map查位置，用链表保顺序。
+- 顺序维护：链表头部存最近访问，尾部存最久未使用（LRM）。
+- 操作口诀：读/写先移至表头，容量满则删尾结点。
+- 必须用虚拟头尾：因为能避免空指针判断，所以大幅简化边界处理。
+

@@ -25,9 +25,14 @@ first_principle:
   derivation: SGD只用当前梯度，方差大、震荡严重，但能找到flat minima（泛化好）。Adam用动量平滑梯度方差，用自适应学习率加速稀疏参数更新，收敛快但易陷sharp minima（泛化差）。权重衰减（正则化）本应约束参数大小，但Adam的自适应学习率破坏了L2正则的尺度一致性——AdamW通过解耦修复了这个bug。
   conclusion: 大模型训练=AdamW（收敛快+正则正确），传统CV任务偶尔用SGD（追求泛化极限）
 follow_up:
-  - 为什么Adam有时泛化不如SGD？sharp/flat minima理论
-  - 学习率warmup为什么对Adam很重要？
-  - Lion、Adafactor等新优化器相比AdamW有什么改进？
+- 为什么Adam有时泛化不如SGD？sharp/flat minima理论
+- 学习率warmup为什么对Adam很重要？
+- Lion、Adafactor等新优化器相比AdamW有什么改进？
+memory_points:
+- 演进脉络：SGD 加惯性变 Momentum，再加自适应学习率演进至 Adam（动量+自适应）。
+- Adam机制：维护一阶动量定方向，二阶动量做自适应步长，并用偏差修正解决冷启动偏小问题。
+- 步长特性：历史梯度大则缩小步长防过拟合，梯度小则放大步长，等效给每个参数专属学习率。
+- 为何用 AdamW：修复了 Adam 将权重衰减与梯度耦合的 Bug，实现真正的解耦权重衰减。
 ---
 
 # 【华为面经】优化器 Adam 与 SGD 的本质区别？大模型为什么用 AdamW？
@@ -314,3 +319,11 @@ optimizer_llm = torch.optim.AdamW(
 - **Lion优化器**（Google 2023）：用符号函数 `sign(m_t)` 替代 `m_t/√v_t`，省去二阶动量v，显存减半，效果相当
 - **Sophia**（Stanford 2023）：用Hessian对角线估计替代二阶动量，理论上更接近二阶方法，收敛更快
 - **学习率与batch size的关系**：大batch训练需线性放大学习率（sqrt scaling rule for Adam）
+
+## 记忆要点
+
+- 演进脉络：SGD 加惯性变 Momentum，再加自适应学习率演进至 Adam（动量+自适应）。
+- Adam机制：维护一阶动量定方向，二阶动量做自适应步长，并用偏差修正解决冷启动偏小问题。
+- 步长特性：历史梯度大则缩小步长防过拟合，梯度小则放大步长，等效给每个参数专属学习率。
+- 为何用 AdamW：修复了 Adam 将权重衰减与梯度耦合的 Bug，实现真正的解耦权重衰减。
+

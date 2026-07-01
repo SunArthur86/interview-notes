@@ -15,10 +15,10 @@ feynman:
   first_principle: 大模型训练的瓶颈是显存。DeepSpeed 的本质是"消除冗余"——传统数据并行每卡存完整副本（冗余），ZeRO 把优化器/梯度/参数分片到各卡，消除冗余让总显存只受 GPU 数限制。
   key_points:
   - 'ZeRO 三阶段: 优化器状态分片(Z1)+梯度分片(Z2)+参数分片(Z3)'
-  - 'Z1省4倍显存，Z2再省一点，Z3让单卡只存1/N参数'
+  - Z1省4倍显存，Z2再省一点，Z3让单卡只存1/N参数
   - '激活检查点: 用算力换显存(只存部分激活，反向时重算)'
   - 'Offload: 卸载到CPU/NVMe进一步省显存(慢但能训)'
-  - '配合Megatron做张量并行+流水线并行(3D并行)'
+  - 配合Megatron做张量并行+流水线并行(3D并行)
 first_principle:
   essence: DeepSpeed = 消除数据并行的冗余
   derivation: 数据并行每卡存完整副本 → 显存冗余 → ZeRO 分片消除冗余 → 显存随GPU数线性降 → 大模型可训
@@ -27,6 +27,12 @@ follow_up:
 - ZeRO-3 的通信开销大不大？
 - 激活检查点的"重算"代价多大？
 - ZeRO 和 FSDP 什么关系？
+memory_points:
+- DeepSpeed核心：基于数据并行，通过ZeRO分片解决大模型显存冗余
+- ZeRO三阶段口诀：Z1切优化器，Z2加切梯度，Z3全切（含参数）
+- ZeRO-3代价：显存随卡数线性降，但前向反向通信开销巨大
+- 激活检查点：用算力换显存，只存部分层，反向重算降显存
+- RLHF扩展：多模型共存显存爆炸，靠ZeRO-3+CPU卸载解决
 ---
 
 # 【阶跃星辰面经】对 DeepSpeed 框架有没有了解
@@ -156,3 +162,12 @@ RLHF 训练要同时驻留多个模型：
 - **FSDP（Fully Sharded Data Parallel）**：PyTorch 原生的 ZeRO-3 实现，逐渐成为标准
 - **Megatron-LM**：NVIDIA 的张量并行库，和 DeepSpeed 配合做 3D 并行
 - **ZeRO 的通信复杂度**：Z1 额外 all-reduce（梯度），Z3 额外 all-gather（参数），Z3 通信最重
+
+## 记忆要点
+
+- DeepSpeed核心：基于数据并行，通过ZeRO分片解决大模型显存冗余
+- ZeRO三阶段口诀：Z1切优化器，Z2加切梯度，Z3全切（含参数）
+- ZeRO-3代价：显存随卡数线性降，但前向反向通信开销巨大
+- 激活检查点：用算力换显存，只存部分层，反向重算降显存
+- RLHF扩展：多模型共存显存爆炸，靠ZeRO-3+CPU卸载解决
+

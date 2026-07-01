@@ -4,27 +4,32 @@ difficulty: L2
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Agent
-  - 概念
-  - LLM
+- B站面经
+- Agent
+- 概念
+- LLM
 feynman:
   essence: LLM是被动的"知识引擎"，Agent是主动的"行动派"——给LLM装上规划、记忆、工具三大外挂，让它从"只会说"变成"能干活"。
   analogy: LLM像一本百科全书（你问它答），Agent像一个员工（你给目标，它自己查资料、定计划、用工具、交付结果）。
   first_principle: LLM是状态less的函数（输入→输出），Agent是有状态的循环系统（感知→规划→行动→观察→再规划）。
   key_points:
-    - LLM被动应答，Agent主动达成目标
-    - Agent三大核心能力：规划+记忆+工具
-    - Agent是循环系统，LLM是其中一环
-    - 关系：Agent以LLM为大脑，外挂记忆和工具
+  - LLM被动应答，Agent主动达成目标
+  - Agent三大核心能力：规划+记忆+工具
+  - Agent是循环系统，LLM是其中一环
+  - 关系：Agent以LLM为大脑，外挂记忆和工具
 first_principle:
   essence: Agent本质是"LLM+控制循环+外部能力"的闭环系统。
-  derivation: '纯LLM：f(prompt)→text，无状态无副作用。Agent：引入循环（while not done）、记忆（读写外部状态）、工具（调用API产生真实效果），把LLM从"生成器"升级为"决策器"。'
+  derivation: 纯LLM：f(prompt)→text，无状态无副作用。Agent：引入循环（while not done）、记忆（读写外部状态）、工具（调用API产生真实效果），把LLM从"生成器"升级为"决策器"。
   conclusion: Agent = LLM（决策核心） + Memory（状态） + Tools（执行） + Loop（控制流）
 follow_up:
-  - Agent和Workflow/工作流有什么区别？——工作流是固定路径，Agent是动态决策
-  - 一个LLM加一个检索算Agent吗？——不算，缺少自主规划和工具调用闭环
-  - LLM的哪些能力是Agent的基础？——推理、指令遵循、工具调用、自我反思
+- Agent和Workflow/工作流有什么区别？——工作流是固定路径，Agent是动态决策
+- 一个LLM加一个检索算Agent吗？——不算，缺少自主规划和工具调用闭环
+- LLM的哪些能力是Agent的基础？——推理、指令遵循、工具调用、自我反思
+memory_points:
+- 一句话定义：Agent是以LLM为大脑，具备感知、规划、记忆、工具使用能力的自主系统
+- 主动性对比：LLM是被动单步应答，而Agent是主动达成多步目标
+- 状态与行动：LLM无状态且只输出文本，而Agent有跨轮记忆且能调用工具产生真实效果
+- 依赖关系：因为LLM是Agent的决策大脑，所以LLM是Agent的必要组件，但LLM≠Agent
 ---
 
 # 什么是 AI Agent？它和单纯的大模型（LLM）有什么区别和关系？
@@ -130,3 +135,11 @@ action = llm.decide(context, tools)  # → book_ticket(flight=CA123)
 1. **强调"自主性"**：Agent 的核心是 autonomy——给定目标后自主完成，而非逐步指令
 2. **区分 Agentic 程度**：Workflow（固定流程）→ Agent（动态决策）→ Autonomous Agent（完全自主），不是二元的
 3. **提 Anthropic 的定义**：Augmented LLM + Tools + Loop，简洁权威
+
+## 记忆要点
+
+- 一句话定义：Agent是以LLM为大脑，具备感知、规划、记忆、工具使用能力的自主系统
+- 主动性对比：LLM是被动单步应答，而Agent是主动达成多步目标
+- 状态与行动：LLM无状态且只输出文本，而Agent有跨轮记忆且能调用工具产生真实效果
+- 依赖关系：因为LLM是Agent的决策大脑，所以LLM是Agent的必要组件，但LLM≠Agent
+

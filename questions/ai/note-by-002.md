@@ -15,11 +15,11 @@ feynman:
   analogy: 像用旧地图（旧策略）采样的路况数据规划新路线（新策略）——新路线和旧路线偏离的地方（分布差异），数据要按"新旧路况匹配度"加权（重要性权重）。token 级就是每个路口单独算匹配度，比整条路一起算更精确。
   first_principle: RL 训练时策略在变，采样用的是旧策略 π_old，估梯度用的是新策略 π_new。两者分布不同导致估计有偏。重要性采样用 w=π_new/π_old 修正权重，无偏估计 E_old[w·f]=E_new[f]。token 级是逐 token 算 w，比序列级（整条 w）更精细。
   key_points:
-  - 'token级ratio = π_new(token|context) / π_old(token|context)'
+  - token级ratio = π_new(token|context) / π_old(token|context)
   - '作用: 修正off-policy偏差（采样用π_old，训练用π_new）'
   - '数学: E_old[ratio·f] = E_new[f]（重要性采样无偏）'
-  - 'token级比序列级精细（长序列token贡献被独立校正）'
-  - 'PPO用clip防ratio爆炸，GRPO继承此机制'
+  - token级比序列级精细（长序列token贡献被独立校正）
+  - PPO用clip防ratio爆炸，GRPO继承此机制
 first_principle:
   essence: token 级重要性采样 = off-policy 偏差的逐 token 修正
   derivation: 策略变化 → 采样分布(π_old)≠当前分布(π_new) → 直接估梯度有偏 → 重要性采样加权修正 → token级比序列级更精细
@@ -28,6 +28,11 @@ follow_up:
 - token 级 ratio 和序列级 ratio 的关系？
 - 为什么 PPO 要 clip ratio？
 - GRPO 怎么处理 token 级 ratio？
+memory_points:
+- 核心对比：序列级是连乘易爆炸下溢，token级是独立计算比值，数值更稳定
+- 计算公式：用log域算避免下溢，即 ratio = exp(logp_new - logp_old)
+- 核心作用：修正off-policy偏差，因为采样用旧策略而训练更新新策略
+- 安全机制：配合PPO clip，限制ratio在[1-ε, 1+ε]防极端权重
 ---
 
 # 【字节面经】GRPO 中 Token 级别重要性采样的实现逻辑与作用
@@ -177,3 +182,11 @@ GRPO 的 token 级 IS 和 PPO 一致，区别在于：
 - **PPO clip 的 ε**：通常 0.1-0.2，限制单步策略更新幅度（trust region 的近似）
 - **GSPO 对 token 级 IS 的优化**：结合 MoE 的稀疏激活特性调整权重
 - **ReMax / RLOO**：其他无需重要性采样的 RL 方法（on-policy，但样本效率低）
+
+## 记忆要点
+
+- 核心对比：序列级是连乘易爆炸下溢，token级是独立计算比值，数值更稳定
+- 计算公式：用log域算避免下溢，即 ratio = exp(logp_new - logp_old)
+- 核心作用：修正off-policy偏差，因为采样用旧策略而训练更新新策略
+- 安全机制：配合PPO clip，限制ratio在[1-ε, 1+ε]防极端权重
+

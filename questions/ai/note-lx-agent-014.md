@@ -4,29 +4,33 @@ difficulty: L2
 category: ai
 subcategory: Prompt
 tags:
-  - 联想
-  - 面经
-  - 一面
-  - Vibe Coding
-  - AI编程
-  - 工具链
+- 联想
+- 面经
+- 一面
+- Vibe Coding
+- AI编程
+- 工具链
 feynman:
   essence: Vibe Coding是用自然语言"凭感觉"编程的新范式——通过Cursor/Claude Code/Copilot等AI编程工具，用自然语言描述需求让AI生成代码。面试考察的是你对这种范式变革的理解和实操经验
   analogy: 就像从"手工制衣"到"3D打印衣服"——以前你一针一线缝代码（手写），现在你描述想要的样式让机器织出来（AI生成），你的角色从"裁缝"变成"设计师"
   first_principle: Vibe Coding的本质是"自然语言成为新的编程语言"。程序员的核心能力从"写代码"转变为"描述需求+审查代码+架构决策"
   key_points:
-    - Vibe Coding = 自然语言驱动 + AI生成代码 + 人类审查
-    - 核心工具：Cursor、Claude Code、GitHub Copilot、Windsurf
-    - 关键能力转变：写代码→读代码+系统设计+需求精确描述
-    - 面试回答要点：展示实操经验+理解局限性+知道何时该手写
+  - Vibe Coding = 自然语言驱动 + AI生成代码 + 人类审查
+  - 核心工具：Cursor、Claude Code、GitHub Copilot、Windsurf
+  - 关键能力转变：写代码→读代码+系统设计+需求精确描述
+  - 面试回答要点：展示实操经验+理解局限性+知道何时该手写
 first_principle:
   essence: AI编程工具改变了"人机协作"的分工——AI负责实现细节，人负责意图表达和质量把关
-  derivation: '传统编程中80%时间写代码+20%设计。Vibe Coding后变为20%描述需求+30%审查代码+50%系统设计/架构。代码编写的时间大幅减少，但架构设计和代码审查的重要性大幅提升'
+  derivation: 传统编程中80%时间写代码+20%设计。Vibe Coding后变为20%描述需求+30%审查代码+50%系统设计/架构。代码编写的时间大幅减少，但架构设计和代码审查的重要性大幅提升
   conclusion: Vibe Coding不是"不用写代码"，而是"把精力从编码细节转移到设计决策"
 follow_up:
-  - Vibe Coding生成的代码质量怎么保证？需要做Code Review吗？
-  - 哪些场景适合Vibe Coding，哪些不适合？
-  - 作为面试者，怎么展示你的Vibe Coding能力？
+- Vibe Coding生成的代码质量怎么保证？需要做Code Review吗？
+- 哪些场景适合Vibe Coding，哪些不适合？
+- 作为面试者，怎么展示你的Vibe Coding能力？
+memory_points:
+- 本质是范式转变：因为核心变为意图描述与审查，所以重点考察人机协作理念
+- 答题分三层：展示实操场景、理解局限风险、关联Agent岗位凸显独立思考
+- 答题口诀：别只夸写得快，要突出试错快，强调生成代码必须经人工严格Code Review
 ---
 
 # Vibe Coding工具为什么最近会被拿来问，面试里应该怎么答？
@@ -159,3 +163,10 @@ RISKS = """
 2. **展示批判思维**：能说出Vibe Coding的局限和风险，体现你不是盲目跟风
 3. **关联岗位**：将Vibe Coding与Agent开发岗位关联——"用AI构建AI"是核心能力
 4. **实操Demo**：如果能现场展示用Claude Code快速实现一个小功能，加分极大
+
+## 记忆要点
+
+- 本质是范式转变：因为核心变为意图描述与审查，所以重点考察人机协作理念
+- 答题分三层：展示实操场景、理解局限风险、关联Agent岗位凸显独立思考
+- 答题口诀：别只夸写得快，要突出试错快，强调生成代码必须经人工严格Code Review
+

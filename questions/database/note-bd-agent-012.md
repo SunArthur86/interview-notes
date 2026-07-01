@@ -4,27 +4,32 @@ difficulty: L2
 category: database
 subcategory: MySQL
 tags:
-  - 字节
-  - 面经
-  - MySQL
-  - 事务隔离
+- 字节
+- 面经
+- MySQL
+- 事务隔离
 feynman:
   essence: 脏读是读到未提交数据，幻读是范围查询行数变化，靠隔离级别和锁机制避免
-  analogy: '脏读像偷看别人的草稿(还没交的作业)，幻读像看同一本书两次页数不一样(中间有人插了页)'
-  first_principle: '事务隔离的本质是在并发访问下权衡一致性和性能——隔离级别越高越安全但并发越低'
+  analogy: 脏读像偷看别人的草稿(还没交的作业)，幻读像看同一本书两次页数不一样(中间有人插了页)
+  first_principle: 事务隔离的本质是在并发访问下权衡一致性和性能——隔离级别越高越安全但并发越低
   key_points:
-    - 脏读=读到其他事务未提交的数据
-    - 幻读=同一范围查询前后结果集行数不同
-    - 脏读靠提升隔离级别避免(至少RC)
-    - 幻读靠MVCC(快照读)和Gap Lock(当前读)避免
+  - 脏读=读到其他事务未提交的数据
+  - 幻读=同一范围查询前后结果集行数不同
+  - 脏读靠提升隔离级别避免(至少RC)
+  - 幻读靠MVCC(快照读)和Gap Lock(当前读)避免
 first_principle:
   essence: 并发事务间的干扰有程度之分，SQL标准定义了四种隔离级别对应四种干扰
-  derivation: '读未提交→脏读→加写锁→读已提交→不可重复读→加读锁→可重复读→幻读→加范围锁→串行化'
+  derivation: 读未提交→脏读→加写锁→读已提交→不可重复读→加读锁→可重复读→幻读→加范围锁→串行化
   conclusion: InnoDB默认RR级别，用MVCC+Next-Key Lock在大多数场景下同时解决脏读、不可重复读和幻读
 follow_up:
-  - 'MVCC的Read View是怎么工作的？'
-  - 'Gap Lock和Next-Key Lock的区别？'
-  - '为什么MySQL默认RR而不是RC？'
+- MVCC的Read View是怎么工作的？
+- Gap Lock和Next-Key Lock的区别？
+- 为什么MySQL默认RR而不是RC？
+memory_points:
+- 一句话区分：脏读读到未提交修改（UPDATE），幻读读到新插入行（INSERT）
+- 隔离级别递进：读未提交<读已提交(RC)<可重复读(RR)<串行化。InnoDB默认RR级别
+- 防脏读：提升至RC级别即可（基于MVCC每次SELECT生成新Read View）
+- 防幻读：RR级别下，快照读靠MVCC解决，当前读靠Next-Key Lock（记录锁+间隙锁）解决
 ---
 
 # MySQL里脏读和幻读分别是什么？数据库怎么避免？
@@ -153,3 +158,11 @@ Gap Lock:    锁定 (20,25), (25,30), (30, +∞) 的间隙
 2. **MVCC原理**：知道快照读通过Read View + Undo Log实现
 3. **Next-Key Lock**：能解释Record Lock + Gap Lock的组合
 4. **MySQL选RR的原因**：历史原因（binlog复制需要RR保证一致性），其他数据库大多默认RC
+
+## 记忆要点
+
+- 一句话区分：脏读读到未提交修改（UPDATE），幻读读到新插入行（INSERT）
+- 隔离级别递进：读未提交<读已提交(RC)<可重复读(RR)<串行化。InnoDB默认RR级别
+- 防脏读：提升至RC级别即可（基于MVCC每次SELECT生成新Read View）
+- 防幻读：RR级别下，快照读靠MVCC解决，当前读靠Next-Key Lock（记录锁+间隙锁）解决
+

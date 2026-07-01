@@ -25,9 +25,14 @@ first_principle:
   derivation: 传统推理的三大浪费：显存碎片（40%浪费）、padding（长短请求混合）、重复计算（相同前缀）。vLLM解决前两个，SGLang解决第三个。两者都是把"静态、粗粒度"的资源管理改为"动态、细粒度"。
   conclusion: vLLM是通用推理标配，SGLang在Agent/多轮场景更优
 follow_up:
-  - PagedAttention具体如何管理KV-Cache的物理块？
-  - SGLang的Radix Tree如何检测前缀共享？
-  - 推理框架如何支持流式输出(streaming)？
+- PagedAttention具体如何管理KV-Cache的物理块？
+- SGLang的Radix Tree如何检测前缀共享？
+- 推理框架如何支持流式输出(streaming)？
+memory_points:
+- vLLM核心：PagedAttention将显存按页分配，彻底消除内存碎片提升至95%
+- vLLM吞吐：Continuous Batching随走随加，请求完成即刻释放不空等
+- SGLang核心：RadixAttention自动复用共享前缀(如System Prompt)的KV-Cache
+- 适用对比：通用高并发选vLLM，而复杂Agent多轮/共享前缀场景选SGLang
 ---
 
 # 【八股总结】vLLM 和 SGLang 的核心原理与适用场景
@@ -397,3 +402,11 @@ vLLM在通用场景持平或略优（更成熟的kernel优化）
 - **SGLang**：Lianmin Zheng等，RadixAttention + 结构化生成
 - **TensorRT-LLM**：NVIDIA的推理框架，与硬件深度优化
 - **Speculative Decoding**：推测解码，用小模型加速大模型推理，vLLM/SGLang都支持
+
+## 记忆要点
+
+- vLLM核心：PagedAttention将显存按页分配，彻底消除内存碎片提升至95%
+- vLLM吞吐：Continuous Batching随走随加，请求完成即刻释放不空等
+- SGLang核心：RadixAttention自动复用共享前缀(如System Prompt)的KV-Cache
+- 适用对比：通用高并发选vLLM，而复杂Agent多轮/共享前缀场景选SGLang
+

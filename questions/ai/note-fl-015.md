@@ -18,8 +18,8 @@ feynman:
   - 'SFT: 监督微调学"指令→答案"格式，答案质量上限决定模型上限'
   - 'RLHF: 用人类偏好训RM再用PPO优化，训练不稳定超参敏感贵'
   - 'DPO: 直接用偏好数据优化策略跳过RM，稳定便宜效果接近PPO'
-  - 'SFT后还要偏好优化：SFT只模仿不排序，偏好优化让模型学到3H(helpful/harmless/honest)'
-  - '工业主流：SFT→DPO(或ORPO/KTO变体)，PPO太贵少用'
+  - SFT后还要偏好优化：SFT只模仿不排序，偏好优化让模型学到3H(helpful/harmless/honest)
+  - 工业主流：SFT→DPO(或ORPO/KTO变体)，PPO太贵少用
 first_principle:
   essence: 模型训练 = 模仿(SFT) + 排序(偏好优化)
   derivation: 预训练模型只会续写 → SFT 教会指令跟随格式 → 但不会区分好坏 → 偏好优化教排序 → 模型学会 3H → 对话体验质变
@@ -28,6 +28,11 @@ follow_up:
 - DPO 的损失函数推导？为什么跳过 RM 等价于 RLHF？
 - ORPO / KTO / SimPO 这些变体相比 DPO 改进了什么？
 - RM 怎么标注？标注一致性怎么保证？
+memory_points:
+- SFT 学格式模仿：数据是(指令, 答案)，难点在答案质量决定模型上限，但无法区分好坏。
+- RLHF 学偏好排序：训 RM+PPO，能实现3H(有用无害诚实)，但4个模型同跑导致显存爆炸且不稳。
+- DPO 主流替代：跳过显式训 RM，直接用偏好对数据一步优化策略，更稳定省钱。
+- 加分项：说出 DPO 基于 Bradley-Terry 模型将最优 RM 与策略建立解析关系。
 ---
 
 # 【字节飞连面经】SFT vs RLHF vs DPO：做什么 / 数据形态 / 难点
@@ -117,3 +122,11 @@ follow_up:
 - **RM 标注一致性**：多人标注偏好会有分歧，用 Cohen's Kappa 衡量一致性，低一致性的数据要剔除
 - **Reward Hacking**：模型钻 RM 漏洞刷分（如输出 RM 偏好的特定词）→ 用 KL 惩罚 + 多 RM 集成缓解
 - **RLAIF**（Constitutional AI）：用 AI 代替人工标注偏好（Anthropic 的方法），降低标注成本
+
+## 记忆要点
+
+- SFT 学格式模仿：数据是(指令, 答案)，难点在答案质量决定模型上限，但无法区分好坏。
+- RLHF 学偏好排序：训 RM+PPO，能实现3H(有用无害诚实)，但4个模型同跑导致显存爆炸且不稳。
+- DPO 主流替代：跳过显式训 RM，直接用偏好对数据一步优化策略，更稳定省钱。
+- 加分项：说出 DPO 基于 Bradley-Terry 模型将最优 RM 与策略建立解析关系。
+

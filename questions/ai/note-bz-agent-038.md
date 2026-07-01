@@ -4,27 +4,31 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - B站面经
-  - Skill
-  - MCP
-  - 对比
+- B站面经
+- Skill
+- MCP
+- 对比
 feynman:
   essence: Skill=Agent的能力封装(prompt+flow)，MCP=工具的通信协议(标准化接口)。Skill是"做什么+怎么做"，MCP是"怎么连接"。互补而非替代。
   analogy: Skill像菜谱(做什么菜+怎么做)，MCP像厨房电器标准接口(所有厨具统一插座)。菜谱用电器的标准接口调用厨具。
   first_principle: Skill解决"能力复用"问题(怎么做事)，MCP解决"工具互联"问题(怎么连接工具)。两者正交。
   key_points:
-    - Skill：能力封装(prompt+tools+flow)，面向任务
-    - MCP：通信协议(标准化工具接口)，面向连接
-    - 关系：Skill通过MCP调用工具
-    - 类比：Skill=应用，MCP=USB标准
+  - Skill：能力封装(prompt+tools+flow)，面向任务
+  - MCP：通信协议(标准化工具接口)，面向连接
+  - 关系：Skill通过MCP调用工具
+  - 类比：Skill=应用，MCP=USB标准
 first_principle:
   essence: Skill和MCP解决不同层次的问题——Skill是应用层(做什么)，MCP是传输层(怎么连)。
-  derivation: 'Agent要调用工具，需要1.知道做什么(Skill定义流程)2.怎么调用工具(MCP标准化接口)。没有MCP，每个工具接口不同，Skill要适配N种。有了MCP，工具统一接口，Skill只管流程。'
+  derivation: Agent要调用工具，需要1.知道做什么(Skill定义流程)2.怎么调用工具(MCP标准化接口)。没有MCP，每个工具接口不同，Skill要适配N种。有了MCP，工具统一接口，Skill只管流程。
   conclusion: Skill(应用层-做什么) + MCP(协议层-怎么连) = 完整的Agent能力体系
 follow_up:
-  - MCP是谁提出的？——Anthropic，2024年开源
-  - 没有MCP能用Skill吗？——能，但工具接口不统一，集成成本高
-  - 两者会融合吗？——可能，Skill可能内置MCP客户端
+- MCP是谁提出的？——Anthropic，2024年开源
+- 没有MCP能用Skill吗？——能，但工具接口不统一，集成成本高
+- 两者会融合吗？——可能，Skill可能内置MCP客户端
+memory_points:
+- 定位不同：Skill聚焦应用层管“做什么与怎么做”，MCP聚焦协议层管“怎么连接”。
+- 包含内容：Skill是包含Prompt+Tools+Flow的能力包；MCP是Server+Client的标准化接口。
+- 互补关系：Skill定义业务执行流程，MCP负责将底层工具标准化暴露供Skill调用。
 ---
 
 # Agent Skill 与 MCP 的区别？
@@ -179,3 +183,10 @@ Skill通过MCP的标准化接口调用这些工具
 1. **层次不同**：Skill 是应用层（做什么），MCP 是协议层（怎么连）——不是同一层面的东西
 2. **互补关系**：Skill 通过 MCP 调用工具，两者结合才是完整方案
 3. **用 USB 类比**：Skill=USB 设备（U 盘/摄像头），MCP=USB 接口标准——设备通过标准接口连接
+
+## 记忆要点
+
+- 定位不同：Skill聚焦应用层管“做什么与怎么做”，MCP聚焦协议层管“怎么连接”。
+- 包含内容：Skill是包含Prompt+Tools+Flow的能力包；MCP是Server+Client的标准化接口。
+- 互补关系：Skill定义业务执行流程，MCP负责将底层工具标准化暴露供Skill调用。
+

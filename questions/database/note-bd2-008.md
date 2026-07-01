@@ -4,29 +4,34 @@ difficulty: L3
 category: database
 subcategory: SQL优化
 tags:
-  - 字节
-  - 面经
-  - SQL
-  - MySQL
-  - 慢查询
-  - 性能优化
+- 字节
+- 面经
+- SQL
+- MySQL
+- 慢查询
+- 性能优化
 feynman:
-  essence: '多表查询优化的核心是减少中间结果集大小，慢查询排查的核心是看执行计划找瓶颈'
-  analogy: '就像物流配送——多表JOIN是合并多个仓库的货物，优化就是让合并的中间货物尽量少(小表驱动大表)，慢查询排查就是看运输路线图(执行计划)找堵点'
+  essence: 多表查询优化的核心是减少中间结果集大小，慢查询排查的核心是看执行计划找瓶颈
+  analogy: 就像物流配送——多表JOIN是合并多个仓库的货物，优化就是让合并的中间货物尽量少(小表驱动大表)，慢查询排查就是看运输路线图(执行计划)找堵点
   first_principle: 'SQL执行的时间 = 磁盘I/O时间 + CPU计算时间 + 网络传输时间。优化目标是减少这三个维度: 减少扫描行数(I/O)、减少JOIN计算量(CPU)、减少返回数据量(网络)'
   key_points:
-    - 'EXPLAIN看执行计划: type/key/rows/Extra四列是关键'
-    - '多表JOIN: 小表驱动大表，优先JOIN过滤性强的表'
-    - '索引优化: WHERE/JOIN/ORDER BY的列要有索引'
-    - '慢查询排查: 慢查询日志→EXPLAIN→优化索引→重写SQL'
+  - 'EXPLAIN看执行计划: type/key/rows/Extra四列是关键'
+  - '多表JOIN: 小表驱动大表，优先JOIN过滤性强的表'
+  - '索引优化: WHERE/JOIN/ORDER BY的列要有索引'
+  - '慢查询排查: 慢查询日志→EXPLAIN→优化索引→重写SQL'
 first_principle:
-  essence: '数据库查询的瓶颈在于磁盘I/O，优化的本质是减少磁盘读取量'
-  derivation: 'B+树一次I/O读一页(16KB)，全表扫描100万行需要~7000次I/O，走索引只需要3-4次I/O(树高3-4)。索引将I/O从O(n)降到O(log n)'
+  essence: 数据库查询的瓶颈在于磁盘I/O，优化的本质是减少磁盘读取量
+  derivation: B+树一次I/O读一页(16KB)，全表扫描100万行需要~7000次I/O，走索引只需要3-4次I/O(树高3-4)。索引将I/O从O(n)降到O(log n)
   conclusion: 'SQL优化的第一性原理: 让查询走索引而非全表扫描'
 follow_up:
-  - '联合索引的最左前缀原则是什么？'
-  - '什么情况下索引会失效？'
-  - '分库分表后多表JOIN怎么做？'
+- 联合索引的最左前缀原则是什么？
+- 什么情况下索引会失效？
+- 分库分表后多表JOIN怎么做？
+memory_points:
+- 多表JOIN：优先让小表/结果集驱动大表，必须带上ON条件以避免产生笛卡尔积
+- 排查入口：用EXPLAIN看type列，出现ALL（全表扫描）必须加索引优化至range或ref级别
+- 执行计划关注点：重点看type确认连表类型，看Extra排查是否出现Using temporary或Using filesort
+- 排查步骤：开启慢查询日志定位SQL -> EXPLAIN分析执行计划 -> 针对性建索引或重写SQL驱动顺序
 ---
 
 # SQL多表查询优化和慢查询排查
@@ -215,3 +220,11 @@ SELECT * FROM orders ORDER BY id LIMIT 1000000, 20;
 SELECT * FROM orders WHERE id > 1000000 
 ORDER BY id LIMIT 20;
 ```
+
+## 记忆要点
+
+- 多表JOIN：优先让小表/结果集驱动大表，必须带上ON条件以避免产生笛卡尔积
+- 排查入口：用EXPLAIN看type列，出现ALL（全表扫描）必须加索引优化至range或ref级别
+- 执行计划关注点：重点看type确认连表类型，看Extra排查是否出现Using temporary或Using filesort
+- 排查步骤：开启慢查询日志定位SQL -> EXPLAIN分析执行计划 -> 针对性建索引或重写SQL驱动顺序
+

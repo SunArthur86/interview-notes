@@ -4,28 +4,33 @@ difficulty: L3
 category: ai
 subcategory: LLM
 tags:
-  - 智谱
-  - 面经
-  - DPO
-  - SFT
-  - 对齐
+- 智谱
+- 面经
+- DPO
+- SFT
+- 对齐
 feynman:
-  essence: "SFT只能教模型模仿标注答案，无法区分好和更好的回答；DPO通过偏好对比让模型学会在多个可行回答中选出更优的，解决SFT的优化天花板"
-  analogy: "SFT是教小孩写对字(模仿)，DPO是教他写好作文(在多个正确写法中选更好的)——会写字不等于写得好"
-  first_principle: "SFT的本质是最大似然(模仿)，DPO的本质是偏好优化(比较)，两个优化目标不同"
+  essence: SFT只能教模型模仿标注答案，无法区分好和更好的回答；DPO通过偏好对比让模型学会在多个可行回答中选出更优的，解决SFT的优化天花板
+  analogy: SFT是教小孩写对字(模仿)，DPO是教他写好作文(在多个正确写法中选更好的)——会写字不等于写得好
+  first_principle: SFT的本质是最大似然(模仿)，DPO的本质是偏好优化(比较)，两个优化目标不同
   key_points:
-    - 'SFT局限: 只有一个标准答案，无法学习偏好'
-    - 'DPO原理: 直接用偏好对(chosen vs rejected)优化，无需训练Reward Model'
-    - 'DPO公式: 让chosen概率/ rejected概率的比值增大'
-    - 'SFT后接DPO: SFT打底能力，DPO优化质量'
+  - 'SFT局限: 只有一个标准答案，无法学习偏好'
+  - 'DPO原理: 直接用偏好对(chosen vs rejected)优化，无需训练Reward Model'
+  - 'DPO公式: 让chosen概率/ rejected概率的比值增大'
+  - 'SFT后接DPO: SFT打底能力，DPO优化质量'
 first_principle:
-  essence: "偏好对齐是从模仿到优化的跃迁"
-  derivation: "SFT数据是(输入→标准答案) → 模型学到了基本能力 → 但同一问题有多个好答案 → SFT只学一个 → 需要对比学习哪个更好 → DPO直接从偏好对学习"
-  conclusion: "SFT解决'能不能做对'，DPO解决'能不能做好'"
+  essence: 偏好对齐是从模仿到优化的跃迁
+  derivation: SFT数据是(输入→标准答案) → 模型学到了基本能力 → 但同一问题有多个好答案 → SFT只学一个 → 需要对比学习哪个更好 → DPO直接从偏好对学习
+  conclusion: SFT解决'能不能做对'，DPO解决'能不能做好'
 follow_up:
-  - "DPO和RLHF/PPO的区别？各自优缺点？"
-  - "DPO训练数据怎么构造？需要多少对？"
-  - "什么情况下DPO会让模型变差？"
+- DPO和RLHF/PPO的区别？各自优缺点？
+- DPO训练数据怎么构造？需要多少对？
+- 什么情况下DPO会让模型变差？
+memory_points:
+- SFT天花板：只学模仿标准答案，无法表达A比B更好的偏好信息
+- DPO目标：利用(好答案,坏答案)偏好对，类似SFT般稳定地学偏好
+- 为何不用RLHF：DPO通过数学转化去除了Reward Model，训练更简单稳定
+- 避坑指南：防止过度优化导致多样性下降，坏样本不能太差且要注意分布偏移
 ---
 
 # 为什么做了 SFT 还要做 DPO？
@@ -157,3 +162,11 @@ DPO数据量经验:
   - 10万对: 收益递减
   - 质量远比数量重要
 ```
+
+## 记忆要点
+
+- SFT天花板：只学模仿标准答案，无法表达A比B更好的偏好信息
+- DPO目标：利用(好答案,坏答案)偏好对，类似SFT般稳定地学偏好
+- 为何不用RLHF：DPO通过数学转化去除了Reward Model，训练更简单稳定
+- 避坑指南：防止过度优化导致多样性下降，坏样本不能太差且要注意分布偏移
+

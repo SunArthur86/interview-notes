@@ -4,28 +4,33 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 某厂
-  - 面经
-  - Agent
-  - ReAct
-  - 推理
+- 某厂
+- 面经
+- Agent
+- ReAct
+- 推理
 feynman:
-  essence: 'ReAct让模型交替进行"思考推理"和"行动调用"，形成Thought-Action-Observation循环，而非一次性输出答案'
-  analogy: '就像做数学题——不是直接写答案(单轮问答)，而是先写"我需要先算X"(Thought)，然后实际去算(Action)，看到结果后(Observation)再推理下一步'
-  first_principle: '单轮问答只有一个Forward Pass，模型无法获取外部信息也无法自我纠错。ReAct引入了"环境交互循环"，让模型能调用工具获取真实数据并基于结果继续推理'
+  essence: ReAct让模型交替进行"思考推理"和"行动调用"，形成Thought-Action-Observation循环，而非一次性输出答案
+  analogy: 就像做数学题——不是直接写答案(单轮问答)，而是先写"我需要先算X"(Thought)，然后实际去算(Action)，看到结果后(Observation)再推理下一步
+  first_principle: 单轮问答只有一个Forward Pass，模型无法获取外部信息也无法自我纠错。ReAct引入了"环境交互循环"，让模型能调用工具获取真实数据并基于结果继续推理
   key_points:
-    - 'ReAct = Reasoning + Acting 的交替循环'
-    - '核心循环: Thought → Action → Observation → Thought → ...'
-    - '与单轮问答本质区别: 引入了外部信息获取和迭代推理'
-    - 'ReAct是当前主流Agent框架(Frank, LangChain Agent)的基础范式'
+  - ReAct = Reasoning + Acting 的交替循环
+  - '核心循环: Thought → Action → Observation → Thought → ...'
+  - '与单轮问答本质区别: 引入了外部信息获取和迭代推理'
+  - ReAct是当前主流Agent框架(Frank, LangChain Agent)的基础范式
 first_principle:
-  essence: '复杂问题需要"推理-行动-观察"的迭代过程，而非单次推理'
-  derivation: '问题"2024年中国GDP增速是多少"需要搜索→获取数据→计算→回答。单轮问答只能凭记忆回答(可能过时)，ReAct通过工具调用获取实时数据后回答(准确)'
-  conclusion: 'ReAct通过引入Action-Observation循环，突破了单轮问答的信息和推理深度限制'
+  essence: 复杂问题需要"推理-行动-观察"的迭代过程，而非单次推理
+  derivation: 问题"2024年中国GDP增速是多少"需要搜索→获取数据→计算→回答。单轮问答只能凭记忆回答(可能过时)，ReAct通过工具调用获取实时数据后回答(准确)
+  conclusion: ReAct通过引入Action-Observation循环，突破了单轮问答的信息和推理深度限制
 follow_up:
-  - 'ReAct和Plan-and-Execute模式有什么区别？'
-  - 'ReAct的Thought是否可以省略？(无推理直接行动)'
-  - 'ReAct循环最多迭代几次？如何防止无限循环？'
+- ReAct和Plan-and-Execute模式有什么区别？
+- ReAct的Thought是否可以省略？(无推理直接行动)
+- ReAct循环最多迭代几次？如何防止无限循环？
+memory_points:
+- 核心：Reason推理+Act行动交替循环，形成Thought-Action-Observation链路
+- 对比：单轮仅靠内部知识，而ReAct能借助外部工具获取实时信息
+- 对比：单轮出错无法挽回，而ReAct可基于Observation动态纠错与迭代
+- 代价：因为需要多轮调用工具，所以ReAct延迟更高、成本更大
 ---
 
 # ReAct的原理和与单轮问答的本质区别
@@ -219,3 +224,11 @@ response = client.chat.completions.create(
 )
 # 模型直接返回结构化的tool_calls，不需要文本解析
 ```
+
+## 记忆要点
+
+- 核心：Reason推理+Act行动交替循环，形成Thought-Action-Observation链路
+- 对比：单轮仅靠内部知识，而ReAct能借助外部工具获取实时信息
+- 对比：单轮出错无法挽回，而ReAct可基于Observation动态纠错与迭代
+- 代价：因为需要多轮调用工具，所以ReAct延迟更高、成本更大
+

@@ -27,6 +27,12 @@ follow_up:
 - Constrained Decoding 的 FSM 怎么构造？
 - Pydantic 和 JSON Schema 什么关系？
 - 模型输出四类失败场景是哪四类？
+memory_points:
+- 五层防御体系：Prompt提示→Schema设计→API限制→约束解码→后处理兜底
+- Schema设计铁律：字段少(防漏)、命名直观、必须加description(帮助理解)
+- 因果逻辑：因为模型靠description理解字段，所以命名直观和描述详尽至关重要
+- 约束解码原理：把JSON结构变FSM状态机，每步仅允许生成能转移到合法状态的token
+- 参数经验：chunk_size推荐200-500，overlap设10-20%防边界切断关键信息
 ---
 
 # 【某讯面经】如何稳定让模型输出标准 JSON Schema？
@@ -221,3 +227,12 @@ def parse_model_output(raw: str) -> OrderInfo:
 - **Pydantic vs JSON Schema**：Pydantic 是 Python 的数据校验库，能从 Pydantic Model 自动生成 JSON Schema（`Model.model_json_schema()`），两者配合用
 - **OpenAI 的 Structured Output**：`response_format: {type: "json_schema", strict: true}` 是 2024 年新功能，比 function calling 更严格
 - **多 Schema 选择**：让模型先选 schema 类型再填充（如"这是订单还是退款"→选对应 schema）
+
+## 记忆要点
+
+- 五层防御体系：Prompt提示→Schema设计→API限制→约束解码→后处理兜底
+- Schema设计铁律：字段少(防漏)、命名直观、必须加description(帮助理解)
+- 因果逻辑：因为模型靠description理解字段，所以命名直观和描述详尽至关重要
+- 约束解码原理：把JSON结构变FSM状态机，每步仅允许生成能转移到合法状态的token
+- 参数经验：chunk_size推荐200-500，overlap设10-20%防边界切断关键信息
+

@@ -4,29 +4,34 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 淘天
-  - 面经
-  - 二面
-  - Function Call
-  - 准确率
-  - Prompt优化
+- 淘天
+- 面经
+- 二面
+- Function Call
+- 准确率
+- Prompt优化
 feynman:
   essence: 提升Function Call准确率从Prompt、Schema、Few-shot、异常重试四个维度系统优化，将准确率从70%提升至95%+
   analogy: 就像训练新员工打电话——给他清晰的话术模板（Prompt），标准的操作手册格式（Schema），几个成功案例参考（Few-shot），以及犯了错怎么纠正的机制（异常重试）
   first_principle: Function Call本质是"自然语言→结构化参数"的映射。准确率取决于模型对工具语义的理解程度和参数生成的精确度
   key_points:
-    - Prompt维度：工具选择决策树、使用时机约束、负面示例
-    - Schema维度：参数描述精确化、枚举值约束、必填校验
-    - Few-shot维度：正例+反例+边界case的示范
-    - 异常重试：错误信息回传→修正参数→重试（最多3次）
+  - Prompt维度：工具选择决策树、使用时机约束、负面示例
+  - Schema维度：参数描述精确化、枚举值约束、必填校验
+  - Few-shot维度：正例+反例+边界case的示范
+  - 异常重试：错误信息回传→修正参数→重试（最多3次）
 first_principle:
   essence: Function Call错误率 = 选错工具概率 + 选对工具但参数错误概率
-  derivation: '设选对工具概率P_tool=0.85，选对后参数正确概率P_param=0.90。总准确率=0.85×0.90=76.5%。优化Prompt→P_tool=0.95，优化Schema+Few-shot→P_param=0.97。总准确率=0.95×0.97=92.2%'
+  derivation: 设选对工具概率P_tool=0.85，选对后参数正确概率P_param=0.90。总准确率=0.85×0.90=76.5%。优化Prompt→P_tool=0.95，优化Schema+Few-shot→P_param=0.97。总准确率=0.95×0.97=92.2%
   conclusion: 准确率是乘法关系，需同时优化工具选择和参数生成
 follow_up:
-  - 怎么评估Function Call准确率？有专门的benchmark吗？
-  - 不同模型（GPT-4/Claude/GLM）的Function Call能力差异大吗？
-  - 能否用SFT专门训练模型的Function Call能力？
+- 怎么评估Function Call准确率？有专门的benchmark吗？
+- 不同模型（GPT-4/Claude/GLM）的Function Call能力差异大吗？
+- 能否用SFT专门训练模型的Function Call能力？
+memory_points:
+- 口诀法：四大维度全面提升调用准确率：决策树提示词、精确Schema、正反例示范、异常重试
+- 因果句：因为模型不知道何时该用工具，所以Prompt必须规定明确的工具选择优先级
+- 对比句：模糊Schema导致乱传参，加入枚举类型与提取示例的精确Schema能大幅提效
+- 因果句：因为大模型缺乏边界感，所以必须注入意图明确的正反例Few-shot防误调用
 ---
 
 # 怎么提升Function Call准确率？Prompt、Schema、Few-shot、异常重试四个维度优化方案？
@@ -201,3 +206,11 @@ async def function_call_with_retry(
 2. **持续迭代**：收集线上错误case补充到Few-shot，形成数据飞轮
 3. **温度调参**：Function Call场景Temperature应设为0（确定性输出），避免随机性导致参数变化
 4. **模型选型**：GPT-4/Claude在Function Call上比开源模型好10-15%，但对成本敏感场景可用SFT微调小模型
+
+## 记忆要点
+
+- 口诀法：四大维度全面提升调用准确率：决策树提示词、精确Schema、正反例示范、异常重试
+- 因果句：因为模型不知道何时该用工具，所以Prompt必须规定明确的工具选择优先级
+- 对比句：模糊Schema导致乱传参，加入枚举类型与提取示例的精确Schema能大幅提效
+- 因果句：因为大模型缺乏边界感，所以必须注入意图明确的正反例Few-shot防误调用
+

@@ -15,10 +15,15 @@ feynman:
   - ReentrantLock=API层+手动释放
   - ReentrantLock支持公平/中断/超时/多Condition
   - JDK6+性能差距很小
-first_principle:
+first_principle: null
 follow_up:
 - 偏向锁什么时候升级为轻量级锁？
 - AQS 的原理是什么？
+memory_points:
+- 层级与释放：synchronized是JVM关键字且自动释放锁，而ReentrantLock是API层需手动unlock
+- 核心机制：synchronized基于Object Monitor，而ReentrantLock基于AQS队列
+- 灵活性：synchronized仅支持非公平且不可中断，而ReentrantLock支持公平/超时/多Condition
+- 选型口诀：因为底层优化差距极小，所以简单加锁用synchronized，高级特性选ReentrantLock
 ---
 
 # synchronized 和 ReentrantLock 的区别？
@@ -313,3 +318,11 @@ final boolean nonfairTryAcquire(int acquires) {
 | 灵活性 | ⭐⭐ | ⭐⭐⭐ |
 
 > **面试一句话**：`synchronized` 是 JVM 内置的自动锁，简单安全；`ReentrantLock` 是基于 AQS 的 API 层手动锁，功能强大但需要小心释放。JDK 6+ 两者性能接近，无高级需求时优先 `synchronized`。
+
+## 记忆要点
+
+- 层级与释放：synchronized是JVM关键字且自动释放锁，而ReentrantLock是API层需手动unlock
+- 核心机制：synchronized基于Object Monitor，而ReentrantLock基于AQS队列
+- 灵活性：synchronized仅支持非公平且不可中断，而ReentrantLock支持公平/超时/多Condition
+- 选型口诀：因为底层优化差距极小，所以简单加锁用synchronized，高级特性选ReentrantLock
+

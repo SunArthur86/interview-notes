@@ -4,28 +4,33 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Golang
-  - goroutine
+- 字节
+- 面经
+- Golang
+- goroutine
 feynman:
-  essence: "GMP是Go运行时的协程调度模型，goroutine泄漏是指协程被阻塞后永远无法退出，导致内存和调度资源持续增长"
-  analogy: "GMP就像一个出租车调度中心：G是乘客，M是出租车，P是发车牌（同时只能有GOMAXPROCS辆车在运营）。泄漏就像乘客上了车却永远到不了目的地，车就一直被占着"
-  first_principle: "Go调度的本质是在用户态实现M:N线程模型，用少量OS线程承载海量协程，通过P的本地队列减少锁竞争"
+  essence: GMP是Go运行时的协程调度模型，goroutine泄漏是指协程被阻塞后永远无法退出，导致内存和调度资源持续增长
+  analogy: GMP就像一个出租车调度中心：G是乘客，M是出租车，P是发车牌（同时只能有GOMAXPROCS辆车在运营）。泄漏就像乘客上了车却永远到不了目的地，车就一直被占着
+  first_principle: Go调度的本质是在用户态实现M:N线程模型，用少量OS线程承载海量协程，通过P的本地队列减少锁竞争
   key_points:
-    - 'G (Goroutine): 用户协程，存储栈和状态'
-    - 'M (Machine): OS线程，真正执行代码'
-    - 'P (Processor): 逻辑处理器，持有本地G队列，数量=GOMAXPROCS'
-    - 'Work Stealing: 空闲P从其他P的队列尾部偷取一半G'
-    - '泄漏原因: channel无接收者、context未取消、mutex死锁'
+  - 'G (Goroutine): 用户协程，存储栈和状态'
+  - 'M (Machine): OS线程，真正执行代码'
+  - 'P (Processor): 逻辑处理器，持有本地G队列，数量=GOMAXPROCS'
+  - 'Work Stealing: 空闲P从其他P的队列尾部偷取一半G'
+  - '泄漏原因: channel无接收者、context未取消、mutex死锁'
 first_principle:
-  essence: "调度器的核心目标是在有限OS线程上最大化CPU利用率"
-  derivation: "线程切换成本高(~1μs) → 用户态协程切换成本低(~100ns) → 用P的本地队列避免全局锁 → 用work stealing实现负载均衡"
-  conclusion: "GMP通过分层调度(本地队列+全局队列+work stealing)实现了高效的多对一映射"
+  essence: 调度器的核心目标是在有限OS线程上最大化CPU利用率
+  derivation: 线程切换成本高(~1μs) → 用户态协程切换成本低(~100ns) → 用P的本地队列避免全局锁 → 用work stealing实现负载均衡
+  conclusion: GMP通过分层调度(本地队列+全局队列+work stealing)实现了高效的多对一映射
 follow_up:
-  - "GOMAXPROCS设置过大会出现什么问题？"
-  - "如何用pprof定位goroutine泄漏？"
-  - "sysmon线程的作用是什么？"
+- GOMAXPROCS设置过大会出现什么问题？
+- 如何用pprof定位goroutine泄漏？
+- sysmon线程的作用是什么？
+memory_points:
+- GMP定义：G是协程，M是OS线程，P是持有本地队列的逻辑处理器
+- 调度核心：P绑定M执行，空闲时触发Work Stealing(从全局拿或偷别人一半)
+- 泄漏定义：goroutine因channel无接收或缺select永久阻塞，无法退出
+- 排查修复：go工具看pprof，阻塞必加context，发数据必用缓冲
 ---
 
 # Golang 的 GMP 调度模型是什么？什么情况下会造成 goroutine 泄漏？
@@ -153,3 +158,11 @@ fmt.Println("goroutine count:", runtime.NumGoroutine())
 - **sysmon线程**：独立于GMP的监控线程，负责抢占长时间运行的G(>10ms)、触发GC、回收闲置M
 - **P的mcache**：每个P有独立的mcache，小对象分配无需加锁，这是Go高性能分配的关键
 - **GOMAXPROCS过大**：P过多 → M过多 → OS线程过多 → 上下文切换开销激增 + cache miss增加
+
+## 记忆要点
+
+- GMP定义：G是协程，M是OS线程，P是持有本地队列的逻辑处理器
+- 调度核心：P绑定M执行，空闲时触发Work Stealing(从全局拿或偷别人一半)
+- 泄漏定义：goroutine因channel无接收或缺select永久阻塞，无法退出
+- 排查修复：go工具看pprof，阻塞必加context，发数据必用缓冲
+

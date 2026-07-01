@@ -4,26 +4,32 @@ difficulty: L3
 category: ai
 subcategory: RAG
 tags:
-  - B站面经
-  - RAG评估
-  - RAGAS
+- B站面经
+- RAG评估
+- RAGAS
 feynman:
   essence: RAG评估用RAGAS框架四大指标：忠实度(防幻觉)、答案相关性(切题)、上下文精度(检索准)、上下文召回(检索全)。四维量化RAG质量。
   analogy: 像考试阅卷——答案对不对(忠实)、有没有答到点上(相关)、参考资料找对了没(精度)、该找的都找了没(召回)。
   first_principle: RAG质量=检索质量×生成质量。检索好但生成差=找到了但没用好；生成好但检索差=巧妇难为无米之炊。需要分别评估。
   key_points:
-    - RAGAS四指标：faithfulness/answer_relevancy/context_precision/context_recall
-    - 忠实度最重要（防幻觉）
-    - 检索和生成分别评估
-    - 建立评估闭环持续优化
+  - RAGAS四指标：faithfulness/answer_relevancy/context_precision/context_recall
+  - 忠实度最重要（防幻觉）
+  - 检索和生成分别评估
+  - 建立评估闭环持续优化
 first_principle:
   essence: RAG是两阶段系统（检索+生成），需分别评估各阶段质量。
-  derivation: '检索质量低→生成再好也无米下锅。生成质量低→检索再准也答不好。RAGAS分别评估检索(context指标)和生成(faithfulness/answer指标)，定位瓶颈。'
+  derivation: 检索质量低→生成再好也无米下锅。生成质量低→检索再准也答不好。RAGAS分别评估检索(context指标)和生成(faithfulness/answer指标)，定位瓶颈。
   conclusion: RAG评估 = 检索指标（precision/recall） + 生成指标（faithfulness/relevancy）
 follow_up:
-  - RAGAS怎么实现？——用LLM自动评估，无需人工标注
-  - 忠实度怎么算？——答案中的每个claim是否能在context找到支持
-  - 评估集怎么建？——真实问题+标准答案+相关文档
+- RAGAS怎么实现？——用LLM自动评估，无需人工标注
+- 忠实度怎么算？——答案中的每个claim是否能在context找到支持
+- 评估集怎么建？——真实问题+标准答案+相关文档
+memory_points:
+- 六大缺陷口诀：检索失败/噪音、LLM幻觉、上下文丢失、时效/矛盾信息
+- 评估框架用RAGAS四大指标：生成看忠实与相关，检索看精度与召回
+- 防幻觉看faithfulness（答案能否在上下文找到依据）
+- 切题度看answer_relevancy（从答案反推问题的相似度）
+- 查全率看context_recall，查准率看context_precision
 ---
 
 # RAG 有哪些缺陷？如何用指标评估 RAG 系统？
@@ -236,3 +242,12 @@ class RAGEvalLoop:
 1. **RAGAS 四指标**：faithfulness/relevancy/precision/recall，覆盖检索和生成
 2. **faithfulness 最重要**：防幻觉是 RAG 的核心价值——答案必须忠于文档
 3. **按指标诊断**：不同指标组合指向不同问题——体现系统化排查能力
+
+## 记忆要点
+
+- 六大缺陷口诀：检索失败/噪音、LLM幻觉、上下文丢失、时效/矛盾信息
+- 评估框架用RAGAS四大指标：生成看忠实与相关，检索看精度与召回
+- 防幻觉看faithfulness（答案能否在上下文找到依据）
+- 切题度看answer_relevancy（从答案反推问题的相似度）
+- 查全率看context_recall，查准率看context_precision
+

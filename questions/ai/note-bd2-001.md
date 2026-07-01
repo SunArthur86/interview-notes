@@ -4,29 +4,34 @@ difficulty: L3
 category: ai
 subcategory: Agent
 tags:
-  - 字节
-  - 面经
-  - Agent
-  - 工具调用
-  - Function Calling
-  - MCP
+- 字节
+- 面经
+- Agent
+- 工具调用
+- Function Calling
+- MCP
 feynman:
   essence: 'Agent调用工具的完整链路: 理解意图→选择工具→构造参数→执行→解析结果→决定下一步'
-  analogy: '就像找师傅修水管——你描述问题(LLM理解意图)，师傅选工具(扳手还是胶带)，按规格操作(构造参数)，看结果对不对(Observation)，不对换方法'
-  first_principle: '工具调用的本质是LLM输出结构化的函数调用指令(JSON)，由外部运行环境执行函数并将结果返回给LLM，形成感知-决策-执行的闭环'
+  analogy: 就像找师傅修水管——你描述问题(LLM理解意图)，师傅选工具(扳手还是胶带)，按规格操作(构造参数)，看结果对不对(Observation)，不对换方法
+  first_principle: 工具调用的本质是LLM输出结构化的函数调用指令(JSON)，由外部运行环境执行函数并将结果返回给LLM，形成感知-决策-执行的闭环
   key_points:
-    - 'LLM本身不执行代码，只输出"调用意图"(函数名+参数JSON)'
-    - '判断是否需要调用工具: 通过System Prompt中的工具描述让LLM自行决策'
-    - '执行环境(Runtime)负责: 解析指令→执行函数→返回结果'
-    - 'MCP协议标准化了工具描述和调用接口'
+  - LLM本身不执行代码，只输出"调用意图"(函数名+参数JSON)
+  - '判断是否需要调用工具: 通过System Prompt中的工具描述让LLM自行决策'
+  - '执行环境(Runtime)负责: 解析指令→执行函数→返回结果'
+  - MCP协议标准化了工具描述和调用接口
 first_principle:
-  essence: 'LLM是"大脑"做决策，工具是"手脚"做执行，两者通过结构化JSON通信'
-  derivation: 'LLM的输出空间是文本，工具的输入空间是代码参数。Function Calling将自然语言意图映射到结构化函数调用，弥合了两个空间'
-  conclusion: 'Agent工具调用 = LLM决策层 + Runtime执行层 + 结构化通信协议'
+  essence: LLM是"大脑"做决策，工具是"手脚"做执行，两者通过结构化JSON通信
+  derivation: LLM的输出空间是文本，工具的输入空间是代码参数。Function Calling将自然语言意图映射到结构化函数调用，弥合了两个空间
+  conclusion: Agent工具调用 = LLM决策层 + Runtime执行层 + 结构化通信协议
 follow_up:
-  - '工具描述写得不好会怎样？如何优化？'
-  - '如果LLM选择了错误的工具怎么办？'
-  - '工具调用失败后如何优雅恢复？'
+- 工具描述写得不好会怎样？如何优化？
+- 如果LLM选择了错误的工具怎么办？
+- 工具调用失败后如何优雅恢复？
+memory_points:
+- 四步链路：LLM判断意图→输出结构化调用指令→Runtime执行→结果回传生成。
+- 定义规范：通过System Prompt下发工具描述和参数Schema。
+- 结构化输出：模型按JSON格式输出工具名和参数列表。
+- 循环反馈：工具执行结果作为Observation拼接到上下文，指导下一步生成。
 ---
 
 # Agent工具调用的完整机制和判断逻辑
@@ -238,3 +243,11 @@ def robust_tool_execution(tool_call, max_retries=2):
     
     # 失败后LLM可以决定: 换工具/换参数/告诉用户失败
 ```
+
+## 记忆要点
+
+- 四步链路：LLM判断意图→输出结构化调用指令→Runtime执行→结果回传生成。
+- 定义规范：通过System Prompt下发工具描述和参数Schema。
+- 结构化输出：模型按JSON格式输出工具名和参数列表。
+- 循环反馈：工具执行结果作为Observation拼接到上下文，指导下一步生成。
+

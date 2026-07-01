@@ -4,27 +4,32 @@ difficulty: L2
 category: database
 subcategory: MySQL
 tags:
-  - Shopee
-  - 面经
-  - MySQL
-  - PostgreSQL
+- Shopee
+- 面经
+- MySQL
+- PostgreSQL
 feynman:
   essence: MySQL用聚簇索引(数据在叶子节点)，PgSQL用非聚簇索引(叶子存物理地址需回表)
-  analogy: 'MySQL像按字典序排列的词典——拼音索引直接翻到页就有解释(聚簇)。PgSQL像普通书的索引——索引页指向正文页码需要翻过去(非聚簇)'
-  first_principle: '索引组织方式决定了数据物理存储——聚簇索引数据按主键物理排列，非聚簇索引数据独立存储'
+  analogy: MySQL像按字典序排列的词典——拼音索引直接翻到页就有解释(聚簇)。PgSQL像普通书的索引——索引页指向正文页码需要翻过去(非聚簇)
+  first_principle: 索引组织方式决定了数据物理存储——聚簇索引数据按主键物理排列，非聚簇索引数据独立存储
   key_points:
-    - MySQL(InnoDB)是聚簇索引，数据存在主键B+树叶子节点
-    - PgSQL是非聚簇索引，叶子节点存物理地址(CTID)
-    - MySQL主键查询快(一次IO)，PgSQL支持复杂查询和JSON/向量
-    - 都用B+树作为底层结构
+  - MySQL(InnoDB)是聚簇索引，数据存在主键B+树叶子节点
+  - PgSQL是非聚簇索引，叶子节点存物理地址(CTID)
+  - MySQL主键查询快(一次IO)，PgSQL支持复杂查询和JSON/向量
+  - 都用B+树作为底层结构
 first_principle:
   essence: 聚簇索引将索引和数据合一，非聚簇索引将索引和数据分离
-  derivation: '聚簇→主键查询一次到位→但二级索引需回表。非聚簇→所有索引平等→但主键查询也需要回表'
+  derivation: 聚簇→主键查询一次到位→但二级索引需回表。非聚簇→所有索引平等→但主键查询也需要回表
   conclusion: 读多写少+主键查询为主选MySQL，复杂查询+JSON/向量场景选PgSQL
 follow_up:
-  - 'MySQL的二级索引为什么需要回表？'
-  - 'PgSQL的CTID是什么？'
-  - '什么场景下PgSQL比MySQL更合适？'
+- MySQL的二级索引为什么需要回表？
+- PgSQL的CTID是什么？
+- 什么场景下PgSQL比MySQL更合适？
+memory_points:
+- 底层结构相同：MySQL和PgSQL均用B+树，核心区别在表组织方式不同
+- 表组织对比：MySQL聚簇索引（主键存行数据），而PgSQL非聚簇（堆表存行）
+- 回表机制差异：MySQL二级索引存主键需回表，而PgSQL所有索引存CTID必回表
+- 性能与场景：MySQL主键查询极快适合KV模式，PgSQL因JSONB和pgvector生态适合复杂查询
 ---
 
 # MySQL和PgSQL的区别？分别用什么数据结构实现索引？
@@ -144,3 +149,11 @@ SELECT id FROM users WHERE id = 1;
 2. **回表性能**：MySQL二级索引需回表(存主键值→再查主键)，PgSQL所有索引都回表(存CTID)
 3. **PgSQL优势**：JSONB可索引、pgvector、PostGIS等扩展生态丰富
 4. **MySQL优势**：聚簇索引主键查询极快，适合KV式访问模式
+
+## 记忆要点
+
+- 底层结构相同：MySQL和PgSQL均用B+树，核心区别在表组织方式不同
+- 表组织对比：MySQL聚簇索引（主键存行数据），而PgSQL非聚簇（堆表存行）
+- 回表机制差异：MySQL二级索引存主键需回表，而PgSQL所有索引存CTID必回表
+- 性能与场景：MySQL主键查询极快适合KV模式，PgSQL因JSONB和pgvector生态适合复杂查询
+

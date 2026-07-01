@@ -4,27 +4,32 @@ difficulty: L3
 category: ai
 subcategory: LLM
 tags:
-  - 智谱
-  - 面经
-  - RoPE
-  - 位置编码
+- 智谱
+- 面经
+- RoPE
+- 位置编码
 feynman:
-  essence: "RoPE(旋转位置编码)通过对Query和Key施加旋转变换，用绝对位置编码实现相对位置关系，兼顾外推性和计算效率"
-  analogy: "想象时钟的指针——绝对位置是时分针的角度，两个指针的夹角差(相对位置)才是我们关心的。RoPE就是把token放到时钟表盘上，通过旋转角度差自然表达相对距离"
-  first_principle: "Attention的核心是Q·K点积，RoPE在点积前旋转Q和K，使得点积结果只依赖它们的相对位置"
+  essence: RoPE(旋转位置编码)通过对Query和Key施加旋转变换，用绝对位置编码实现相对位置关系，兼顾外推性和计算效率
+  analogy: 想象时钟的指针——绝对位置是时分针的角度，两个指针的夹角差(相对位置)才是我们关心的。RoPE就是把token放到时钟表盘上，通过旋转角度差自然表达相对距离
+  first_principle: Attention的核心是Q·K点积，RoPE在点积前旋转Q和K，使得点积结果只依赖它们的相对位置
   key_points:
-    - 'RoPE = 绝对位置编码 + 自然得到相对位置关系'
-    - '通过旋转矩阵实现，不引入额外参数'
-    - '支持长度外推(配合NTK-aware scaling)'
-    - '主流模型: LLaMA/Qwen/GLM/DeepSeek都用RoPE'
+  - RoPE = 绝对位置编码 + 自然得到相对位置关系
+  - 通过旋转矩阵实现，不引入额外参数
+  - 支持长度外推(配合NTK-aware scaling)
+  - '主流模型: LLaMA/Qwen/GLM/DeepSeek都用RoPE'
 first_principle:
-  essence: "Attention只关心token间的相对位置，不关心绝对位置"
-  derivation: "需要Q·K只依赖m-n(相对位置) → 对Q_m旋转θm、K_n旋转θn → Q_m·K_n = g(x_m, x_n, m-n) → 点积自然包含相对位置信息"
-  conclusion: "RoPE用绝对位置的旋转变换巧妙实现了相对位置编码"
+  essence: Attention只关心token间的相对位置，不关心绝对位置
+  derivation: 需要Q·K只依赖m-n(相对位置) → 对Q_m旋转θm、K_n旋转θn → Q_m·K_n = g(x_m, x_n, m-n) → 点积自然包含相对位置信息
+  conclusion: RoPE用绝对位置的旋转变换巧妙实现了相对位置编码
 follow_up:
-  - "RoPE怎么实现长度外推？NTK-aware是什么？"
-  - "ALiBi和RoPE有什么区别？"
-  - "RoPE的base(10000)怎么调？"
+- RoPE怎么实现长度外推？NTK-aware是什么？
+- ALiBi和RoPE有什么区别？
+- RoPE的base(10000)怎么调？
+memory_points:
+- 必要性：Self-Attention本身位置无关，需注入位置信息防顺序混乱
+- 核心原理：Q/K做绝对旋转，点积自动内含相对位置(m-n)信息
+- 优势对比：相比绝对编码无额外参数，且天然具备相对位置感知能力
+- 长文本救星：通过NTK-aware scaling调大base，实现长度外推(如32K)
 ---
 
 # 详细讲讲 RoPE 旋转位置编码？还有哪些位置编码？为什么用 RoPE？
@@ -160,3 +165,11 @@ Attention[i,j] = softmax(Q_i·K_j / √d - m·|i-j|)
 优点: 极简、外推天然好
 缺点: 线性衰减假设太强，远距离token信息丢失严重
 ```
+
+## 记忆要点
+
+- 必要性：Self-Attention本身位置无关，需注入位置信息防顺序混乱
+- 核心原理：Q/K做绝对旋转，点积自动内含相对位置(m-n)信息
+- 优势对比：相比绝对编码无额外参数，且天然具备相对位置感知能力
+- 长文本救星：通过NTK-aware scaling调大base，实现长度外推(如32K)
+

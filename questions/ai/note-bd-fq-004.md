@@ -4,29 +4,34 @@ difficulty: L2
 category: ai
 subcategory: RAG
 tags:
-  - 字节
-  - 番茄小说
-  - 面经
-  - 向量检索
-  - Top-K
-  - 调参
+- 字节
+- 番茄小说
+- 面经
+- 向量检索
+- Top-K
+- 调参
 feynman:
   essence: Top-K控制向量检索的召回数量。太小→漏召回，太大→噪声多+延迟高+Rerank成本飙升。工业经验：向量检索K=100-200，Rerank后截断到5-10
   analogy: 就像海选歌手——太少人参加会漏掉好苗子（K太小），太多人参加评委看不过来且水军多（K太大），正确做法是大规模海选→评委精筛
   first_principle: 召回率和精确率是Trade-off关系。Top-K增大→召回率提升但精确率下降；Top-K减小→精确率提升但可能漏掉正确答案
   key_points:
-    - K过小：召回不足、容错率低、Rerank无候选可排
-    - K过大：延迟增加、Rerank成本飙升、噪声引入
-    - 工业经验值：向量检索K=100-200，Rerank后截断到5-10
-    - 需通过AB测试在具体场景确定最优K
+  - K过小：召回不足、容错率低、Rerank无候选可排
+  - K过大：延迟增加、Rerank成本飙升、噪声引入
+  - 工业经验值：向量检索K=100-200，Rerank后截断到5-10
+  - 需通过AB测试在具体场景确定最优K
 first_principle:
   essence: Top-K是在召回率和计算成本之间寻找最优点
-  derivation: '设Top-K=i的召回率R(i)，精确率P(i)。R(i)随i递增但边际递减，P(i)随i递减。Rerank成本C(i)=i×cost_per_doc。最优K满足：dR/dK × value_of_recall = dC/dK'
+  derivation: 设Top-K=i的召回率R(i)，精确率P(i)。R(i)随i递增但边际递减，P(i)随i递减。Rerank成本C(i)=i×cost_per_doc。最优K满足：dR/dK × value_of_recall = dC/dK
   conclusion: 最优K值 = 召回率曲线拐点 + Rerank成本约束，需在具体数据上AB测试确定
 follow_up:
-  - 如何自动化确定最优Top-K？有没有自适应K的方法？
-  - 动态K（根据Query难度调整K）怎么做？
-  - 如果Rerank模型很强，K可以设小一点吗？
+- 如何自动化确定最优Top-K？有没有自适应K的方法？
+- 动态K（根据Query难度调整K）怎么做？
+- 如果Rerank模型很强，K可以设小一点吗？
+memory_points:
+- 过小危害：因为召回不足且容错率低，导致标准答案被漏掉，Rerank也无用武之地
+- 过大危害：不仅P99延迟和Rerank成本飙升，更会引入噪声导致准确率反降
+- 工程最优解：采用三阶段架构，第一阶段Top-K设置在100-200之间粗排
+- 动态自适应：需根据Query区分度调整，模糊问题放大K，明确事实缩小K
 ---
 
 # 向量检索中Top-K设置过大或过小分别会带来什么问题？
@@ -134,3 +139,11 @@ def adaptive_top_k(query: str, query_type: str) -> int:
 2. **成本意识**：Rerank模型（如bge-reranker）每条约100ms，K=200意味着P99延迟至少20s——需要批处理或GPU加速
 3. **动态K**：不要写死K值，根据Query难度动态调整（简单问题小K，复杂问题大K）
 4. **监控指标**：设置召回率监控、Rerank延迟监控，当分布漂移时自动调整K
+
+## 记忆要点
+
+- 过小危害：因为召回不足且容错率低，导致标准答案被漏掉，Rerank也无用武之地
+- 过大危害：不仅P99延迟和Rerank成本飙升，更会引入噪声导致准确率反降
+- 工程最优解：采用三阶段架构，第一阶段Top-K设置在100-200之间粗排
+- 动态自适应：需根据Query区分度调整，模糊问题放大K，明确事实缩小K
+

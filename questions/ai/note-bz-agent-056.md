@@ -4,27 +4,32 @@ difficulty: L4
 category: ai
 subcategory: RAG
 tags:
-  - B站面经
-  - Agentic RAG
-  - GraphRAG
-  - RAG对比
+- B站面经
+- Agentic RAG
+- GraphRAG
+- RAG对比
 feynman:
   essence: Agentic RAG=把检索变成Agent的工具，动态决策检索策略。区别于Naive RAG的固定流程，Agentic RAG让LLM自主决定何时查、查什么、查几次。
   analogy: Naive RAG像自动售货机(投币出货固定流程)，Agentic RAG像导购(听需求→找商品→不够再找→推荐)。
   first_principle: 复杂问题的信息需求是动态的，固定流程的Naive RAG无法适应。Agent能根据上下文动态调整检索策略。
   key_points:
-    - Agentic RAG是检索作为Agent工具，动态决策
-    - Naive RAG是固定流程，一次性检索
-    - 区别：智能程度（动态vs固定）
-    - 优势：多跳问答/复杂推理/自我纠错
+  - Agentic RAG是检索作为Agent工具，动态决策
+  - Naive RAG是固定流程，一次性检索
+  - 区别：智能程度（动态vs固定）
+  - 优势：多跳问答/复杂推理/自我纠错
 first_principle:
   essence: 检索策略应该匹配问题的复杂度——简单问题一次检索够，复杂问题需多次探索。
-  derivation: 'Naive RAG假设一次检索就能找到答案。复杂问题（多跳/需要推理）的信息需求是动态的——查到A后才知道要查B。Agent能在推理过程中按需检索，适应这种动态性。'
+  derivation: Naive RAG假设一次检索就能找到答案。复杂问题（多跳/需要推理）的信息需求是动态的——查到A后才知道要查B。Agent能在推理过程中按需检索，适应这种动态性。
   conclusion: Agentic RAG = 检索作为Agent工具 + 动态检索策略决策
 follow_up:
-  - Agentic RAG什么时候比Naive好？——多跳问答/复杂分析
-  - 会不会太慢？——会，简单问题用Naive，复杂才用Agentic
-  - 怎么实现？——ReAct框架+retrieve工具
+- Agentic RAG什么时候比Naive好？——多跳问答/复杂分析
+- 会不会太慢？——会，简单问题用Naive，复杂才用Agentic
+- 怎么实现？——ReAct框架+retrieve工具
+memory_points:
+- 核心区别：Naive RAG是固定单次检索，Agentic RAG是Agent动态按需多次检索。
+- Agent四能力：决定是否查、改写拆解问、评估检索结果、多源路由（KG/SQL/Web）。
+- 特性对比：Agent具备自我纠错和多跳推理能力，但相比传统RAG速度慢且成本高。
+- 实现范式：ReAct模式加工具调用，思考-行动-观察多轮循环。
 ---
 
 # 什么是 Agentic RAG？和传统 RAG 的区别？
@@ -198,3 +203,11 @@ Naive RAG
 1. **核心是"动态决策"**：Agentic RAG 不是固定流程，而是 Agent 根据需要动态检索
 2. **多跳问答最能体现价值**：这是 Naive RAG 做不到的，用例子说明
 3. **承认成本**：Agentic 更慢更贵，简单任务不该用——体现实用主义
+
+## 记忆要点
+
+- 核心区别：Naive RAG是固定单次检索，Agentic RAG是Agent动态按需多次检索。
+- Agent四能力：决定是否查、改写拆解问、评估检索结果、多源路由（KG/SQL/Web）。
+- 特性对比：Agent具备自我纠错和多跳推理能力，但相比传统RAG速度慢且成本高。
+- 实现范式：ReAct模式加工具调用，思考-行动-观察多轮循环。
+
