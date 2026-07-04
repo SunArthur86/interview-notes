@@ -245,5 +245,89 @@
       "rebuild": "从链表指针的本质出发：保存next→翻转curr.next→前进prev和curr。三个指针是最小完备集，不需要额外数据结构。递归利用系统栈隐式保存prev，但空间换时间"
     },
     "images": []
+  },
+  {
+    "id": "note-xhs-algo-007",
+    "category": "algorithm",
+    "subcategory": "数组",
+    "difficulty": "L3",
+    "tags": [
+      "大数据",
+      "外部排序",
+      "布隆过滤器",
+      "哈希分桶",
+      "招商银行面试",
+      "招商银行"
+    ],
+    "question": "假如两个很大的集合，每个集合本身数据不重复，但两个集合之间存在重复数据，且集合很大加载到内存会有问题，从数据结构和算法的角度考虑，该怎么找到两个大集合的重复元素？（招商银行Java后端）",
+    "answer": "## 一、问题分析\n\n```\n两个大集合A和B：\n  - 各自内部无重复\n  - A和B之间存在重复元素\n  - 集合很大，无法全部加载到内存\n  - 找到A和B中的重复元素\n\n约束：内存有限 → 不能直接HashSet\n```\n\n## 二、方案1：外部排序 + 归并\n\n```\nStep 1: 分别对A和B排序（外部归并排序）\n  A_sorted: [1, 3, 5, 7, 9, 11, ...]  （分块排序后归并）\n  B_sorted: [2, 3, 5, 8, 9, 12, ...]\n\nStep 2: 双指针归并找交集\n  i=0, j=0\n  A[i] < B[j] → i++\n  A[i] > B[j] → j++\n  A[i] == B[j] → 找到重复！i++, j++\n```\n\n```java\npublic List<Integer> findDuplicates(File fileA, File fileB) throws IOException {\n    // 1. 外部排序（分块读入内存→排序→写临时文件→归并）\n    File sortedA = externalSort(fileA, chunkSize);\n    File sortedB = externalSort(fileB, chunkSize);\n\n    // 2. 双指针找交集\n    List<Integer> duplicates = new ArrayList<>();\n    BufferedReader readerA = new BufferedReader(new FileReader(sortedA));\n    BufferedReader readerB = new BufferedReader(new FileReader(sortedB));\n\n    Integer a = readNext(readerA);\n    Integer b = readNext(readerB);\n\n    while (a != null && b != null) {\n        if (a.equals(b)) {\n            duplicates.add(a);\n            a = readNext(readerA);\n            b = readNext(readerB);\n        } else if (a < b) {\n            a = readNext(readerA);\n        } else {\n            b = readNext(readerB);\n        }\n    }\n    return duplicates;\n}\n\n// 外部排序：分块 → 排序 → 归并\nprivate File externalSort(File input, int chunkSize) throws IOException {\n    List<File> sortedChunks = new ArrayList<>();\n    BufferedReader reader = new BufferedReader(new FileReader(input));\n\n    // 分块读取 → 排序 → 写临时文件\n    List<Integer> chunk = new ArrayList<>();\n    String line;\n    while ((line = reader.readLine()) != null) {\n        chunk.add(Integer.parseInt(line));\n        if (chunk.size() >= chunkSize) {\n            chunk.sort(Integer::compare);\n            File tmp = writeChunk(chunk);\n            sortedChunks.add(tmp);\n            chunk.clear();\n        }\n    }\n    if (!chunk.isEmpty()) {\n        chunk.sort(Integer::compare);\n        sortedChunks.add(writeChunk(chunk));\n    }\n\n    // 多路归并\n    return mergeSortedFiles(sortedChunks);\n}\n```\n\n**时间复杂度**：O(N log N)（排序） + O(N)（归并找交集）\n**空间复杂度**：O(chunkSize)（每块大小可控）\n\n## 三、方案2：布隆过滤器\n\n```\nStep 1: 用A构建布隆过滤器（内存友好，1亿数据~120MB）\nStep 2: 遍历B，检查每个元素是否在布隆过滤器中\n  → 可能存在 → 写入候选文件（有误判）\n  → 一定不存在 → 跳过\nStep 3: 对候选文件做精确验证\n```\n\n```java\npublic List<Integer> findDuplicates_Bloom(File fileA, File fileB) throws IOException {\n    // 1. 构建布隆过滤器\n    BloomFilter<Integer> filter = BloomFilter.create(\n        Funnels.integerFunnel(), 100_000_000, 0.01\n    );\n    BufferedReader readerA = new BufferedReader(new FileReader(fileA));\n    String line;\n    while ((line = readerA.readLine()) != null) {\n        filter.put(Integer.parseInt(line));\n    }\n\n    // 2. 遍历B，检查重复\n    List<Integer> candidates = new ArrayList<>();\n    BufferedReader readerB = new BufferedReader(new FileReader(fileB));\n    while ((line = readerB.readLine()) != null) {\n        int val = Integer.parseInt(line);\n        if (filter.mightContain(val)) {\n            candidates.add(val);  // 可能重复（1%误判）\n        }\n    }\n\n    // 3. 精确验证（candidates远小于B，可以放入内存HashSet）\n    Set<Integer> setA = loadToSet(fileA);  // 或分批加载\n    return candidates.stream()\n        .filter(setA::contains)\n        .collect(Collectors.toList());\n}\n```\n\n**时间复杂度**：O(N) + O(M)\n**空间复杂度**：O(N/8) ≈ 120MB（1亿数据）\n\n## 四、方案3：哈希分桶（分而治之）\n\n```\n核心思想：按哈希值分桶，相同元素一定在同一桶\n\n  hash(x) % 100 → 分到100个文件\n  A_0, A_1, ..., A_99\n  B_0, B_1, ..., B_99\n\n  只需要比较 A_i 和 B_i（相同哈希值的桶）\n  每个桶的数据量 = 总量/100 → 可以放入内存\n```\n\n```java\npublic List<Integer> findDuplicates_Hash(File fileA, File fileB, int buckets) throws IOException {\n    // 1. 按哈希分桶\n    List<BufferedWriter> writersA = createWriters(\"A_\", buckets);\n    List<BufferedWriter> writersB = createWriters(\"B_\", buckets);\n\n    partition(fileA, writersA, buckets);\n    partition(fileB, writersB, buckets);\n    closeAll(writersA);\n    closeAll(writersB);\n\n    // 2. 逐桶比较（每桶可放入内存）\n    List<Integer> result = new ArrayList<>();\n    for (int i = 0; i < buckets; i++) {\n        Set<Integer> setA = loadToSet(new File(\"A_\" + i));\n        BufferedReader reader = new BufferedReader(new FileReader(\"B_\" + i));\n        String line;\n        while ((line = reader.readLine()) != null) {\n            int val = Integer.parseInt(line);\n            if (setA.contains(val)) {\n                result.add(val);\n            }\n        }\n    }\n    return result;\n}\n\nprivate void partition(File input, List<BufferedWriter> writers, int buckets) throws IOException {\n    BufferedReader reader = new BufferedReader(new FileReader(input));\n    String line;\n    while ((line = reader.readLine()) != null) {\n        int val = Integer.parseInt(line);\n        int bucket = Math.abs(val % buckets);\n        writers.get(bucket).write(line + \"\\n\");\n    }\n}\n```\n\n**时间复杂度**：O(N + M)\n**空间复杂度**：O((N+M)/buckets)（每桶内存可控）\n\n## 五、三种方案对比\n\n| 方案 | 时间 | 空间 | 优点 | 缺点 |\n|------|------|------|------|------|\n| 外部排序+归并 | O(NlogN) | O(chunk) | 精确，通用 | 排序耗时 |\n| 布隆过滤器 | O(N+M) | O(N/8) | 快，内存省 | 有误判，需二次验证 |\n| 哈希分桶 | O(N+M) | O((N+M)/k) | 精确，可并行 | 需要临时磁盘空间 |\n\n## 六、面试加分点\n\n- 哈希分桶是大数据处理的经典思路（MapReduce的精髓）\n- 布隆过滤器方案需要二次精确验证（误判处理）\n- 提到MapReduce/Spark等分布式方案处理超大数据\n- 外部排序的归并阶段可以用多路归并（小顶堆）",
+    "follow_up": [
+      "如果数据分布在不同的机器上，如何用MapReduce找重复？",
+      "外部排序的时间复杂度是O(NlogN)，有没有O(N)的精确方案？",
+      "布隆过滤器的误判如何做二次验证？验证阶段内存够吗？",
+      "如果只需要判断「是否存在重复」（不需要找出来），用什么方案最快？"
+    ],
+    "feynman": {
+      "essence": "大数据找重复 = 把大问题拆成小问题。三种思路：1）排序后双指针扫描；2）布隆过滤器快速过滤；3）哈希分桶分而治之。",
+      "analogy": "两个图书馆找重复书：1）排序法 = 两边都按书名排好序，然后同时翻找（归并）；2）布隆法 = 先给A馆建个「书名速查卡」，再到B馆逐本查（有1%可能误判）；3）分桶法 = 按26个字母分26堆，只在对应堆里找重复。",
+      "key_points": [
+        "外部排序+归并：O(NlogN)，精确但排序耗时",
+        "布隆过滤器：O(N)，快但1%误判需二次验证",
+        "哈希分桶：O(N)，精确且可并行，经典MapReduce思路",
+        "核心思想：分而治之（大→小→内存可处理）"
+      ]
+    },
+    "first_principle": {
+      "problem": "数据量超过内存容量，如何在有限内存下处理全量数据？",
+      "axioms": [
+        "内存有限，不能加载全部数据",
+        "磁盘可以存储全部数据但访问慢",
+        "分而治之可以将大问题分解为内存可处理的小问题",
+        "排序后可以高效做集合运算（双指针）"
+      ],
+      "rebuild": "从「内存不足」出发：要么分批处理（外部排序/哈希分桶），要么用概率数据结构压缩（布隆过滤器）。分桶是最通用的方案——按哈希值分配到不同桶，每桶可独立放入内存处理。"
+    }
+  },
+  {
+    "id": "note-xhs-algo-008",
+    "category": "algorithm",
+    "subcategory": "数组",
+    "difficulty": "L2",
+    "tags": [
+      "滑动窗口",
+      "字符串",
+      "字母异位词",
+      "LeetCode438",
+      "招商银行面试",
+      "招商银行"
+    ],
+    "question": "编程题：找到字符串中所有字母异位词（LeetCode 438）（招商银行Java后端）",
+    "answer": "## 一、题目描述\n\n```\nLeetCode 438: 找到字符串中所有字母异位词\n\n给定一个字符串s和一个字符串p，找到s中所有p的字母异位词的子串\n返回这些子串的起始索引列表（不考虑顺序）\n\n字母异位词：字母重新排列（字母和数量相同，顺序不同）\n\n示例：\n  s = \"cbaebabacd\", p = \"abc\"\n  输出: [0, 6]\n  \n  解释：\n  s[0:3] = \"cba\" → 是\"abc\"的异位词 ✅\n  s[1:4] = \"bae\" → 不是\n  s[6:9] = \"bac\" → 是\"abc\"的异位词 ✅\n```\n\n## 二、思路分析\n\n```\n方法1: 暴力法 — 对每个位置排序比较 O(n*klogk)\n方法2: 滑动窗口 + 计数数组 — O(n) ✅\n\n滑动窗口核心思想：\n  维护一个大小=len(p)的窗口\n  比较窗口内字符频率和p的字符频率\n  频率相同 → 是异位词\n\n  \"c b a e b a b a c d\"   p = \"abc\"\n   [c b a] → freq{a:1,b:1,c:1} == p_freq{a:1,b:1,c:1} ✅ 索引0\n    [b a e] → freq{a:1,b:1,e:1} != p_freq ❌\n     [a e b] → freq{a:1,b:1,e:1} != ❌\n      ...\n         [b a c] → freq{a:1,b:1,c:1} == p_freq ✅ 索引6\n```\n\n## 三、最优解：滑动窗口 + 计数数组\n\n```java\npublic List<Integer> findAnagrams(String s, String p) {\n    List<Integer> result = new ArrayList<>();\n    if (s == null || s.length() < p.length()) {\n        return result;\n    }\n\n    int[] pCount = new int[26];  // p的字符频率\n    int[] sCount = new int[26];  // 窗口的字符频率\n\n    // 初始化p的频率\n    for (char c : p.toCharArray()) {\n        pCount[c - 'a']++;\n    }\n\n    int windowSize = p.length();\n\n    // 滑动窗口遍历s\n    for (int i = 0; i < s.length(); i++) {\n        // 右边界：加入新字符\n        sCount[s.charAt(i) - 'a']++;\n\n        // 左边界：移除旧字符（窗口形成后）\n        if (i >= windowSize) {\n            sCount[s.charAt(i - windowSize) - 'a']--;\n        }\n\n        // 窗口大小等于p时，比较频率\n        if (i >= windowSize - 1) {\n            if (Arrays.equals(sCount, pCount)) {\n                result.add(i - windowSize + 1);\n            }\n        }\n    }\n\n    return result;\n}\n```\n\n## 四、优化：避免每次Arrays.equals\n\n```java\n// 用一个matchCount记录匹配的字符数，避免每次比较整个数组\npublic List<Integer> findAnagrams_optimized(String s, String p) {\n    List<Integer> result = new ArrayList<>();\n    if (s.length() < p.length()) return result;\n\n    int[] count = new int[26];\n    for (char c : p.toCharArray()) {\n        count[c - 'a']++;\n    }\n\n    int left = 0, right = 0;\n    int matchCount = 0;  // 匹配的字符种类数\n    int uniqueChars = 0; // p中不同字符数\n    for (int c : count) {\n        if (c > 0) uniqueChars++;\n    }\n\n    while (right < s.length()) {\n        // 扩大右窗口\n        int idx = s.charAt(right) - 'a';\n        count[idx]--;\n        if (count[idx] == 0) matchCount++;  // 这个字符刚好匹配\n        right++;\n\n        // 缩小左窗口\n        while (count[idx] < 0) {\n            int leftIdx = s.charAt(left) - 'a';\n            if (count[leftIdx] == 0) matchCount--;\n            count[leftIdx]++;\n            left++;\n        }\n\n        // 所有字符匹配 → 找到异位词\n        if (matchCount == uniqueChars) {\n            result.add(left);\n        }\n    }\n\n    return result;\n}\n```\n\n## 五、复杂度分析\n\n| 方法 | 时间 | 空间 |\n|------|------|------|\n| 暴力排序 | O(n * k * log k) | O(k) |\n| 滑动窗口+计数数组 | O(n * 26) = O(n) | O(1) |\n| 优化matchCount | O(n) | O(1) |\n\n## 六、面试加分点\n\n- 滑动窗口是字符串匹配的经典范式（类似LeetCode 76最小覆盖子串）\n- 计数数组代替HashMap（26个字母 → O(1)空间）\n- matchCount优化避免每次Arrays.equals的O(26)比较\n- 提到如果字符集是Unicode（而非26字母），改用HashMap",
+    "follow_up": [
+      "滑动窗口和双指针有什么区别？什么场景用哪个？",
+      "如果字符集不是26个小写字母而是Unicode，怎么调整？",
+      "LeetCode 76（最小覆盖子串）和这题有什么联系？",
+      "如果p中有重复字符（如p=\"aab\"），算法需要调整吗？"
+    ],
+    "feynman": {
+      "essence": "字母异位词 = 字母组成相同、顺序不同的词。滑动窗口在s上滑动，每次比较窗口内字符频率是否等于p的频率。",
+      "analogy": "在书架上找「abc」的排列组合。拿一个正好放3本书的书框（窗口），从左到右滑。每次看框里的书是不是a、b、c各一本——是就记下位置，不是就继续滑。",
+      "key_points": [
+        "滑动窗口：窗口大小=len(p)，逐字符滑动",
+        "比较字符频率数组（26个字母用int[26]）",
+        "优化：matchCount记录匹配字符种类，避免每次比较",
+        "时间O(n)，空间O(1)（固定26字母）"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何在字符串中高效找到所有异位词子串？",
+      "axioms": [
+        "异位词的本质是字符频率相同（与顺序无关）",
+        "固定窗口大小等于p的长度",
+        "字符频率可以用固定大小数组表示（26字母）",
+        "窗口滑动时只需增量更新（加入一个、移除一个）"
+      ],
+      "rebuild": "从「频率相同=异位词」出发：维护窗口的字符频率数组，每次滑动时增量更新（加入右边、移除左边），比较窗口频率和p的频率。时间复杂度O(n)。"
+    }
   }
 ]

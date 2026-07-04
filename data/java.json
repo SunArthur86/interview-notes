@@ -1015,5 +1015,262 @@
       "rebuild": "从对象依赖管理出发：工厂模式→IOC容器(统一管理)→DI(自动注入)→三级缓存(解决循环依赖)→AOP(代理增强)→AOP失效场景(内部调用绕过代理)"
     },
     "images": []
+  },
+  {
+    "id": "note-xhs-java-005",
+    "category": "java",
+    "subcategory": "分布式",
+    "difficulty": "L4",
+    "tags": [
+      "Kafka",
+      "热点分区",
+      "高并发",
+      "批量写入",
+      "滴滴面试",
+      "滴滴"
+    ],
+    "question": "数百万司机每秒上报GPS位置，写入TPS超百万，如何避免Kafka热点分区？（滴滴Java后端一面）",
+    "answer": "## 一、问题场景\n\n```\n滴滴场景：数百万司机每秒上报GPS位置\n写入TPS：>100万/秒\n如果所有请求打到少数几个Kafka分区 → 热点分区\n  → 那几个分区所在Broker负载飙升\n  → 其他Broker空闲\n  → 整体吞吐被限制\n\n热点分区成因：\n  ① 默认按key哈希分区 → key分布不均\n  ② 某些区域司机密集 → 同一区域ID集中\n  ③ 分区数太少 → 并行度不够\n```\n\n## 二、三重优化方案\n\n### 优化1：按司机ID哈希分区（均匀分散）\n\n```java\n// 自定义分区器：按司机ID做哈希，保证均匀分散\npublic class DriverIdPartitioner implements Partitioner {\n    @Override\n    public int partition(String topic, Object key, byte[] keyBytes,\n                         Object value, byte[] valueBytes, Cluster cluster) {\n        // driverId 作为分区key\n        String driverId = (String) key;\n        int numPartitions = cluster.partitionCountForTopic(topic);\n        \n        // 一致性哈希 → 均匀分散到所有分区\n        return Math.abs(driverId.hashCode() % numPartitions);\n    }\n}\n```\n\n```\n效果：100万司机ID → 均匀分散到100+分区\n     每分区约1万TPS → 单Broker可承受\n```\n\n### 优化2：批量合并写入（减少IO次数）\n\n```java\n// Producer端：批量发送 + 压缩\nProperties props = new Properties();\nprops.put(\"batch.size\", 65536);           // 批次大小64KB\nprops.put(\"linger.ms\", 10);               // 最多等待10ms凑批\nprops.put(\"compression.type\", \"lz4\");     // LZ4压缩\nprops.put(\"buffer.memory\", 67108864);     // 缓冲区64MB\nprops.put(\"acks\", \"1\");                   // 主副本确认即可\n\nKafkaProducer<String, String> producer = new KafkaProducer<>(props);\n\n// 批量发送GPS数据\nfor (GpsLocation gps : gpsBatch) {\n    ProducerRecord<String, String> record = new ProducerRecord<>(\n        \"driver-gps-topic\",\n        gps.getDriverId(),     // key = driverId\n        gson.toJson(gps)        // value = GPS JSON\n    );\n    producer.send(record);\n}\n// 10ms内的数据合并成一个batch → 大幅减少IO次数\n```\n\n### 优化3：分区预扩容（避免运行时Rebalance）\n\n```\n容量规划公式：\n  分区数 = max(峰值TPS / 单分区TPS上限, 消费并发数)\n\n  峰值TPS = 100万/秒\n  单分区TPS上限 ≈ 1万/秒（SSD磁盘）\n  → 至少需要100个分区\n\n  消费并发 = 消费者实例数 × 每实例线程数\n  → 需要保证 分区数 >= 消费并发\n\n✅ 预先创建100+分区，避免运行中扩容触发Rebalance\n```\n\n## 三、完整架构\n\n```\n百万级GPS上报架构：\n\n  数百万司机APP\n       │ HTTP/gRPC\n       ▼\n  ┌─ 接入网关 ──────────┐\n  │  Netty长连接          │\n  │  聚合 + 压缩          │\n  └───────┬──────────────┘\n          ▼\n  ┌─ Kafka集群 ──────────┐\n  │  Topic: driver-gps    │\n  │  100+分区（ID哈希）     │\n  │  批量写入 + LZ4压缩    │\n  └───────┬──────────────┘\n          ▼\n  ┌─ 时序数据库 ─────────┐\n  │  InfluxDB/TDengine    │\n  │  按时间+区域分区       │\n  └──────────────────────┘\n```\n\n## 四、性能数据\n\n| 优化项 | TPS提升 | 说明 |\n|--------|--------|------|\n| 基线（默认分区） | ~10万 | 热点严重 |\n| +ID哈希分区 | ~50万 | 分散均匀 |\n| +批量合并 | ~80万 | IO次数减半 |\n| +分区预扩容 | >100万 | 并行度充足 |\n\n## 五、面试加分点\n\n- 强调三重优化是叠加效果，不是单点\n- 提到分区数公式（峰值TPS/单分区上限）\n- 提到批量写入的linger.ms权衡（延迟vs吞吐）\n- 提到时序数据库的选择（InfluxDB/TDengine/IoTDB）",
+    "follow_up": [
+      "Kafka的分区数可以动态增加吗？增加后消息顺序如何保证？",
+      "如果某个Broker宕机，分区Leader切换期间如何保证不丢数据？",
+      "时序数据库和Kafka如何配合？消费端如何保证不积压？",
+      "GPS数据的消费端如何做实时计算（比如热力图）？"
+    ],
+    "feynman": {
+      "essence": "避免热点分区 = 让数据均匀分散到所有分区。核心三板斧：按ID哈希分区（均匀）+ 批量合并写入（减IO）+ 预扩容（够并行）。",
+      "analogy": "高速公路收费站：如果所有车都挤到一个口（热点分区），后面排长队。解决方案：1）按车牌号分配到不同口（哈希分区）；2）凑满一辆大巴再过站（批量合并）；3）提前修够多的口（预扩容）。",
+      "key_points": [
+        "热点分区：数据集中到少数分区→Broker负载不均",
+        "三重优化：ID哈希分区+批量合并+预扩容",
+        "分区数公式：峰值TPS/单分区TPS上限",
+        "批量写入：batch.size+linger.ms平衡延迟和吞吐"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何在高并发写入场景下保证Kafka集群的负载均衡和吞吐量？",
+      "axioms": [
+        "Kafka分区是并行度的最小单位（一个分区只能在一个Broker上）",
+        "哈希分区只在key分布均匀时才能负载均衡",
+        "IO次数是吞吐量的瓶颈（批量合并可减少）",
+        "分区扩容会触发Rebalance（影响在线服务）"
+      ],
+      "rebuild": "从负载均衡出发：用ID哈希保证均匀分散（空间维度），用批量合并减少IO次数（时间维度），用预扩容保证并行度充足（容量维度）。三个维度叠加实现百万TPS。"
+    }
+  },
+  {
+    "id": "note-xhs-java-006",
+    "category": "java",
+    "subcategory": "缓存",
+    "difficulty": "L3",
+    "tags": [
+      "Redis",
+      "缓存穿透",
+      "布隆过滤器",
+      "空值缓存",
+      "招商银行面试",
+      "招商银行"
+    ],
+    "question": "系统用Redis做缓存时，大量短链访问不存在的key导致数据库压力暴增，该怎么办？布隆过滤器放在哪一层？误判了怎么办？（招商银行Java后端）",
+    "answer": "## 一、缓存穿透 vs 击穿 vs 雪崩\n\n```\n┌──────────┬───────────────────────┬─────────────────┐\n│  类型     │  本质                  │  解决方案        │\n├──────────┼───────────────────────┼─────────────────┤\n│  穿透     │  查不存在的key          │  布隆过滤器      │\n│          │  → 每次都打到DB         │  + 空值缓存      │\n├──────────┼───────────────────────┼─────────────────┤\n│  击穿     │  热点key突然失效        │  互斥锁          │\n│          │  → 大量请求打到DB       │  + 热点永不过期   │\n├──────────┼───────────────────────┼─────────────────┤\n│  雪崩     │  大量key同时失效        │  过期时间加随机值  │\n│          │  → DB瞬间过载           │  + 多级缓存      │\n└──────────┴───────────────────────┴─────────────────┘\n```\n\n## 二、缓存穿透详解\n\n### 场景\n\n```\n攻击者：大量请求 user_id = -1（不存在）的短链\n\n请求 → Redis（miss）→ DB（也miss）→ 返回null\n      ↑ 每次都穿透到DB\n\n如果有10万次/秒这种请求 → DB直接被打爆\n```\n\n### 方案1：布隆过滤器\n\n```\n请求流程：\n  ┌─ 请求 ──→ 布隆过滤器 ──→ 存在？──→ Redis ──→ DB\n  │             │              │\n  │          不存在 ←─────── 不存在 → 直接返回null（不查DB）\n  │\n  └─ 布隆过滤器放在 Redis 之前（网关层之后）\n\n布隆过滤器特点：\n  ✅ 说「不存在」→ 一定不存在（无假阴性）\n  ❌ 说「存在」→ 可能不存在（有假阳性，误判率~1%）\n  ✅ 内存极省（1亿key只需~120MB）\n  ❌ 不能删除元素（标准布隆过滤器）\n```\n\n```java\n// Redisson实现布隆过滤器\nRBloomFilter<String> bloomFilter = redisson.getBloomFilter(\"user:bloom\");\nbloomFilter.tryInit(100_000_000L, 0.01);  // 1亿容量，1%误判率\n\n// 初始化：加载所有存在的key到布隆过滤器\npublic void initBloomFilter() {\n    List<String> allUserIds = userMapper.selectAllIds();\n    for (String id : allUserIds) {\n        bloomFilter.add(id);\n    }\n}\n\n// 查询时先过布隆过滤器\npublic User getUser(String userId) {\n    // 第1层：布隆过滤器快速判断\n    if (!bloomFilter.contains(userId)) {\n        return null;  // 一定不存在，直接返回\n    }\n    // 第2层：Redis缓存\n    User user = redis.get(\"user:\" + userId);\n    if (user != null) return user;\n    // 第3层：查DB\n    user = userMapper.selectById(userId);\n    if (user != null) {\n        redis.set(\"user:\" + userId, user, 3600);\n    }\n    return user;\n}\n```\n\n### 布隆过滤器误判怎么办？\n\n```\n误判率 ~1% → 1%的「不存在」被判定为「存在」→ 仍会查DB\n\n兜底方案：\n  ① 空值缓存：DB查不到也缓存null（短TTL，如60秒）\n     → 同一个不存在的key，最多每60秒打DB一次\n\n  ② 限流兜底：对穿透到DB的请求做限流\n     → 即使误判，也不会打爆DB\n\n  ③ Counting Bloom Filter：支持删除的变种\n     → 误判率更低，但内存占用更大\n```\n\n```java\n// 空值缓存兜底\npublic User getUser(String userId) {\n    if (!bloomFilter.contains(userId)) return null;\n\n    // 检查空值缓存\n    if (redis.exists(\"null:\" + userId)) {\n        return null;  // 之前查过，确实不存在\n    }\n\n    User user = redis.get(\"user:\" + userId);\n    if (user != null) return user;\n\n    user = userMapper.selectById(userId);\n    if (user != null) {\n        redis.set(\"user:\" + userId, user, 3600);\n    } else {\n        // 缓存空值，防止误判后反复打DB\n        redis.set(\"null:\" + userId, \"\", 60);\n    }\n    return user;\n}\n```\n\n## 三、完整防护链\n\n```\n请求 → ①限流（令牌桶）→ ②布隆过滤器 → ③Redis缓存 → ④空值缓存 → ⑤DB\n         ↓                  ↓                ↓            ↓\n      超频拒绝          不存在→拦截      命中→返回     null→缓存\n```\n\n## 四、面试加分点\n\n- 布隆过滤器放在网关层之后、Redis之前（减少Redis查询）\n- 空值缓存设短TTL（60秒）防止数据不一致\n- 误判率公式：m = -(n * ln(p)) / (ln(2)^2)，n=元素数，p=误判率\n- 提到Counting Bloom Filter可删除但更耗内存",
+    "follow_up": [
+      "布隆过滤器的误判率和容量、哈希函数个数的关系是什么？",
+      "Counting Bloom Filter如何支持删除？有什么缺点？",
+      "缓存穿透和缓存击穿的区别？击穿怎么用互斥锁解决？",
+      "布隆过滤器的数据如何和DB保持同步（新增的key怎么加入）？"
+    ],
+    "feynman": {
+      "essence": "缓存穿透 = 查的东西根本不存在，每次都穿过缓存打到DB。布隆过滤器是一道「快速安检门」——先判断key是否存在，不存在就直接拦截，不浪费DB资源。",
+      "analogy": "机场安检：布隆过滤器 = 快速预检通道。如果你的名字不在乘客名单上（不存在的key），直接在预检口拦住，不用走到登机口（DB）。偶尔会误放一个人过去（误判），但到了登机口发现确实没他的座位（DB查不到），就缓存这个结果，下次直接拦住。",
+      "key_points": [
+        "穿透=查不存在的key→每次打DB；布隆过滤器拦截",
+        "布隆过滤器放Redis前：不存在→直接返回null",
+        "误判~1%：用空值缓存兜底（null缓存60秒）",
+        "完整防护链：限流→布隆→Redis→空值缓存→DB"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何在不查DB的情况下，快速判断一个key是否存在？",
+      "axioms": [
+        "DB查询是昂贵的（毫秒级）",
+        "HashSet判断存在性是O(1)但内存占用大",
+        "可以牺牲准确性换取空间效率（概率数据结构）",
+        "假阴性（漏报）比假阳性（误报）更危险"
+      ],
+      "rebuild": "从空间效率出发：用bit数组+k个哈希函数，每个元素映射k个bit位。查询时所有bit位都为1才「可能存在」。空间只需HashSet的1/8，代价是~1%误判率。用空值缓存兜底误判。"
+    }
+  },
+  {
+    "id": "note-xhs-java-007",
+    "category": "java",
+    "subcategory": "缓存",
+    "difficulty": "L3",
+    "tags": [
+      "Redis",
+      "缓存击穿",
+      "互斥锁",
+      "分布式锁",
+      "热点Key",
+      "招商银行面试",
+      "招商银行"
+    ],
+    "question": "当一个热点数据刚好失效，几万请求同时打到数据库，这时候会锁住那个key吗？锁的粒度是多大？用Redis锁还是本地锁？锁超时了怎么办？（招商银行Java后端）",
+    "answer": "## 一、缓存击穿场景\n\n```\n热点key（如：首页推荐、秒杀商品）缓存刚好失效\n       ↓\n几万请求同时发现缓存miss\n       ↓\n几万请求同时去查DB重建缓存\n       ↓\nDB瞬间过载 💥\n\n时间线：\n  t=0   缓存过期\n  t=1ms 请求1到达 → miss → 查DB\n  t=1ms 请求2到达 → miss → 查DB  ← 同时！\n  t=1ms 请求3到达 → miss → 查DB  ← 同时！\n  ...\n  t=1ms 请求10000到达 → miss → 查DB  ← DB被10000个查询打爆\n```\n\n## 二、解决方案对比\n\n| 方案 | 原理 | 优点 | 缺点 |\n|------|------|------|------|\n| 互斥锁 | 只允许一个请求查DB | 简单有效 | 有等待延迟 |\n| 逻辑过期 | 不设TTL，后台异步刷新 | 无阻塞 | 短暂数据不一致 |\n| 提前刷新 | 过期前主动刷新 | 无miss | 实现复杂 |\n| 热点探测 | 自动发现热点key | 智能化 | 需要额外组件 |\n\n## 三、方案1：互斥锁（最常用）\n\n### Redis分布式锁\n\n```java\npublic String getWithLock(String key) {\n    String value = redis.get(key);\n    if (value != null) {\n        return value;  // 缓存命中\n    }\n\n    // 缓存miss → 获取分布式锁\n    String lockKey = \"lock:\" + key;\n    String lockValue = UUID.randomUUID().toString();\n\n    try {\n        // 尝试获取锁（SETNX + 过期时间）\n        Boolean locked = redis.setIfAbsent(\n            lockKey, lockValue, 10, TimeUnit.SECONDS\n        );\n\n        if (Boolean.TRUE.equals(locked)) {\n            // 获取锁成功 → 查DB重建缓存\n            try {\n                // 双重检查（可能其他线程已经重建了）\n                value = redis.get(key);\n                if (value != null) return value;\n\n                value = db.query(key);\n                redis.set(key, value, 3600);\n                return value;\n            } finally {\n                // 释放锁（Lua保证原子性）\n                releaseLock(lockKey, lockValue);\n            }\n        } else {\n            // 获取锁失败 → 短暂等待后重试\n            Thread.sleep(50);\n            return getWithLock(key);  // 递归重试\n        }\n    } catch (Exception e) {\n        return getFallback(key);  // 降级\n    }\n}\n\n// 释放锁：Lua脚本保证「判断+删除」原子性\nprivate void releaseLock(String lockKey, String lockValue) {\n    String luaScript =\n        \"if redis.call('get', KEYS[1]) == ARGV[1] then \" +\n        \"  return redis.call('del', KEYS[1]) \" +\n        \"else return 0 end\";\n    redis.execute(luaScript, Collections.singletonList(lockKey), lockValue);\n}\n```\n\n### 锁的粒度选择\n\n```\n面试官追问：锁的粒度是多大？\n\n方案A：全局锁（粒度太大）\n  lock = \"global:cache:rebuild\"\n  → 所有key共用一把锁 → 串行化 → 性能差 ❌\n\n方案B：按key加锁（推荐）\n  lock = \"lock:\" + key\n  → 每个key独立锁 → 不同key可并行重建 ✅\n\n方案C：按key前缀分桶\n  lock = \"lock:\" + (key.hashCode() % 16)\n  → 折中方案 → 减少锁数量\n```\n\n### Redis锁 vs 本地锁\n\n```\n单机部署 → 本地锁（synchronized/Lock）即可\n集群部署 → 必须用Redis分布式锁\n\nRedis锁优势：\n  ✅ 跨JVM互斥\n  ✅ 自动过期（防止死锁）\n  ❌ 有网络开销\n  ❌ 需要处理锁续期（看门狗机制）\n\nRedisson封装（推荐）：\n  RLock lock = redisson.getLock(\"lock:\" + key);\n  lock.lock(10, TimeUnit.SECONDS);  // 自动续期\n  try { ... } finally { lock.unlock(); }\n```\n\n## 四、方案2：逻辑过期（无阻塞）\n\n```java\n// 不设物理TTL，在value中存逻辑过期时间\npublic class CacheData<T> {\n    T data;\n    long logicalExpire;  // 逻辑过期时间\n}\n\npublic T getWithLogicalExpire(String key) {\n    CacheData<T> cached = redis.get(key);\n    if (cached == null) {\n        return null;  // 理论上不会miss（热点永不过期）\n    }\n\n    if (cached.logicalExpire > System.currentTimeMillis()) {\n        return cached.data;  // 未过期 → 直接返回\n    }\n\n    // 逻辑过期 → 尝试获取锁异步刷新\n    if (tryLock(\"refresh:\" + key)) {\n        // 后台异步刷新缓存\n        CompletableFuture.runAsync(() -> {\n            try {\n                T newData = db.query(key);\n                CacheData<T> newCached = new CacheData<>(\n                    newData, System.currentTimeMillis() + 3600_000\n                );\n                redis.set(key, newCached);  // 不设TTL！\n            } finally {\n                unlock(\"refresh:\" + key);\n            }\n        });\n    }\n\n    return cached.data;  // 返回旧数据（短暂不一致，但无阻塞）\n}\n```\n\n## 五、面试加分点\n\n- 互斥锁必须做「双重检查」（获取锁后再查一次缓存）\n- 释放锁必须用Lua脚本保证原子性\n- 逻辑过期方案牺牲一致性换取无阻塞\n- 提到Redisson的看门狗（Watchdog）自动续期机制",
+    "follow_up": [
+      "Redis分布式锁和Zookeeper分布式锁有什么区别？哪个更适合缓存重建？",
+      "如果持有锁的线程宕机了，锁超时期间其他线程怎么处理？",
+      "逻辑过期方案中，异步刷新失败了怎么办？数据一直旧的吗？",
+      "如何自动发现热点key？有没有开源的热点探测组件？"
+    ],
+    "feynman": {
+      "essence": "缓存击穿 = 热点key突然过期，大量请求同时涌入DB。解决核心 = 加锁让只有一个请求去查DB，其他等结果。",
+      "analogy": "食堂打饭：突然饭盆空了（缓存过期）。如果100个人都冲去厨房催饭，厨房就崩溃了。正确做法：选一个人去厨房拿饭（互斥锁），其他人排队等着，饭拿回来大家都有得吃。",
+      "key_points": [
+        "击穿=热点key失效→大量请求打DB；互斥锁解决",
+        "锁粒度按key：lock:key，不同key可并行",
+        "集群用Redis分布式锁，单机用本地锁",
+        "双重检查+Lua释放锁+逻辑过期无阻塞"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何在高并发下保证缓存重建只执行一次？",
+      "axioms": [
+        "缓存重建是IO密集操作（查DB耗时）",
+        "多线程同时重建浪费资源且打爆DB",
+        "互斥可以保证只执行一次",
+        "锁需要跨JVM（集群部署）"
+      ],
+      "rebuild": "从「只重建一次」出发：用分布式锁保证只有一个线程查DB，其他线程等待。双重检查避免重复重建。Lua脚本保证释放锁的原子性。逻辑过期方案可避免阻塞但牺牲短暂一致性。"
+    }
+  },
+  {
+    "id": "note-xhs-java-008",
+    "category": "java",
+    "subcategory": "集合",
+    "difficulty": "L3",
+    "tags": [
+      "HashMap",
+      "ConcurrentHashMap",
+      "线程安全",
+      "CAS",
+      "synchronized",
+      "JDK1.7",
+      "JDK1.8",
+      "招商银行面试",
+      "招商银行"
+    ],
+    "question": "Java中HashMap和ConcurrentHashMap有什么区别？1.8和1.7的区别是什么？（招商银行Java后端）",
+    "answer": "## 一、HashMap vs ConcurrentHashMap\n\n```\nHashMap（线程不安全）：\n┌──────────────────────────────┐\n│  Node[] table                 │\n│  [0] → null                   │\n│  [1] → K1,V1 → K2,V2 → null   │  ← 链表\n│  [2] → K3,V3 → null           │\n│  ...                          │\n│  [n] → (Tree) K4,V4           │  ← 红黑树(链表>8)\n└──────────────────────────────┘\n  非线程安全 → 多线程put可能丢数据\n\nConcurrentHashMap（线程安全）：\n  JDK 1.7: Segment[] 分段锁（16段）\n  JDK 1.8: Node[] + CAS + synchronized\n           只锁单个桶（链表头节点）\n           → 并发度大大提升\n```\n\n## 二、核心区别\n\n| 维度 | HashMap | ConcurrentHashMap |\n|------|---------|-------------------|\n| 线程安全 | ❌ 不安全 | ✅ 安全 |\n| null键/值 | 允许 | ❌ 不允许 |\n| 锁粒度 | 无锁 | 桶级别（1.8）/ 段级别（1.7） |\n| 并发度 | 无 | 1.7=16段, 1.8=桶数 |\n| 迭代器 | fail-fast | 弱一致性（允许并发修改） |\n| 性能 | 最快 | 略低于HashMap（锁开销） |\n\n## 三、JDK 1.7 vs 1.8 区别\n\n### HashMap\n\n```\nJDK 1.7: 数组 + 链表（头插法 → 多线程成环）\nJDK 1.8: 数组 + 链表 + 红黑树（尾插法 → 不成环）\n\n关键改进：\n  1. 链表长度 > 8 且数组长度 >= 64 → 转红黑树（O(n)→O(logn)）\n  2. 头插法改尾插法 → 解决多线程成环问题\n  3. 扩容时保持相对位置（bit运算优化）\n```\n\n### ConcurrentHashMap\n\n```\nJDK 1.7: Segment + HashEntry[]\n  ┌─ Segment[0] ─→ HashEntry[]（各自加锁）\n  ├─ Segment[1] ─→ HashEntry[]\n  │  ...（默认16段，并发度=16）\n  └─ Segment[15]─→ HashEntry[]\n\n  → 锁粒度：Segment级别（段锁）\n  → 不同Segment可并行，同Segment串行\n\nJDK 1.8: Node[] + CAS + synchronized\n  ┌─ Node[0] ─→ null\n  ├─ Node[1] ─→ K1,V1 → K2,V2（synchronized锁头节点）\n  ├─ Node[2] ─→ K3,V3\n  │  ...\n  └─ Node[n]\n\n  → 锁粒度：桶级别（Node头节点）\n  → 不同桶完全并行，并发度=桶数\n  → 空桶用CAS插入（无锁）\n```\n\n### ConcurrentHashMap put流程（JDK 1.8）\n\n```java\n// 简化的put逻辑\nfinal V putVal(K key, int hash, V value, boolean onlyIfAbsent) {\n    // 1. key和value都不能为null\n    if (key == null || value == null) throw new NullPointerException();\n\n    int binCount = 0;\n    for (Node<K,V>[] tab = table;;) {\n        Node<K,V> f; int n, i, fh;\n\n        // 2. 数组为空 → 初始化（CAS保证）\n        if (tab == null || (n = tab.length) == 0)\n            tab = initTable();\n\n        // 3. 目标桶为空 → CAS插入（无锁）\n        else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {\n            if (casTabAt(tab, i, null, new Node<>(hash, key, value)))\n                break;  // CAS成功 → 完成\n        }\n\n        // 4. 正在扩容（MOVED）→ 协助扩容\n        else if ((fh = f.hash) == MOVED)\n            tab = helpTransfer(tab, f);\n\n        // 5. 桶不为空 → synchronized锁头节点\n        else {\n            synchronized (f) {\n                if (tabAt(tab, i) == f) {  // 双重检查\n                    // 链表或红黑树插入\n                    if (fh >= 0) {\n                        // 链表遍历插入/更新\n                    } else if (f instanceof TreeBin) {\n                        // 红黑树插入\n                    }\n                }\n            }\n            if (binCount >= TREEIFY_THRESHOLD)\n                treeifyBin(tab, i);  // 链表→红黑树\n            break;\n        }\n    }\n    addCount(1L, binCount);  // 元素数+1\n    return null;\n}\n```\n\n## 四、为什么ConcurrentHashMap不允许null？\n\n```java\n// 原因：二义性问题\nConcurrentHashMap<String, String> map = new ConcurrentHashMap<>();\nmap.put(\"key\", null);  // ❌ 编译通过但运行时NPE\n\n// 如果允许null：\nString value = map.get(\"key\");\n// value == null 到底是：\n//   ① key不存在？\n//   ② key存在但value是null？\n// HashMap可以用containsKey()区分（单线程无并发问题）\n// ConcurrentHashMap在并发下，containsKey和get之间可能被修改 → 无法区分\n```\n\n## 五、面试加分点\n\n- 1.8用synchronized而非ReentrantLock：JDK 1.6后synchronized优化（偏向锁→轻量级锁→重量级锁），性能不输ReentrantLock\n- CAS+锁的混合策略：空桶CAS无锁，非空桶synchronized\n- 红黑树退化：节点数<6时从红黑树退回链表\n- 扩容时多线程协助迁移（helpTransfer）",
+    "follow_up": [
+      "ConcurrentHashMap的size()方法在并发下准确吗？如何实现的？",
+      "HashMap多线程下为什么会出现死循环？1.8修复了吗？",
+      "CAS的ABA问题是什么？ConcurrentHashMap如何处理？",
+      "红黑树和链表的转换阈值为什么是8和6？为什么不一样？"
+    ],
+    "feynman": {
+      "essence": "HashMap = 非线程安全的哈希表；ConcurrentHashMap = 线程安全版本。1.7用分段锁（Segment），1.8改进为桶级锁（CAS+synchronized），并发度大幅提升。",
+      "analogy": "HashMap = 一个公用的储物柜（没人管，多人同时用会打架）。ConcurrentHashMap 1.7 = 把柜子分成16个区，每个区有锁（16人可同时用）。1.8 = 每个格子单独有锁（几乎所有人都能同时用）。",
+      "key_points": [
+        "HashMap不安全，CHM安全；CHM不允许null",
+        "1.7: Segment分段锁(16段)；1.8: CAS+sync桶级锁",
+        "1.8改进：空桶CAS无锁，非空桶synchronized",
+        "HashMap 1.8: 头插→尾插+红黑树(>8转树)"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何在多线程环境下实现高性能的线程安全哈希表？",
+      "axioms": [
+        "锁粒度越细，并发度越高",
+        "CAS比加锁更轻量（无竞争时）",
+        "synchronized在JDK1.6后有锁升级优化",
+        "并发读可以不加锁（volatile）"
+      ],
+      "rebuild": "从「减少锁竞争」出发：1.7用分段锁将锁粒度从全局降到段（16段）。1.8进一步降到桶级别——空桶用CAS无锁插入（大部分情况），非空桶用synchronized锁头节点（JDK优化后性能好）。"
+    }
+  },
+  {
+    "id": "note-xhs-java-009",
+    "category": "java",
+    "subcategory": "并发",
+    "difficulty": "L3",
+    "tags": [
+      "线程池",
+      "ThreadPoolExecutor",
+      "拒绝策略",
+      "并发",
+      "招商银行面试",
+      "招商银行"
+    ],
+    "question": "一般线程池通过什么方式来创建？线程池有哪些核心参数？谈谈线程池工作的流程？（招商银行Java后端）",
+    "answer": "## 一、线程池7大核心参数\n\n```\nThreadPoolExecutor构造函数：\n┌──────────────────────────────────────────────────┐\n│  1. corePoolSize      核心线程数（即使空闲也不销毁） │\n│  2. maximumPoolSize   最大线程数                    │\n│  3. keepAliveTime     非核心线程空闲存活时间         │\n│  4. unit              时间单位                      │\n│  5. workQueue         任务队列                      │\n│  6. threadFactory     线程工厂（创建线程）           │\n│  7. handler           拒绝策略                      │\n└──────────────────────────────────────────────────┘\n```\n\n## 二、线程池工作流程（核心！）\n\n```\n新任务到达\n    │\n    ▼\n┌─ 当前线程数 < corePoolSize？ ─┐\n│  YES → 创建核心线程执行任务      │\n│  NO  ↓                         │\n├─ 任务队列已满？ ────────────────┤\n│  NO  → 任务放入队列等待          │\n│  YES ↓                         │\n├─ 当前线程数 < maximumPoolSize？ ┤\n│  YES → 创建非核心线程执行任务    │\n│  NO  ↓                         │\n├─ 执行拒绝策略 ──────────────────┤\n│  AbortPolicy(默认) → 抛异常     │\n│  CallerRunsPolicy  → 调用者执行  │\n│  DiscardPolicy     → 丢弃       │\n│  DiscardOldest     → 丢最旧的   │\n└────────────────────────────────┘\n\n记忆口诀：\n  核心满 → 入队列 → 队列满 → 非核心 → 都满 → 拒绝\n```\n\n## 三、四种拒绝策略详解\n\n| 策略 | 行为 | 适用场景 |\n|------|------|---------|\n| AbortPolicy | 抛RejectedExecutionException | 默认，需要感知过载 |\n| CallerRunsPolicy | 由提交任务的线程执行 | 不丢任务，自动限流 |\n| DiscardPolicy | 静默丢弃新任务 | 允许丢任务 |\n| DiscardOldestPolicy | 丢弃队列最老的任务 | 只关心最新任务 |\n\n## 四、常用队列选择\n\n```\n┌─ LinkedBlockingQueue ──────┐\n│  无界队列（默认Integer.MAX）  │\n│  → maximumPoolSize无意义    │\n│  →Executors.newFixedThreadPool用这个\n│  ⚠️ 可能OOM！\n└─────────────────────────────┘\n\n┌─ ArrayBlockingQueue ───────┐\n│  有界队列                    │\n│  → 配合maximumPoolSize使用  │\n│  → 生产环境推荐\n└─────────────────────────────┘\n\n┌─ SynchronousQueue ─────────┐\n│  不存储任务（直接交接）       │\n│  → 每个put必须等一个take    │\n│  →Executors.newCachedThreadPool用这个\n│  → 可能创建大量线程\n└─────────────────────────────┘\n```\n\n## 五、阿里规范：不要用Executors\n\n```java\n// ❌ 阿里巴巴规范禁止\nExecutorService executor1 = Executors.newFixedThreadPool(10);\n// 问题：LinkedBlockingQueue无界 → OOM\n\nExecutorService executor2 = Executors.newCachedThreadPool();\n// 问题：maximumPoolSize=Integer.MAX_VALUE → 创建大量线程\n\n// ✅ 正确做法：手动创建\nThreadPoolExecutor executor = new ThreadPoolExecutor(\n    10,                              // corePoolSize\n    20,                              // maximumPoolSize\n    60L,                             // keepAliveTime\n    TimeUnit.SECONDS,                // unit\n    new ArrayBlockingQueue<>(500),   // 有界队列\n    new ThreadFactoryBuilder()\n        .setNameFormat(\"biz-pool-%d\")\n        .build(),                    // 带名称的线程工厂\n    new ThreadPoolExecutor.CallerRunsPolicy()  // 拒绝策略\n);\n```\n\n## 六、线程池参数如何设置\n\n```\nCPU密集型（计算为主）：\n  corePoolSize = CPU核心数 + 1\n  理由：多一个线程在某个线程偶尔暂停时顶替\n\nIO密集型（网络/DB等待为主）：\n  corePoolSize = CPU核心数 × 2  或  CPU核心数 / (1 - 阻塞系数)\n  理由：IO等待时CPU空闲，可以多开线程\n\n混合型：\n  根据实际IO/CPU比例调整，最好通过压测确定\n\n公式（Brian Goetz）：\n  线程数 = CPU核心数 × (1 + 等待时间/计算时间)\n```\n\n## 七、面试加分点\n\n- 工作流程是面试必考，一定要会画流程图\n- 强调「核心满→入队列→队列满→非核心→拒绝」的顺序\n- 阿里规范禁用Executors的原因（OOM风险）\n- 提到线程名规范化（ThreadFactoryBuilder）便于排查问题",
+    "follow_up": [
+      "线程池shutdown和shutdownNow有什么区别？",
+      "如何监控线程池的运行状态？有哪些关键指标？",
+      "核心线程可以被回收吗？allowCoreThreadTimeOut的作用？",
+      "如果线程池中某个任务抛出异常，会发生什么？怎么处理？"
+    ],
+    "feynman": {
+      "essence": "线程池 = 一个有等级的用工制度。先派正式工（核心线程），忙不过来先排队（队列），排队满了招临时工（非核心线程），临时工也满了就拒绝（拒绝策略）。",
+      "analogy": "餐厅用工：1）核心员工5人（corePoolSize）；2）来了客人先让正式员工做；3）忙不过来把订单贴墙上排队（workQueue）；4）排队满了招临时工到最多10人（maximumPoolSize）；5）临时工也满了→拒绝接单（拒绝策略）。临时工空闲1小时后辞退（keepAliveTime）。",
+      "key_points": [
+        "7参数：核心/最大线程数、存活时间、队列、工厂、拒绝策略",
+        "流程：核心满→入队列→队列满→非核心→都满→拒绝",
+        "阿里规范禁用Executors（无界队列OOM风险）",
+        "CPU密集型=N+1，IO密集型=2N"
+      ]
+    },
+    "first_principle": {
+      "problem": "为什么需要线程池而不是每次创建新线程？",
+      "axioms": [
+        "线程创建和销毁有开销（系统调用）",
+        "线程数过多导致上下文切换开销增大",
+        "资源有限（内存、CPU、DB连接数）",
+        "需要可控的并发度"
+      ],
+      "rebuild": "从「线程复用+资源控制」出发：预先创建一组线程（核心线程），任务到来时复用而非新建。通过队列缓冲突发流量，通过最大线程数防止资源耗尽，通过拒绝策略处理过载。核心是用空间（预创建线程）换时间（避免创建开销），用排队换吞吐。"
+    }
+  },
+  {
+    "id": "note-xhs-java-010",
+    "category": "java",
+    "subcategory": "并发",
+    "difficulty": "L3",
+    "tags": [
+      "异步调用",
+      "CompletableFuture",
+      "消息队列",
+      "Webhook",
+      "回调",
+      "招商银行面试",
+      "招商银行"
+    ],
+    "question": "假设有A和B两个服务，A服务需要调用B服务，而B服务执行时间比较长，B服务执行完毕后需要把结果返回给A服务，请设计解决方法，让A和B进行交互，需要三种方案。（招商银行Java后端）",
+    "answer": "## 一、问题分析\n\n```\n场景：A服务调用B服务，B执行时间长，B完成后要通知A\n需求：异步回调，不阻塞A\n\n核心挑战：\n  ① A不能一直等B（同步阻塞 → 超时/资源浪费）\n  ② B完成后要通知A（结果回传）\n  ③ 需要三种不同方案\n```\n\n## 二、三种方案\n\n### 方案1：Future / CompletableFuture（JDK原生）\n\n```\nA发送请求 → B开始执行 → A拿到Future（不阻塞）\n                                ↓\nA做其他事情 ← ← ← ← ← ← ← ← ←\n                                ↓\n                        B完成后 → A通过Future.get()获取结果\n\n或者用回调方式（CompletableFuture）：\n```\n\n```java\n// 方案1：CompletableFuture（推荐）\npublic void callB_Async() {\n    CompletableFuture.supplyAsync(() -> {\n        // 异步调用B服务\n        return bService.longRunningTask(params);\n    }).thenAccept(result -> {\n        // B完成后回调处理结果\n        handleResult(result);\n    }).exceptionally(ex -> {\n        // 异常处理\n        log.error(\"调用B失败\", ex);\n        return null;\n    });\n\n    // A不阻塞，继续做其他事\n    doOtherWork();\n}\n```\n\n### 方案2：消息队列（MQ回调）\n\n```\nA → 发送请求到MQ → B消费请求\n                     ↓\n                B执行完成\n                     ↓\n                B发送结果到MQ → A消费结果\n\n  ┌─ A服务 ──┐         ┌─ MQ ─┐         ┌─ B服务 ──┐\n  │          │──请求──→│       │──→     │          │\n  │          │         │       │         │  执行任务  │\n  │          │←--结果--│       │←--结果--│          │\n  └──────────┘         └───────┘         └──────────┘\n```\n\n```java\n// A服务：发送请求 + 监听结果\n// 发送请求\n@Service\npublic class ServiceA {\n    @Autowired\n    private RabbitTemplate rabbitTemplate;\n\n    public void callB() {\n        String taskId = UUID.randomUUID().toString();\n        rabbitTemplate.convertAndSend(\"task.queue\", new TaskRequest(taskId, params));\n        // 不等待，继续做其他事\n    }\n\n    // 监听结果队列\n    @RabbitListener(queues = \"result.queue\")\n    public void onResult(TaskResult result) {\n        // B完成后通过MQ回调\n        handleResult(result);\n    }\n}\n\n// B服务：消费请求 + 发送结果\n@Service\npublic class ServiceB {\n    @RabbitListener(queues = \"task.queue\")\n    public void executeTask(TaskRequest request) {\n        Object result = longRunningTask(request.getParams());\n        // 结果发回MQ\n        rabbitTemplate.convertAndSend(\"result.queue\",\n            new TaskResult(request.getTaskId(), result));\n    }\n}\n```\n\n### 方案3：HTTP回调（Webhook）\n\n```\nA → HTTP调用B（带callback_url）→ B异步执行\n                                    ↓\n                              B完成后\n                                    ↓\n                              B → HTTP POST → A的callback_url\n\n  ┌─ A服务 ──────────┐              ┌─ B服务 ──┐\n  │ POST /b/api       │──请求+callback──→│         │\n  │ {callback_url}    │              │  执行任务 │\n  │                   │              │         │\n  │ /a/callback ←───HTTP POST─结果────│         │\n  │ (接收回调)         │              └─────────┘\n  └───────────────────┘\n```\n\n```java\n// A服务：调用B并提供回调URL\n@Service\npublic class ServiceA {\n\n    @Async\n    public void callB() {\n        String taskId = UUID.randomUUID().toString();\n        String callbackUrl = \"https://service-a.com/a/callback?taskId=\" + taskId;\n\n        // 调用B，传递回调URL\n        bClient.submitTask(params, callbackUrl);\n    }\n\n    // B完成后的回调接口\n    @PostMapping(\"/a/callback\")\n    public ResponseEntity<String> callback(@RequestBody CallbackRequest req) {\n        // 处理B返回的结果\n        handleResult(req.getTaskId(), req.getResult());\n        return ResponseEntity.ok(\"received\");\n    }\n}\n\n// B服务：接收请求，完成后回调A\n@Service\npublic class ServiceB {\n\n    @Async\n    public void submitTask(Map params, String callbackUrl) {\n        Object result = longRunningTask(params);\n        // 异步回调A\n        restTemplate.postForObject(callbackUrl,\n            new CallbackRequest(result), String.class);\n    }\n}\n```\n\n## 三、三种方案对比\n\n| 维度 | CompletableFuture | 消息队列(MQ) | HTTP回调(Webhook) |\n|------|-------------------|-------------|------------------|\n| 耦合度 | 高（同JVM） | 低（解耦） | 中（URL耦合） |\n| 可靠性 | JVM崩溃则丢失 | MQ持久化保证 | 需要重试机制 |\n| 适用场景 | 同一应用内异步 | 微服务间异步 | 跨系统/第三方 |\n| 开发复杂度 | 最低 | 中等 | 中等 |\n| 运维成本 | 无 | 需维护MQ集群 | 需要公网暴露 |\n| 结果保证 | 单机内存 | MQ保证可达 | 需手动重试 |\n\n## 四、选型建议\n\n```\n同一JVM内异步 → CompletableFuture（最简单）\n微服务间可靠异步 → 消息队列（RabbitMQ/Kafka/RocketMQ）\n跨系统/第三方回调 → HTTP Webhook（需重试+幂等）\n```\n\n## 五、面试加分点\n\n- 三种方案各有适用场景，不能说谁好谁坏\n- MQ方案要提到幂等性（B可能重试→A收到重复结果）\n- Webhook要提到重试机制和超时设置\n- CompletableFuture要提到thenCompose（链式调用）和allOf/anyOf（多任务组合）",
+    "follow_up": [
+      "CompletableFuture和RxJava/Reactor有什么区别？",
+      "MQ方案中如何保证消息不丢？消息重复消费怎么处理？",
+      "Webhook回调失败如何重试？重试几次合适？",
+      "如果有多个A同时等待B的结果，用哪种方案最优？"
+    ],
+    "feynman": {
+      "essence": "异步回调 = A找B干活但不想干等，B干完了通知A。三种方式：1）留个电话等B打来（Future）；2）通过快递公司传话（MQ）；3）告诉B我的地址让他寄包裹（Webhook）。",
+      "analogy": "你去修电脑（B执行时间长）。方案1：你留下电话，修好了老板打给你（CompletableFuture回调）；方案2：你通过跑腿小哥送修，修好了跑腿送回来（消息队列）；方案3：你告诉老板你的家庭地址，修好了寄快递到家（Webhook）。",
+      "key_points": [
+        "方案1 CompletableFuture：同JVM异步，最简单",
+        "方案2 消息队列：微服务间解耦，可靠持久",
+        "方案3 Webhook：跨系统回调，需重试+幂等",
+        "选型：单机→CF，微服务→MQ，跨系统→Webhook"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何让调用方不阻塞等待，同时保证结果可靠回传？",
+      "axioms": [
+        "同步等待浪费线程资源（线程被阻塞）",
+        "异步需要结果回传机制",
+        "网络不可靠（需要重试和持久化）",
+        "系统间耦合度影响可维护性"
+      ],
+      "rebuild": "从「不阻塞+可靠回传」出发：同JVM用Future回调（零网络开销）；跨服务用MQ持久化（解耦+可靠）；跨系统用Webhook（简单但需重试）。核心是让调用方释放线程去做其他事，结果通过某种机制异步回传。"
+    }
   }
 ]

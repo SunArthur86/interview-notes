@@ -1590,5 +1590,430 @@
       "rebuild": "从分类需求出发：最简单的想法是「看周围邻居是什么类」。不建模型→存数据(Lazy)→预测时算距离→取TopK→投票。优点是简单无假设，缺点是计算量大。现代通过ANN(HNSW/KD-Tree)优化后，KNN成为RAG向量检索的理论基础"
     },
     "images": []
+  },
+  {
+    "id": "note-xhs-ai-028",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L3",
+    "tags": [
+      "Coze",
+      "Agent编排",
+      "DAG",
+      "MCP",
+      "网易面试",
+      "网易"
+    ],
+    "question": "Coze拖拽式编排和新版原生Agent模式有什么区别？你项目中用的哪种？（网易AI大模型一面）",
+    "answer": "## 一、核心对比\n\n| 维度 | 拖拽式编排 | 原生Agent模式 |\n|------|-----------|-------------|\n| 开发方式 | 可视化拖拽节点 | 代码自定义节点 |\n| 适用场景 | 标准化、固定流程 | 复杂分支、循环、DAG |\n| 灵活性 | 低（受限于预设节点） | 高（自主意图识别、动态工具选择） |\n| 上手难度 | 快速上手 | 需要开发能力 |\n| 自定义逻辑 | 受限 | 完全自定义 |\n\n## 二、拖拽式编排\n\n```\n用户输入 → [意图识别节点] → [知识库检索节点] → [LLM生成节点] → 输出\n                ↑                    ↑                ↑\n            预设模板            预设模板          预设模板\n\n特点：\n✅ 快速搭建标准化流程\n✅ 非开发人员也能使用\n❌ 复杂分支难以实现\n❌ 循环/依赖调度受限\n```\n\n**适用**：简单固定流程的快速原型搭建、标准化问答。\n\n## 三、原生Agent模式\n\n```\n用户输入 → Agent核心引擎\n              ├── 意图识别（动态）\n              ├── 工具选择（动态）\n              ├── DAG依赖编排\n              ├── 循环检测 + 熔断\n              └── 多步骤自动化\n                    ↓\n              自定义节点开发\n\n特点：\n✅ 自主意图识别 + 动态工具选择\n✅ 复杂DAG依赖编排\n✅ 支持循环、条件分支、并行\n❌ 开发成本较高\n```\n\n## 四、实战中的混合策略\n\n```python\n# 策略：简单流程用拖拽模板，复杂场景用原生Agent\nclass AgentOrchestrator:\n    def __init__(self):\n        self.simple_templates = CozeDragDropTemplates()  # 拖拽模板\n        self.native_engine = NativeAgentEngine()          # 原生引擎\n    \n    def route(self, task):\n        if task.is_standard_flow():\n            # 固定流程 → 拖拽模板（快速、低成本）\n            return self.simple_templates.execute(task)\n        else:\n            # 复杂多步骤 → 原生Agent（灵活、可控）\n            return self.native_engine.run(task)\n```\n\n## 五、面试加分点\n\n1. **不要只说区别**：要结合项目说明混合使用的策略\n2. **强调工程思维**：简单场景用工具提效，复杂场景做深度定制\n3. **提到DAG**：原生模式的核心优势是DAG调度和死循环检测",
+    "follow_up": [
+      "你在原生Agent中如何实现DAG拓扑排序？用什么数据结构？",
+      "Coze平台的MCP工具协议你了解吗？和Function Calling有什么区别？",
+      "如果Agent执行过程中某个节点失败，你怎么做故障恢复？"
+    ],
+    "feynman": {
+      "essence": "拖拽式编排像搭积木——用预设模块拼装；原生Agent像写程序——完全自定义逻辑。前者快但受限，后者灵活但成本高。",
+      "analogy": "拖拽式 = 宜家家具（按说明书拼，快但款式固定）；原生Agent = 找木匠定制（想怎么做怎么做，但要等要花钱）。聪明人两种都用：标准家具买宜家，特殊需求找木匠。",
+      "key_points": [
+        "拖拽式：可视化、快速搭建、适合固定流程",
+        "原生模式：代码自定义、DAG调度、动态工具选择",
+        "实战策略：混合使用，简单用模板，复杂用原生",
+        "原生模式核心优势：意图识别+DAG编排+死循环检测"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何让非技术人员也能快速搭建AI工作流，同时保留复杂场景的深度定制能力？",
+      "axioms": [
+        "标准化任务占80%，复杂定制任务占20%（二八定律）",
+        "可视化降低门槛，代码提升上限",
+        "编排的本质是DAG——有向无环图",
+        "工具选择应动态而非静态（意图驱动）"
+      ],
+      "rebuild": "从需求出发：标准化任务用拖拽模板快速覆盖（低边际成本），剩余20%复杂场景用原生Agent深度定制（高边际价值）。两者通过统一API层衔接，实现效率与灵活性的平衡。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-029",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L3",
+    "tags": [
+      "Agent",
+      "上下文管理",
+      "长期记忆",
+      "Token",
+      "网易面试",
+      "网易"
+    ],
+    "question": "Agent多轮对话的上下文和长期记忆你是怎么设计的？（网易AI大模型一面）",
+    "answer": "## 一、分层记忆架构\n\n```\n┌─────────────────────────────────────────┐\n│           用户对话请求                     │\n└──────────────┬──────────────────────────┘\n               ▼\n┌─────────────────────────────────────────┐\n│  Layer 1: 短期记忆（滑动窗口）              │\n│  - 保留最近 10 轮对话完整内容               │\n│  - 保障实时交互连贯性                       │\n│  - Token 阈值动态裁剪                      │\n└──────────────┬──────────────────────────┘\n               ▼ 超出窗口 → 自动摘要\n┌─────────────────────────────────────────┐\n│  Layer 2: 长期记忆（摘要库）               │\n│  - 关键意图、用户偏好、业务参数             │\n│  - 过滤无效闲聊和重复内容                   │\n│  - 存入向量数据库，按相关性召回             │\n└──────────────┬──────────────────────────┘\n               ▼\n┌─────────────────────────────────────────┐\n│  Layer 3: 全局上下文（System Prompt）      │\n│  - 角色人设、业务规则、能力边界             │\n│  - 每轮对话固定注入                       │\n└─────────────────────────────────────────┘\n```\n\n## 二、核心技术实现\n\n### 1. 短期记忆 — 滑动窗口\n\n```python\nclass ShortTermMemory:\n    def __init__(self, max_turns=10, max_tokens=4000):\n        self.messages = []\n        self.max_turns = max_turns\n        self.max_tokens = max_tokens\n\n    def add(self, role, content):\n        self.messages.append({\"role\": role, \"content\": content})\n        if len(self.messages) > self.max_turns * 2:\n            removed = self.messages.pop(0)\n            return removed  # 交给LongTermMemory处理\n        return None\n\n    def get_context(self):\n        total = sum(len(m[\"content\"]) for m in self.messages)\n        while total > self.max_tokens and len(self.messages) > 2:\n            removed = self.messages.pop(0)\n            total -= len(removed[\"content\"])\n        return self.messages\n```\n\n### 2. 长期记忆 — 摘要 + 向量检索\n\n```python\nclass LongTermMemory:\n    def compress(self, old_messages):\n        summary = self.summary_chain.run(\n            messages=old_messages,\n            extract=[\"intent\", \"preference\", \"business_params\"]\n        )\n        if self._is_small_talk(summary):\n            return None\n        self.vector_store.add(summary)\n        return summary\n\n    def recall(self, query, top_k=3):\n        return self.vector_store.search(query, top_k=top_k)\n```\n\n### 3. 上下文组装\n\n```python\ndef build_context(user_input, short_mem, long_mem):\n    context = [SYSTEM_PROMPT]           # 1.系统提示\n    context.extend(long_mem.recall(user_input))  # 2.长期记忆\n    context.extend(short_mem.get_context())       # 3.短期记忆\n    context.append({\"role\": \"user\", \"content\": user_input})\n    return context\n```\n\n## 三、关键优化点\n\n| 问题 | 解决方案 |\n|------|---------|\n| 多轮对话Token超限 | 滑动窗口 + 动态裁剪 |\n| 记忆冗余 | 自动摘要 + 闲聊过滤 |\n| 意图丢失 | 长期摘要保留关键意图 |\n| 召回不准 | 向量检索 + 关键词混合 |\n\n## 四、面试加分点\n\n- Token阈值动态裁剪而非固定截断\n- 异步摘要不阻塞实时对话\n- 记忆去重和闲聊过滤\n- 向量数据库（Chroma/Milvus）存储长期记忆",
+    "follow_up": [
+      "长期记忆存储用什么向量数据库？如何评估召回质量？",
+      "如果用户突然提起10轮对话前的话题，你的系统能想起来吗？怎么做到？",
+      "摘要压缩会不会丢失关键信息？如何保证摘要质量？",
+      "Token阈值如何动态计算？不同模型的限制不同怎么适配？"
+    ],
+    "feynman": {
+      "essence": "Agent记忆像人脑——短期记忆（工作记忆）记住最近几轮对话，长期记忆（笔记）把重要信息压缩存储，需要时再回想。",
+      "analogy": "你的大脑有个便签纸（短期记忆），记着刚才聊了什么；还有一个笔记本（长期记忆），把重要的事写下来。便签写满了就把重要的抄到笔记本上，不重要的扔掉。下次聊到相关话题，翻笔记本找。",
+      "key_points": [
+        "三层架构：短期滑动窗口 + 部分长期摘要记忆 + 全局系统提示",
+        "短期保留最近10轮，超出自动触发摘要压缩",
+        "长期记忆存向量库，按相关性召回",
+        "Token阈值动态裁剪，闲聊过滤，意图保留"
+      ]
+    },
+    "first_principle": {
+      "problem": "大模型有Token上限，如何在有限上下文窗口内保留最关键的信息？",
+      "axioms": [
+        "模型上下文窗口有限（4K~128K Token）",
+        "近期信息比远期信息更可能相关（时间局部性）",
+        "摘要压缩不可避免地丢失细节（信息损失）",
+        "相关性检索比全量保留更高效"
+      ],
+      "rebuild": "从Token限制出发：不可能保留所有历史。所以分层——近期全量保留（高价值），远期压缩为摘要（保留关键意图），需要时从向量库按需召回。本质是在有限空间内最大化信息价值。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-030",
+    "category": "ai",
+    "subcategory": "RAG",
+    "difficulty": "L4",
+    "tags": [
+      "RAG",
+      "召回优化",
+      "混合检索",
+      "重排序",
+      "BM25",
+      "网易面试",
+      "网易"
+    ],
+    "question": "讲讲RAG整体流程，以及你项目中解决召回不准的核心手段？（网易AI大模型一面）",
+    "answer": "## 一、RAG全流程六环节\n\n```\n原始文档 → [文档处理] → [向量化存储] → [Query检索] → [重排增强] → [模型生成] → [结果校验]\n            切分清洗     Embedding     召回      Rerank     LLM生成     过滤\n```\n\n## 二、召回不准的四层优化\n\n### 优化1：语义 + 规则混合切片\n\n```\n传统固定500字符切分：\n┌──────────500──────────┐┌──────────500──────────┐\n|...表格被切成两半......||...SQL语句断开......|\n└───────────────────────┘└───────────────────────┘\n\n按文档结构切分（+13%准确率）：\n┌──── Markdown标题锚点 ────┐\n│ # 第一章                  │ ← 标题做切分边界\n│ | 表格完整保留 |           │ ← 表格不拆\n│ ```代码块不拆分```         │ ← 代码不拆\n└───────────────────────────┘\n```\n\n### 优化2：无效噪声数据清洗\n\n```python\ndef clean_documents(docs):\n    cleaned = []\n    for doc in docs:\n        # 去除页眉页脚、水印、目录页\n        doc = remove_boilerplate(doc)\n        # 去除乱码、特殊字符\n        doc = clean_encoding(doc)\n        # 去除低信息量段落（<10字的碎片）\n        doc = filter_low_info(doc)\n        if len(doc.strip()) > 20:\n            cleaned.append(doc)\n    return cleaned\n```\n\n### 优化3：Query改写与歧义消解\n\n```\n用户问：「风机故障怎么排查」\n         ↓ Query改写\n改写后：「风力发电机 常见故障 排查步骤 维修流程」\n         ↓ 多路检索\n同时搜索：原始Query + 改写Query + 同义词扩展\n```\n\n### 优化4：轻量级重排模型二次筛选\n\n```python\n# 先粗排：向量检索召回Top50\ncandidates = vector_store.search(query, top_k=50)\n\n# 再精排：Cross-Encoder重排Top5\nreranker = CrossEncoder(\"BGE-Reranker-v2\")\nranked = reranker.rank(query, candidates, top_k=5)\n```\n\n## 三、效果数据（实战案例）\n\n| 优化阶段 | 准确率 | 提升幅度 |\n|---------|--------|---------|\n| 基线（固定切分+单路向量） | 62% | - |\n| +结构化切分 | 75% | +13% |\n| +BM25混合检索 | 85% | +10% |\n| +Cross-Encoder重排 | 91% | +6% |\n\n## 四、方法论总结\n\n```\n① 先跑100条真实问题做基线测试\n② 分析Bad Case分类（切分问题/检索问题/理解问题）\n③ 每个优化只改一个变量，跑回归测试\n④ 上线后每周抽检50条，防止模型退化\n```\n\n## 五、面试加分点\n\n- 强调「先量化再优化」：跑基线、分Bad Case、回归测试\n- 提到BM25+向量混合检索的权重调优（4:6经验值）\n- 提到Cross-Encoder vs Bi-Encoder的区别\n- 提到向量库增量更新机制",
+    "follow_up": [
+      "BM25和向量检索的权重比怎么确定？如何自动调优？",
+      "Cross-Encoder重排的性能开销如何控制？Top-K选多少合适？",
+      "如果文档更新频繁，向量库如何做增量更新而不影响在线服务？",
+      "如何评估RAG系统的整体效果？用什么指标？"
+    ],
+    "feynman": {
+      "essence": "RAG召回不准就像图书馆找书——要么书分错了类（切分问题），要么搜索关键词不对（检索问题），要么找到的书没排好序（重排问题）。逐个修复就能提升准确率。",
+      "analogy": "你去图书馆找「修车」的书。如果书架按固定页数划分（不分章节），可能一本书的前半截在A架、后半截在B架，你永远找不到完整答案。改成按章节分，用关键词+语义两种方式搜，最后让管理员帮你挑最相关的5本——这就是RAG召回优化的三板斧。",
+      "key_points": [
+        "RAG六环节：文档处理→向量化→检索→重排→生成→校验",
+        "四层优化：混合切片、噪声清洗、Query改写、重排精筛",
+        "实战效果：结构化切分+13%、混合检索+10%、重排序+6%",
+        "方法论：先基线→分Bad Case→单变量优化→回归测试"
+      ]
+    },
+    "first_principle": {
+      "problem": "大模型不知道你的私有数据，如何让它准确回答特定领域问题？",
+      "axioms": [
+        "模型参数中不包含私有/实时信息（知识截止）",
+        "上下文窗口有限，不能塞入全部文档",
+        "检索质量决定生成质量（Garbage In Garbage Out）",
+        "文档切分粒度影响检索精度（太粗召回噪声，太细丢失上下文）"
+      ],
+      "rebuild": "从「让模型看到正确信息」出发：先把文档结构化切分（保留语义完整性），再用混合检索（语义+关键词双保险）精准召回，最后用重排模型精排到Top5，确保喂给LLM的是最相关、最完整的信息。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-031",
+    "category": "ai",
+    "subcategory": "微调",
+    "difficulty": "L3",
+    "tags": [
+      "灾难性遗忘",
+      "微调",
+      "LoRA",
+      "PEFT",
+      "网易面试",
+      "网易"
+    ],
+    "question": "什么是模型灾难性遗忘？应用层怎么规避？（网易AI大模型一面）",
+    "answer": "## 一、什么是灾难性遗忘\n\n```\n模型微调前（通用能力强）：\n  ┌─────────────────────────┐\n  │ 通用问答 ██████████ 100% │\n  │ 代码生成 █████████░  90% │\n  │ 翻译    ██████████ 100% │\n  │ 垂域任务 ██░░░░░░░░  20% │ ← 需要提升\n  └─────────────────────────┘\n\n微调后（垂域能力强，但通用退化）：\n  ┌─────────────────────────┐\n  │ 通用问答 ████░░░░░░  40% │ ← 灾难性遗忘！\n  │ 代码生成 ███░░░░░░░  30% │ ← 严重退化\n  │ 翻译    █████░░░░░  50% │ ← 退化\n  │ 垂域任务 █████████░  90% │ ← 目标达成\n  └─────────────────────────┘\n```\n\n## 二、原因分析\n\n```\n微调本质：在预训练权重上做梯度更新\n\n     预训练权重 W₀\n         │\n         ▼ 梯度下降（新数据）\n     微调后权重 W₁\n         │\n    问题：新数据的梯度方向可能覆盖旧知识\n\n    参数空间：\n    ┌────────────────────────┐\n    │  ● 旧知识区域           │\n    │      ↘ 梯度更新方向     │\n    │         ● 新知识区域    │\n    │  （旧区域被破坏）        │\n    └────────────────────────┘\n```\n\n**核心原因**：神经网络的参数是共享的，新任务优化的参数与旧任务依赖的参数重叠，导致旧知识被覆盖。\n\n## 三、应用层规避方案\n\n### 方案1：增量微调（保留基础权重）\n\n```python\n# LoRA微调 — 只更新低秩矩阵，不动基础权重\nfrom peft import LoraConfig, get_peft_model\n\nconfig = LoraConfig(\n    r=8,                    # 低秩矩阵维度\n    lora_alpha=32,          # 缩放系数\n    target_modules=[\"q_proj\", \"v_proj\"],  # 只调注意力层\n    lora_dropout=0.05,\n)\nmodel = get_peft_model(base_model, config)\n# 基础权重W₀被冻结，只训练ΔW → 原有能力不被破坏\n```\n\n### 方案2：新旧混合训练集\n\n```python\n# 构建混合数据集：新场景 + 旧通用\ntrain_data = (\n    domain_specific_data * 0.7 +   # 70% 垂域数据\n    general_data_sample * 0.3       # 30% 通用数据（防遗忘）\n)\n```\n\n### 方案3：全场景回归测评\n\n```python\nclass RegressionTester:\n    def __init__(self):\n        self.general_test = load_test_set(\"mmlu\", \"cmmlu\")\n        self.domain_test = load_test_set(\"domain_qa\")\n    \n    def evaluate(self, model):\n        general_score = self._run(self.general_test, model)\n        domain_score = self._run(self.domain_test, model)\n        \n        if general_score < threshold:\n            # 能力退化 → 回滚参数\n            model.rollback()\n            return \"ROLLBACK: 通用能力退化\"\n        return f\"PASS: 通用{general_score}, 垂域{domain_score}\"\n```\n\n## 四、各方案对比\n\n| 方案 | 效果 | 成本 | 适用场景 |\n|------|------|------|---------|\n| LoRA增量微调 | ⭐⭐⭐⭐ | 低 | 大多数场景首选 |\n| 混合训练集 | ⭐⭐⭐ | 中 | 数据充足时 |\n| 回归测评+回滚 | ⭐⭐⭐⭐ | 中 | 上线前必做 |\n| EWC正则化 | ⭐⭐⭐ | 高 | 学术研究 |\n| 提示工程 | ⭐⭐ | 极低 | 快速验证 |\n\n## 五、面试加分点\n\n- 强调「应用层」规避而非模型层——用LoRA、混合数据、回归测试\n- 提到PEFT（Parameter-Efficient Fine-Tuning）理念\n- 提到上线前的全场景回归测评是最后一道防线",
+    "follow_up": [
+      "LoRA的秩r选多大合适？r太大或太小有什么影响？",
+      "EWC（Elastic Weight Consolidation）的原理是什么？为什么应用层很少用？",
+      "如何量化评估模型是否发生了灾难性遗忘？用什么指标？",
+      "除了LoRA，还有哪些PEFT方法可以避免遗忘？"
+    ],
+    "feynman": {
+      "essence": "灾难性遗忘 = 模型学了新知识，忘了旧知识。就像一个人死记硬背了新课本，结果把以前学的全忘了。",
+      "analogy": "你的大脑像一个仓库。学新东西就像往里搬新货。如果仓库满了还硬塞，旧货就被挤出去。LoRA的做法是：不在主仓库动，在旁边搭个小棚子放新货，主仓库的原封不动。",
+      "key_points": [
+        "灾难性遗忘：微调后旧能力退化",
+        "原因：参数共享，新梯度覆盖旧知识",
+        "规避三板斧：LoRA增量微调 + 混合训练集 + 回归测评",
+        "LoRA只调低秩矩阵，冻结基础权重"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何在让模型学习新领域知识的同时，不丢失原有通用能力？",
+      "axioms": [
+        "神经网络参数是共享的（没有独立的「知识存储区」）",
+        "梯度下降会修改所有参与计算的参数",
+        "旧知识和新知识可能依赖相同的参数",
+        "参数修改是不可逆的（除非保存快照）"
+      ],
+      "rebuild": "从「新旧知识共享参数」出发：要么不修改原始参数（LoRA旁路），要么在训练数据中混入旧知识（混合集），要么在上线前检测退化（回归测试）。核心思想是保护原有参数不被新梯度破坏。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-032",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L3",
+    "tags": [
+      "限流",
+      "熔断",
+      "降级",
+      "高并发",
+      "AI服务",
+      "网易面试",
+      "网易"
+    ],
+    "question": "AI服务高并发场景，你怎么做限流、熔断和降级？（网易AI大模型一面）",
+    "answer": "## 一、AI服务的高并发挑战\n\n```\n传统后端：                     AI服务：\n请求 → 业务逻辑 → DB           请求 → LLM推理 → 返回\n响应时间: 10~50ms              响应时间: 1~30s（200倍慢）\nQPS: 1000~10000               QPS: 10~100（100倍低）\n失败模式: 超时/异常             失败模式: 超时/限流/Token耗尽/内容审查\n\n→ AI服务的瓶颈不是CPU/DB，而是GPU推理速度和Token配额\n```\n\n## 二、三板斧：限流 + 熔断 + 降级\n\n### 1. 限流（Rate Limiting）\n\n```\n┌──── 请求入口 ────┐\n│                  │\n│  ┌─ 用户维度 ─┐  │   每用户: 10次/分钟\n│  │  令牌桶    │  │\n│  └────────────┘  │\n│                  │\n│  ┌─ IP维度  ──┐  │   每IP: 50次/分钟\n│  │  滑动窗口  │  │\n│  └────────────┘  │\n│                  │\n│  ┌─ API维度 ─┐  │   全局: 100并发\n│  │  信号量    │  │\n│  └────────────┘  │\n└──────────────────┘\n```\n\n```python\nclass AIRateLimiter:\n    def __init__(self):\n        self.user_buckets = {}  # 用户级令牌桶\n        self.global_semaphore = asyncio.Semaphore(100)  # 全局并发限制\n\n    async def acquire(self, user_id):\n        # 1. 用户级限流\n        bucket = self.user_buckets.setdefault(\n            user_id, TokenBucket(rate=10, capacity=10)\n        )\n        if not bucket.consume():\n            raise RateLimitExceeded(\"用户请求过快，请稍后重试\")\n\n        # 2. 全局并发限制\n        await self.global_semaphore.acquire()\n\n    def release(self):\n        self.global_semaphore.release()\n```\n\n### 2. 熔断（Circuit Breaker）\n\n```\n状态机：\n                失败率 > 50%\n  ┌────────┐ ──────────────→ ┌────────┐\n  │ CLOSED │                 │  OPEN  │\n  │ (正常)  │ ←──────────────│ (熔断)  │\n  └────────┘  半开探测成功    └────┬───┘\n                                   │ 5秒后\n                                   ▼\n                               ┌────────┐\n                               │HALF_OPEN│\n                               │ (探测)   │\n                               └────────┘\n```\n\n```python\nclass AICircuitBreaker:\n    def __init__(self, failure_threshold=0.5, recovery_timeout=5):\n        self.failure_rate = 0\n        self.state = \"CLOSED\"\n        self.recovery_timeout = recovery_timeout\n\n    async def call(self, llm_api, prompt):\n        if self.state == \"OPEN\":\n            raise ServiceUnavailable(\"AI服务暂时不可用\")\n\n        try:\n            result = await llm_api(prompt)\n            self._on_success()\n            return result\n        except (TimeoutError, LLMError) as e:\n            self._on_failure()\n            raise\n\n    def _on_failure(self):\n        self.failure_count += 1\n        if self.failure_rate > 0.5:\n            self.state = \"OPEN\"\n            # 5秒后自动转HALF_OPEN探测\n```\n\n### 3. 降级（Degradation）\n\n```\n核心服务（实时对话）     → 全力保障 ✅\n  ↓\n非核心服务降级：\n  - 批量文案生成       → 延迟处理 / 降低并发\n  - 历史数据复盘       → 暂停\n  - 复杂Agent编排      → 降级为简单问答\n  - 模型选择           → 大模型→小模型（省GPU）\n```\n\n### 4. 队列削峰填谷\n\n```python\nclass AIRequestQueue:\n    \"\"\"高峰期请求入队，平稳承接\"\"\"\n    def __init__(self):\n        self.queue = asyncio.Queue(maxsize=500)\n        self.workers = [asyncio.create_task(self._process())\n                        for _ in range(20)]  # 20个推理worker\n\n    async def submit(self, request):\n        try:\n            self.queue.put_nowait(request)\n        except QueueFull:\n            # 队列满 → 降级返回缓存或友好提示\n            return await self.fallback(request)\n```\n\n## 三、分级保障策略\n\n| 优先级 | 服务类型 | 保障措施 |\n|--------|---------|---------|\n| P0 | 实时对话、智能问答 | 限流保护，全力保障 |\n| P1 | Agent编排、工具调用 | 熔断保护，超时降级 |\n| P2 | 批量生成、数据复盘 | 高峰期暂停 |\n| P3 | 历史分析、报告生成 | 低谷期执行 |\n\n## 四、面试加分点\n\n- 区分AI服务与传统后端的区别（响应慢200倍、QPS低100倍）\n- 强调「分级保障」而非一刀切\n- 提到队列削峰填谷（异步推理）\n- 提到大模型→小模型的降级策略（省GPU成本）",
+    "follow_up": [
+      "令牌桶和滑动窗口限流有什么区别？AI场景更适合哪种？",
+      "熔断器的失败率阈值怎么确定？50%合理吗？",
+      "如果GPU资源不够，你会选择降级为小模型还是排队等待？怎么决策？",
+      "AI服务的SLA怎么定义？P99延迟通常设多少？"
+    ],
+    "feynman": {
+      "essence": "AI服务限流熔断降级 = 给AI服务装「保险丝」——请求太多就限流挡住，服务出问题就熔断断开，实在撑不住就降级保核心。",
+      "analogy": "想象一家餐厅（AI服务）：1）限流 = 门口排队限号（防止挤爆厨房）；2）熔断 = 厨房着火暂停接单（防止级联故障）；3）降级 = 高峰期只做简餐不做大餐（保核心服务）。4）排队削峰 = 外卖订单先存着慢慢做。",
+      "key_points": [
+        "AI服务响应慢200倍、QPS低100倍，传统方案不够用",
+        "限流：用户级令牌桶 + IP级滑动窗口 + 全局信号量",
+        "熔断：失败率超50%自动断开，5秒后半开探测",
+        "降级：P0保对话，P2暂停批量，模型大→小"
+      ]
+    },
+    "first_principle": {
+      "problem": "AI推理速度远慢于传统服务，GPU资源有限，如何在流量洪峰下保障核心服务可用？",
+      "axioms": [
+        "GPU推理速度有物理上限（不能无限扩容）",
+        "AI服务响应时间是传统服务的200倍",
+        "部分功能比其他功能更重要（业务优先级）",
+        "级联故障比单点故障危害更大"
+      ],
+      "rebuild": "从GPU有限出发：不能无限扩容，所以必须控制入口（限流）+ 隔离故障（熔断）+ 牺牲非核心（降级）+ 异步缓冲（队列）。核心思想是在有限资源下最大化核心服务的可用性。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-033",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L4",
+    "tags": [
+      "DAG",
+      "任务调度",
+      "拓扑排序",
+      "Agent编排",
+      "死循环",
+      "网易面试",
+      "网易"
+    ],
+    "question": "DAG任务调度在Agent中怎么落地？如何判断节点依赖、控制执行顺序会不会死循环？（网易AI大模型二面）",
+    "answer": "## 一、DAG基础概念\n\n```\nDAG = Directed Acyclic Graph（有向无环图）\n\n    [文档解析] ──→ [信息提取] ──→ [结果汇总]\n         │                              ↑\n         └──→ [格式校验] ──→ [数据清洗] ─┘\n\n特点：\n  ✅ 有向：节点间有明确执行方向\n  ✅ 无环：不存在循环依赖（A→B→C→A ❌）\n  ✅ 可并行：无依赖关系的节点可以并行执行\n```\n\n## 二、Agent中的DAG调度实现\n\n### 1. 节点定义\n\n```python\nfrom dataclasses import dataclass\nfrom typing import List\n\n@dataclass\nclass TaskNode:\n    node_id: str\n    name: str\n    handler: callable           # 节点执行函数\n    dependencies: List[str]     # 前置依赖节点ID\n    max_retries: int = 3        # 最大重试次数\n    timeout: int = 30           # 超时时间（秒）\n\n# 示例：Agent任务编排\nnodes = [\n    TaskNode(\"parse\",   \"文档解析\",   parse_doc,    deps=[]),\n    TaskNode(\"extract\", \"信息提取\",   extract_info, deps=[\"parse\"]),\n    TaskNode(\"validate\",\"格式校验\",   validate,     deps=[\"parse\"]),\n    TaskNode(\"clean\",   \"数据清洗\",   clean_data,   deps=[\"validate\"]),\n    TaskNode(\"summary\", \"结果汇总\",   summarize,    deps=[\"extract\", \"clean\"]),\n]\n```\n\n### 2. 拓扑排序\n\n```python\nfrom collections import deque, defaultdict\n\nclass DAGScheduler:\n    def __init__(self, nodes):\n        self.nodes = {n.node_id: n for n in nodes}\n        self.graph = defaultdict(list)  # 邻接表\n        self.in_degree = {}             # 入度表\n        self._build_graph()\n\n    def _build_graph(self):\n        for node in self.nodes.values():\n            self.in_degree[node.node_id] = len(node.dependencies)\n            for dep in node.dependencies:\n                self.graph[dep].append(node.node_id)\n\n    def topological_sort(self):\n        \"\"\"Kahn算法拓扑排序\"\"\"\n        queue = deque([nid for nid, d in self.in_degree.items() if d == 0])\n        order = []\n        while queue:\n            nid = queue.popleft()\n            order.append(nid)\n            for neighbor in self.graph[nid]:\n                self.in_degree[neighbor] -= 1\n                if self.in_degree[neighbor] == 0:\n                    queue.append(neighbor)\n        if len(order) != len(self.nodes):\n            raise ValueError(\"检测到环路！DAG中不允许循环依赖\")\n        return order\n```\n\n### 3. 循环检测（防止死循环）\n\n```python\ndef detect_cycle(nodes):\n    \"\"\"DFS三色标记法检测环路\"\"\"\n    WHITE, GRAY, BLACK = 0, 1, 2\n    color = {n.node_id: WHITE for n in nodes}\n    node_map = {n.node_id: n for n in nodes}\n\n    def dfs(node_id):\n        color[node_id] = GRAY  # 正在访问\n        for dep in node_map[node_id].dependencies:\n            if color[dep] == GRAY:\n                return True   # 发现环路！\n            if color[dep] == WHITE and dfs(dep):\n                return True\n        color[node_id] = BLACK  # 访问完成\n        return False\n\n    return any(color[nid] == WHITE and dfs(nid) for nid in color)\n```\n\n### 4. 执行引擎（含并行 + 熔断）\n\n```python\nclass AgentExecutor:\n    def __init__(self, scheduler):\n        self.scheduler = scheduler\n        self.max_total_steps = 100  # 全局最大执行次数\n\n    async def run(self):\n        if detect_cycle(list(self.scheduler.nodes.values())):\n            raise RuntimeError(\"DAG存在环路，拒绝执行\")\n\n        step_count = 0\n        completed = set()\n        results = {}\n\n        while len(completed) < len(self.scheduler.nodes):\n            if step_count > self.max_total_steps:\n                raise RuntimeError(\"超过最大执行次数，触发环路熔断\")\n\n            # 找到所有可执行节点（依赖已完成）\n            ready = [\n                nid for nid, node in self.scheduler.nodes.items()\n                if nid not in completed\n                and all(d in completed for d in node.dependencies)\n            ]\n\n            # 并行执行无依赖冲突的节点\n            tasks = [self._execute_node(nid, results) for nid in ready]\n            done = await asyncio.gather(*tasks, return_exceptions=True)\n\n            for nid, result in zip(ready, done):\n                if isinstance(result, Exception):\n                    raise RuntimeError(f\"节点 {nid} 执行失败: {result}\")\n                results[nid] = result\n                completed.add(nid)\n\n            step_count += 1\n\n        return results\n\n    async def _execute_node(self, node_id, context):\n        node = self.scheduler.nodes[node_id]\n        for attempt in range(node.max_retries):\n            try:\n                return await asyncio.wait_for(\n                    node.handler(context), timeout=node.timeout\n                )\n            except Exception as e:\n                if attempt == node.max_retries - 1:\n                    raise\n```\n\n## 三、三重防护机制\n\n```\n┌──────────────────────────────────┐\n│  第1重：拓扑排序时的环路检测       │ ← 编排阶段\n│  （Kahn算法：入度为0才能入队）     │\n├──────────────────────────────────┤\n│  第2重：最大执行次数限制           │ ← 运行阶段\n│  （step_count > 100 → 熔断）      │\n├──────────────────────────────────┤\n│  第3重：单节点超时 + 重试          │ ← 节点级别\n│  （timeout=30s, retry=3）         │\n└──────────────────────────────────┘\n```\n\n## 四、面试加分点\n\n- 强调三重防护（编译期检测 + 运行期限制 + 节点级超时）\n- 提到并行执行无依赖节点提升效率\n- 提到实际项目中的业务提效数据（成本降低60%，耗时从1分钟到5秒）\n- 区分DAG调度和简单的链式调用",
+    "follow_up": [
+      "拓扑排序除了Kahn算法，还有DFS版本吗？两者有什么区别？",
+      "如果DAG中某个节点执行很慢，会阻塞整个流水线吗？怎么优化？",
+      "Agent的DAG调度和Airflow/Prefect等工作流引擎有什么区别？",
+      "如何实现动态DAG——运行时根据结果决定后续执行哪些节点？"
+    ],
+    "feynman": {
+      "essence": "DAG调度 = 把复杂任务拆成有依赖关系的小步骤，自动排序执行，同时防止死循环。就像项目管理中的甘特图——先做A再做B，C和D可以并行。",
+      "analogy": "做饭就是DAG：1）先淘米（无依赖）；2）煮饭依赖淘米；3）洗菜（与淘米并行）；4）切菜依赖洗菜；5）炒菜依赖煮饭+切菜。但如果食谱写「炒菜→煮饭→炒菜」那就是死循环，DAG会自动检测并报错。",
+      "key_points": [
+        "DAG=有向无环图，节点有依赖关系但不能成环",
+        "拓扑排序确定执行顺序（Kahn算法/DFS）",
+        "三重防护：环路检测+最大步数+节点超时",
+        "无依赖节点可并行执行提升效率"
+      ]
+    },
+    "first_principle": {
+      "problem": "复杂Agent任务涉及多个步骤，步骤间有依赖关系，如何保证执行顺序正确且不会死循环？",
+      "axioms": [
+        "任务之间有明确的先后依赖（偏序关系）",
+        "存在依赖关系的任务不能并行",
+        "循环依赖导致死锁（永远无法完成）",
+        "有限步骤内必须完成（不能无限执行）"
+      ],
+      "rebuild": "从依赖关系出发：用图表示任务依赖（DAG），用拓扑排序确定执行顺序，用环路检测防止死循环，用最大步数做兜底熔断。无依赖节点并行执行以提升效率。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-034",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L4",
+    "tags": [
+      "系统设计",
+      "游戏AI",
+      "Agent",
+      "RAG",
+      "网易面试",
+      "网易",
+      "架构设计"
+    ],
+    "question": "设计一个游戏AI陪玩系统，说说核心模块和落地思路。（网易AI大模型二面高频原题）",
+    "answer": "## 一、五大核心模块\n\n```\n┌─────────────────────────────────────────────────────┐\n│                  游戏AI陪玩系统                        │\n├─────────────┬──────────────┬──────────────┬─────────┤\n│  意图识别    │  角色人设     │  游戏知识库   │ 工具调度 │\n│  Module     │  Module      │  RAG Module  │ Module  │\n├─────────────┴──────────────┴──────────────┴─────────┤\n│                  工程稳定 Module                        │\n│  会话管理 / 超时重试 / 并发限流 / 内容合规              │\n└─────────────────────────────────────────────────────┘\n```\n\n## 二、各模块详解\n\n### Module 1: 意图识别\n\n```\n玩家输入 → 意图分类器 → 路由到不同处理链\n\n意图类型：\n  ┌─ 闲聊      → 直接LLM生成（轻量）\n  ├─ 游戏问答   → RAG检索游戏攻略\n  ├─ 任务指引   → 调用任务查询工具\n  ├─ 对战互动   → 调用战绩分析工具\n  └─ 投诉反馈   → 转人工客服\n\n实现方式：\n  - 轻量级：Prompt分类（低成本、快速）\n  - 中等级：小模型微调分类器\n  - 重量级：多Agent协作（每个意图一个Agent）\n```\n\n### Module 2: 角色人设\n\n```python\nCHARACTER_PROMPT = \"\"\"\n你是「小灵」，一位热情的游戏陪玩伙伴。\n- 语气：活泼、幽默，偶尔用游戏术语\n- 人设：资深玩家，擅长MOBA和吃鸡\n- 边界：不讨论政治/色情，不代练/不外挂\n- 风格：先共情再建议，给鼓励不给嘲讽\n- 知识：了解当前版本Meta、英雄强度、装备搭配\n\"\"\"\n\n# 关键：每轮对话注入人设，保证一致性\ndef build_prompt(user_msg, character, history):\n    return [\n        {\"role\": \"system\", \"content\": CHARACTER_PROMPT},\n        *history[-10:],  # 短期记忆\n        {\"role\": \"user\", \"content\": user_msg}\n    ]\n```\n\n### Module 3: 游戏知识库RAG\n\n```\n数据来源：\n  - 官方攻略Wiki\n  - 版本更新公告\n  - 英雄/装备/地图数据\n  - 常见FAQ\n\nRAG流程：\n  玩家问题 → Embedding → 向量检索 → Rerank → LLM生成\n\n关键优化：\n  - 版本感知：每个文档标注版本号，过期数据自动降权\n  - 实时更新：新版本发布后24h内更新知识库\n  - 多模态：支持截图识别装备/阵容\n```\n\n### Module 4: 实时工具调度\n\n```python\n# Agent可调用的工具集\ntools = {\n    \"query_match_history\": \"查询玩家历史战绩\",\n    \"analyze_team_comp\": \"分析双方阵容优劣势\",\n    \"recommend_build\": \"推荐装备/符文搭配\",\n    \"get_server_status\": \"查询服务器状态\",\n    \"submit_feedback\": \"提交玩家反馈\",\n}\n\n# Agent根据意图自动选择工具\nasync def handle_intent(intent, user_msg):\n    if intent == \"game_qa\":\n        docs = await rag.retrieve(user_msg)\n        return await llm.generate(user_msg, context=docs)\n    elif intent == \"combat_interaction\":\n        result = await agent.execute(\n            tools=[\"query_match_history\", \"analyze_team_comp\"],\n            query=user_msg\n        )\n        return result\n```\n\n### Module 5: 工程稳定\n\n```\n┌────────────────────────────────────┐\n│         工程稳定保障层               │\n├────────────────────────────────────┤\n│ 会话状态管理  → Redis存储会话上下文   │\n│ 超时重试     → 单次推理30s超时+3次重试│\n│ 并发限流     → 每用户10次/分钟       │\n│ 内容合规     → 敏感词过滤+内容审核API │\n│ 监控告警     → 响应时间/P99/错误率   │\n│ 降级策略     → GPU忙时→缓存/模板回复  │\n└────────────────────────────────────┘\n```\n\n## 三、系统架构图\n\n```\n玩家客户端\n    │ WebSocket（Netty长连接）\n    ▼\n┌─ API Gateway ─┐\n│  限流 + 鉴权    │\n└──────┬────────┘\n       ▼\n┌─ 意图识别 ────┐     ┌─ 角色人设 ──┐\n│  轻量分类器    │────→│  Prompt引擎  │\n└──────┬────────┘     └─────────────┘\n       │\n  ┌────┼────┬─────────┐\n  ▼    ▼    ▼         ▼\n RAG  工具  闲聊    转人工\n 检索  调用  LLM    客服\n  │    │    │\n  └────┼────┘\n       ▼\n┌─ 内容合规 ────┐\n│  敏感词+审核   │\n└──────┬────────┘\n       ▼\n   返回玩家\n```\n\n## 四、面试加分点\n\n- 强调「贴合游戏实时交互场景」——低延迟是关键\n- 提到版本感知RAG（游戏版本频繁更新）\n- 提到内容合规和防沉迷（游戏行业强监管）\n- 提到人设一致性（多轮对话中风格不漂移）\n- 对标字节/腾讯的游戏AI产品（如蛋仔派对AI助手）",
+    "follow_up": [
+      "游戏AI陪玩如何保证低延迟？P99响应时间要求多少？",
+      "如果百万玩家同时在线，系统如何水平扩展？",
+      "如何防止玩家通过AI陪玩获取不当信息（越狱攻击）？",
+      "角色人设如何在多轮对话中保持一致？有没有量化指标？"
+    ],
+    "feynman": {
+      "essence": "游戏AI陪玩 = 一个懂游戏、有人设、能查数据、会聊天的虚拟伙伴。核心是把游戏场景拆成五大模块，每个模块解决一个具体问题。",
+      "analogy": "想象游戏里有个「老玩家好友」——他能跟你聊天（意图识别+人设），你问他装备怎么出他秒答（知识库RAG），你打完一局他帮你复盘（工具调度），而且永远不卡顿不掉线（工程稳定）。",
+      "key_points": [
+        "五大模块：意图识别+角色人设+游戏RAG+工具调度+工程稳定",
+        "意图分类路由：闲聊/游戏问答/任务指引/对战互动",
+        "版本感知RAG：游戏版本更新24h内同步知识库",
+        "工程稳定：会话管理+超时重试+并发限流+内容合规"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何让AI在游戏场景中既有趣又有用，同时保证稳定性和合规性？",
+      "axioms": [
+        "游戏交互要求低延迟（玩家没有耐心等30秒）",
+        "游戏版本频繁更新，知识需要实时同步",
+        "不同意图需要不同处理策略（闲聊≠问答≠工具调用）",
+        "游戏行业监管严格（内容合规是硬性要求）"
+      ],
+      "rebuild": "从游戏交互需求出发：先分意图（路由到不同处理链），再注入人设（保证体验一致性），用RAG解决游戏知识（版本感知），用工具调度实现主动服务（战绩分析），最后用工程层保障高并发稳定。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-035",
+    "category": "ai",
+    "subcategory": "推理优化",
+    "difficulty": "L3",
+    "tags": [
+      "AI评估",
+      "质量量化",
+      "Bad Case",
+      "LLM-as-a-Judge",
+      "网易面试",
+      "网易"
+    ],
+    "question": "如何量化评估对话类AI应用的生成质量？（网易AI大模型二面）",
+    "answer": "## 一、评估框架总览\n\n```\n              AI生成质量评估\n             ┌──────┴──────┐\n         客观指标           主观指标\n        (可量化)           (需人工/AI评判)\n    ┌────┼────┐      ┌─────┼─────┐\n  准确率  效率  安全   相关性  流畅度  满意度\n```\n\n## 二、客观指标\n\n| 指标 | 定义 | 计算方式 | 目标值 |\n|------|------|---------|--------|\n| 准确率 | 回答正确的比例 | 正确数/总数 | >90% |\n| 召回率 | 该回答的都回答了 | 已回答/(已回答+未回答) | >85% |\n| 幻觉率 | 编造不存在信息 | 幻觉数/总数 | <5% |\n| 重复率 | 重复内容比例 | 重复段/总段 | <10% |\n| 响应耗时 | P99延迟 | 统计分位数 | <3s |\n| Token消耗 | 每次对话成本 | 总Token/对话数 | 监控趋势 |\n\n```python\nclass ObjectiveMetrics:\n    def evaluate(self, predictions, ground_truth):\n        return {\n            \"accuracy\": self._accuracy(predictions, ground_truth),\n            \"hallucination_rate\": self._hallucination(predictions, ground_truth),\n            \"repetition_rate\": self._repetition(predictions),\n            \"avg_latency_ms\": self._latency(),\n            \"avg_tokens\": self._token_usage(),\n        }\n\n    def _hallucination(self, preds, truth):\n        \"\"\"幻觉检测：回答中不在知识库的内容比例\"\"\"\n        hallucinated = 0\n        for pred in preds:\n            # 用NLI模型检测矛盾\n            if self.nli_checker.contradicts(pred, truth):\n                hallucinated += 1\n        return hallucinated / len(preds)\n```\n\n## 三、主观指标\n\n| 维度 | 评估方式 | 评分标准 |\n|------|---------|---------|\n| 内容相关性 | 人工/AI打分 | 1-5分（是否切题） |\n| 逻辑通顺度 | 人工/AI打分 | 1-5分（条理清晰） |\n| 人设一致性 | 规则+AI打分 | 1-5分（风格不漂移） |\n| 用户满意度 | 点赞/反馈 | 满意率>80% |\n\n### AI辅助评估（LLM-as-a-Judge）\n\n```python\nJUDGE_PROMPT = \"\"\"\n你是一个专业的AI对话质量评估员。\n请从以下维度对回答进行1-5分评估：\n\n1. 相关性：回答是否直接解决了用户问题？\n2. 准确性：信息是否正确、无幻觉？\n3. 流畅性：语言是否通顺、逻辑清晰？\n4. 有用性：回答是否有实际价值？\n5. 安全性：是否包含不当内容？\n\n用户问题：{question}\nAI回答：{answer}\n参考答案：{reference}\n\n请输出JSON：{{\"relevance\": N, \"accuracy\": N, ...}}\n\"\"\"\n\nasync def llm_judge(question, answer, reference=None):\n    prompt = JUDGE_PROMPT.format(\n        question=question, answer=answer, reference=reference or \"无\"\n    )\n    result = await llm.generate(prompt, response_format=\"json\")\n    return json.loads(result)\n```\n\n## 四、Bad Case沉淀与迭代\n\n```\n┌─ 日常质量保障闭环 ────────────────────────┐\n│                                          │\n│  ① 每日抽样50条对话                        │\n│      ↓                                   │\n│  ② 自动评估（客观指标）+ AI评判（主观指标）  │\n│      ↓                                   │\n│  ③ 筛选Bad Case（评分<3或用户点踩）         │\n│      ↓                                   │\n│  ④ 归类分析：                             │\n│     - 切分问题 → 优化文档切分               │\n│     - 检索问题 → 调整混合检索权重            │\n│     - 理解问题 → 优化Prompt                │\n│     - 安全问题 → 加强内容审核               │\n│      ↓                                   │\n│  ⑤ 修复 → 回归测试 → 上线                  │\n│      ↓                                   │\n│  ⑥ 每周抽检50条，防止退化                   │\n│                                          │\n└──────────────────────────────────────────┘\n```\n\n## 五、面试加分点\n\n- 强调「客观+主观」双维度评估\n- 提到LLM-as-a-Judge的成本优势（比纯人工便宜）\n- 提到Bad Case分类驱动的迭代方法论\n- 提到防退化机制（上线后定期抽检）\n- 提到幻觉率检测用NLI模型（而非简单关键词匹配）",
+    "follow_up": [
+      "LLM-as-a-Judge有哪些已知偏差？如何缓解？",
+      "幻觉检测除了NLI模型，还有哪些方法？",
+      "如果用户满意度持续下降，你会从哪些维度排查？",
+      "如何搭建自动化评估Pipeline？需要哪些工具？"
+    ],
+    "feynman": {
+      "essence": "AI生成质量评估 = 用数据说话。客观指标看「准不准、快不快、贵不贵」，主观指标看「好不好用、满不满意」，再用Bad Case驱动持续改进。",
+      "analogy": "评估AI回答质量就像评估餐厅：1）客观数据 = 菜品上桌时间、价格、卫生评分（可量化）；2）主观感受 = 味道好不好、服务态度（需要评价）；3）Bad Case = 差评分析 → 改进菜品 → 再看评分。",
+      "key_points": [
+        "客观指标：准确率/幻觉率/重复率/延迟/Token消耗",
+        "主观指标：相关性/流畅度/人设一致性/满意度",
+        "LLM-as-a-Judge：用AI评估AI，降低人工成本",
+        "Bad Case闭环：抽样→评估→分类→修复→回归"
+      ]
+    },
+    "first_principle": {
+      "problem": "AI生成的回答是概率性的、非结构化的，如何客观量化其质量？",
+      "axioms": [
+        "无法测量的东西无法改进",
+        "AI输出有随机性（同一问题不同回答）",
+        "用户感知质量≠技术指标质量",
+        "质量会随时间和数据变化而退化"
+      ],
+      "rebuild": "从「可测量才能改进」出发：先用客观指标建立基线（准确率/延迟/成本），再用主观指标覆盖用户体验维度，最后用Bad Case驱动迭代闭环。防退化靠定期抽检。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-036",
+    "category": "ai",
+    "subcategory": "RAG",
+    "difficulty": "L4",
+    "tags": [
+      "RAG",
+      "切分策略",
+      "混合检索",
+      "BM25",
+      "重排序",
+      "Cross-Encoder",
+      "实战复盘"
+    ],
+    "question": "RAG知识库准确率从62%到91%，只改了3处——切分策略、检索策略、重排序，具体怎么做的？（小红书实战复盘）",
+    "answer": "## 一、项目背景\n\n```\n场景：中型企业知识库智能问答\n数据：1200份内部文档（技术方案 + 运维手册 + 客服SOP）\n目标：用AI做智能问答，准确率要求 >90%\n\n时间线：\n  第1周 → 搭完第一版 → 准确率62% 😅\n  第7周 → 优化后      → 准确率91% ✅\n\n核心：只改了3个东西，提升29个百分点\n```\n\n## 二、第1刀：切分策略（+13%）\n\n### 问题\n\n```\n固定500字符切分的灾难：\n\n原始PDF表格：\n┌─────────┬─────────┬─────────┐\n│ 字段A    │ 字段B    │ 字段C    │\n├─────────┼─────────┼─────────┤\n│ 数据1    │ 数据2    │ 数据3    │\n└─────────┴─────────┴─────────┘\n\n固定切分后：\n  chunk1: \"...字段A | 字段B | 字段C | 数据1 | 数据2...\"（表格被打碎）\n  chunk2: \"数据3 | 下一段内容...\"（SQL语句断成两半）\n\n→ 检索时找到的chunk语义不完整 → 回答错误\n```\n\n### 解决：按文档结构切分\n\n```python\nfrom langchain.text_splitter import MarkdownHeaderTextSplitter\n\n# 按Markdown标题层级做锚点切分\nheaders_to_split_on = [\n    (\"#\", \"Header 1\"),\n    (\"##\", \"Header 2\"),\n    (\"###\", \"Header 3\"),\n]\n\nsplitter = MarkdownHeaderTextSplitter(headers_to_split_on)\n# 效果：\n#   # 第一章 → 整章作为语义单元\n#   表格 → 完整保留不拆分\n#   代码块 → 不拆分\n#   SQL语句 → 完整保留\n\n# 补充规则\nclass SmartSplitter:\n    def split(self, doc):\n        chunks = []\n        for section in self._by_headers(doc):\n            if self._has_table(section):\n                chunks.append(section)  # 表格整块保留\n            elif self._has_code(section):\n                chunks.append(section)  # 代码块不拆\n            elif len(section) > 1000:\n                # 超长段落：按句子做二次切分\n                chunks.extend(self._by_sentences(section, max_len=500))\n            else:\n                chunks.append(section)\n        return chunks\n```\n\n**效果：+13%准确率**\n\n## 三、第2刀：检索策略（+10%）\n\n### 问题\n\n```\n单路向量检索的盲区：\n\n用户问：\"风机故障怎么排查？\"\n向量检索 → 召回的都是「运维日报」中提到「风机」的段落\n          → 不相关！用户需要的是「故障排查流程」\n\n原因：向量检索侧重语义相似，但关键词精确匹配能力弱\n```\n\n### 解决：BM25 + 向量混合检索\n\n```python\nclass HybridRetriever:\n    def __init__(self):\n        self.bm25 = BM25Retriever()      # 关键词检索\n        self.vector = VectorRetriever()   # 语义检索\n\n    def search(self, query, top_k=20):\n        # 双路召回\n        bm25_results = self.bm25.search(query, top_k=top_k)\n        vector_results = self.vector.search(query, top_k=top_k)\n\n        # 加权融合（经验权重：向量40% + 关键词60%）\n        fused = self._reciprocal_rank_fusion(\n            bm25_results, weight=0.6,\n            vector_results=vector_results, weight=0.4\n        )\n        return fused[:top_k]\n\n    def _reciprocal_rank_fusion(self, *ranked_lists):\n        \"\"\"RRF融合算法\"\"\"\n        scores = defaultdict(float)\n        for results, weight in ranked_lists:\n            for rank, doc in enumerate(results):\n                scores[doc.id] += weight / (rank + 1)\n        return sorted(scores, key=scores.get, reverse=True)\n```\n\n**效果：+10%准确率**\n\n## 四、第3刀：重排序（+6%）\n\n### 问题\n\n```\n混合检索召回Top20 → 直接喂给LLM → 上下文太长 → LLM注意力分散\n                                        ↓\n                              排序靠后的噪声干扰生成\n```\n\n### 解决：Cross-Encoder精排\n\n```python\nfrom FlagEmbedding import FlagReranker\n\n# BGE-Reranker-v2：Cross-Encoder架构\nreranker = FlagReranker('BAAI/bge-reranker-v2', use_fp16=True)\n\ndef rerank(query, candidates, top_k=5):\n    \"\"\"从Top20精排到Top5\"\"\"\n    pairs = [[query, doc.content] for doc in candidates]\n    scores = reranker.compute_score(pairs)\n\n    # 按Cross-Encoder分数排序\n    ranked = sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)\n    return [doc for doc, _ in ranked[:top_k]]\n\n# Cross-Encoder vs Bi-Encoder：\n# Bi-Encoder（向量检索）：Query和Doc独立编码 → 快但精度低\n# Cross-Encoder（重排序）：Query和Doc拼接后联合编码 → 慢但精度高\n```\n\n**效果：+6%准确率**\n\n## 五、完整优化效果\n\n```\n准确率变化：\n62% ──→ 75% ──→ 85% ──→ 91%\n基线    +切分    +混合检索  +重排序\n        +13%     +10%       +6%\n\n成本：\n  2张A100跑Embedding + Reranker\n  日处理3万次查询\n  月成本约1.2万元\n```\n\n## 六、可复制方法论\n\n```\n① 先跑100条真实问题做基线测试（不要凭感觉）\n② 分析Bad Case分类：\n   - 切分问题 → 优化切分策略\n   - 检索问题 → 调整检索方式/权重\n   - 理解问题 → 优化Prompt/换模型\n③ 每个优化只改一个变量（A/B测试）\n④ 上线后每周抽检50条，防止退化\n```\n\n## 七、面试加分点\n\n- 强调「先量化再优化」——不凭感觉，用数据驱动\n- 三板斧都有明确的量化效果（+13/+10/+6）\n- 提到RRF融合算法（而非简单分数加权）\n- 提到Cross-Encoder和Bi-Encoder的本质区别\n- 提到防退化机制",
+    "follow_up": [
+      "BM25和向量检索的权重比（6:4）是如何确定的？不同场景需要调整吗？",
+      "Cross-Encoder重排的性能开销有多大？如何控制延迟？",
+      "如果文档包含图片/表格等非文本内容，切分策略怎么调整？",
+      "RAG系统的Bad Case如何自动分类？可以用LLM自动归因吗？"
+    ],
+    "feynman": {
+      "essence": "RAG优化三板斧 = 切对（结构化切分）+ 搜全（混合检索）+ 排好（重排序精排）。每一步都有明确的量化效果，总共提升29个百分点。",
+      "analogy": "找一本菜谱做菜：1）切分 = 菜谱要按章节分（不能把炒菜步骤和煲汤步骤混在一起）；2）检索 = 既搜菜名又搜食材（双保险）；3）重排 = 从20个结果里让大厨帮你挑最靠谱的5个。",
+      "key_points": [
+        "第1刀切分：按Markdown标题/表格/代码块结构化切分（+13%）",
+        "第2刀检索：BM25关键词+向量语义混合召回（+10%）",
+        "第3刀重排：BGE-Reranker Cross-Encoder精排Top5（+6%）",
+        "方法论：先基线→分Bad Case→单变量优化→防退化"
+      ]
+    },
+    "first_principle": {
+      "problem": "RAG系统准确率不高的根本原因是什么？",
+      "axioms": [
+        "切分破坏语义完整性 → 检索到的信息不完整",
+        "单一检索方式有盲区 → 向量不擅长精确匹配",
+        "召回结果排序不佳 → 噪声干扰LLM生成",
+        "不量化就无法改进 → 凭感觉优化是盲目的"
+      ],
+      "rebuild": "从Garbage In Garbage Out出发：确保输入LLM的信息是完整（结构化切分）、全面（混合检索）、精准（重排精筛）的。每一步用数据量化效果，用Bad Case驱动迭代。"
+    }
+  },
+  {
+    "id": "note-xhs-ai-037",
+    "category": "ai",
+    "subcategory": "Agent",
+    "difficulty": "L5",
+    "tags": [
+      "Agentic RAG",
+      "Reflection Agent",
+      "引用溯源",
+      "故障恢复",
+      "拜耳",
+      "Thoughtworks",
+      "架构设计"
+    ],
+    "question": "拆解拜耳×Thoughtworks的生产级Agentic RAG：面对大量医学遗留文档，为什么选择Agentic RAG而非简单的PDF转Markdown加grep？（小红书技术拆解）",
+    "answer": "## 一、案例背景\n\n```\n项目：Bayer × Thoughtworks\n论文：《Building Reliable Agentic AI Systems》\n场景：处理大量医学遗留文档（Legacy Documents）\n挑战：医学文档格式杂乱、内容专业、准确性要求极高\n```\n\n## 二、为什么不用简单PDF转Markdown + grep？\n\n```\n❌ 简单方案的致命问题：\n\nPDF转Markdown → 信息丢失：\n  - 表格结构被打乱\n  - 图表/流程图丢失\n  - 页眉页脚混入正文\n  - 多栏排版错位\n\ngrep关键词搜索 → 召回不准：\n  - 医学术语同义词多（\"心肌梗死\" vs \"心梗\" vs \"MI\"）\n  - 上下文依赖强（同一词在不同语境含义不同）\n  - 无法理解语义（\"禁用\"和\"慎用\"语义不同）\n\n✅ Agentic RAG的核心理念：\n  不是简单检索+生成，而是让Agent主动思考、多步推理、交叉验证\n```\n\n## 三、Agentic RAG架构\n\n```\n用户医学问题\n      │\n      ▼\n┌─ Query分析Agent ──────────┐\n│  意图识别 + Query改写       │\n│  + 歧义消解 + 多查询生成    │\n└──────────┬────────────────┘\n           ▼\n┌─ 混合检索Agent ───────────┐\n│  ① 向量检索（语义）         │\n│  ② BM25检索（关键词）       │\n│  ③ 结构化数据查询（SQL）     │ ← 关键差异点\n│  ④ 医学知识图谱查询         │\n└──────────┬────────────────┘\n           ▼\n┌─ Reflection Agent ────────┐\n│  检查：检索结果是否充分？    │\n│  判断：是否需要补充检索？    │\n│  验证：信息是否矛盾？        │\n│  决策：继续检索 or 生成？    │\n└──────────┬────────────────┘\n      ↙ 需要补充 ↘ 可以生成\n  回到检索Agent    ↓\n            ┌─ 生成Agent ───┐\n            │  带引用溯源    │\n            │  的答案生成    │\n            └───────┬───────┘\n                    ▼\n            ┌─ 故障恢复Agent ┐\n            │  格式校验      │\n            │  内容审核      │\n            │  兜底回复      │\n            └───────────────┘\n```\n\n## 四、核心设计要点\n\n### 1. 结构化数据查询（区别于传统RAG）\n\n```python\n# 不只是向量检索，还能查结构化数据库\nclass HybridQueryAgent:\n    async def route(self, query):\n        if self._is_factual_query(query):\n            # \"阿司匹林的常用剂量是多少？\" → 查药品数据库\n            return await self.sql_query(query)\n        elif self._is_semantic_query(query):\n            # \"哪些药物不能和华法林一起用？\" → 向量+知识图谱\n            return await self.rag_query(query)\n        else:\n            # 混合查询\n            return await self.combined_query(query)\n```\n\n### 2. Reflection Agent（反思机制）\n\n```python\nclass ReflectionAgent:\n    async def evaluate(self, query, retrieved_docs):\n        checks = {\n            \"sufficient\": self._check_coverage(query, retrieved_docs),\n            \"consistent\": self._check_consistency(retrieved_docs),\n            \"authoritative\": self._check_source(retrieved_docs),\n        }\n\n        if not all(checks.values()):\n            # 信息不充分 → 生成补充查询\n            follow_up = await self._generate_followup(query, checks)\n            return {\"action\": \"re_retrieve\", \"query\": follow_up}\n        return {\"action\": \"generate\", \"docs\": retrieved_docs}\n```\n\n### 3. 引用溯源\n\n```python\n# 每个回答都标注信息来源（医学场景必须）\ndef generate_with_citations(query, docs):\n    prompt = f\"\"\"\n    基于以下文档回答问题。每个陈述必须标注来源[doc_id]。\n\n    文档：\n    {format_docs_with_ids(docs)}\n\n    问题：{query}\n\n    要求：\n    1. 每个事实陈述后标注 [来源:doc_id, 页码]\n    2. 如果信息不充分，明确说明\n    3. 如果有矛盾信息，列出所有版本\n    \"\"\"\n    return llm.generate(prompt)\n```\n\n### 4. 故障恢复\n\n```\n┌─ 故障恢复流程 ─────────────────┐\n│                               │\n│  生成失败 → 重试（3次）         │\n│     ↓ 仍失败                   │\n│  降级 → 返回检索到的原文片段     │\n│     ↓ 仍不行                   │\n│  兜底 → \"无法回答，建议咨询医生\" │\n│                               │\n│  所有失败 → 记录日志 → 人工审核 │\n└───────────────────────────────┘\n```\n\n## 五、传统RAG vs Agentic RAG对比\n\n| 维度 | 传统RAG | Agentic RAG |\n|------|---------|-------------|\n| 检索方式 | 单次向量检索 | 多路混合+迭代检索 |\n| 结果验证 | 无 | Reflection Agent交叉验证 |\n| 结构化数据 | 不支持 | SQL+知识图谱查询 |\n| 引用溯源 | 无 | 每个陈述标注来源 |\n| 故障恢复 | 无 | 多级降级+兜底 |\n| 准确性 | 中 | 高（医学场景必需） |\n| 延迟 | 低 | 较高（多步推理） |\n\n## 六、面试加分点\n\n- 强调「医学场景对准确性的极端要求」→ 需要Reflection+引用溯源\n- 提到结构化数据查询是Agentic RAG与传统RAG的关键差异\n- 提到Reflection Agent的「自检-补充-验证」循环\n- 提到故障恢复的多级降级策略\n- 对标北美FDE Take-home标准（这是工业级最佳实践）",
+    "follow_up": [
+      "Reflection Agent如何判断检索结果是否「充分」？用什么标准？",
+      "Agentic RAG的多步推理如何控制延迟？医学场景对延迟有什么要求？",
+      "引用溯源在工程上如何实现？如何保证引用的准确性？",
+      "知识图谱在Agentic RAG中扮演什么角色？如何构建医学知识图谱？"
+    ],
+    "feynman": {
+      "essence": "Agentic RAG = 会思考的RAG。不只是搜一次就回答，而是搜完检查够不够、对不对，不够再搜，回答时还标注来源。像一位严谨的医生——查资料、交叉验证、注明出处。",
+      "analogy": "传统RAG = 实习生翻一本书就回答（可能翻错页）。Agentic RAG = 资深医生查多本参考书+数据库，交叉验证信息，不确定就继续查，最后告诉你「这个结论来自XX教科书第Y页」。",
+      "key_points": [
+        "核心差异：多路混合检索+结构化查询+Reflection反思",
+        "Reflection Agent：自检覆盖率→补充检索→交叉验证",
+        "引用溯源：每个陈述标注来源（医学合规必需）",
+        "故障恢复：重试→降级→兜底→人工审核"
+      ]
+    },
+    "first_principle": {
+      "problem": "在高准确性要求的场景（如医学），简单的检索+生成不够用，如何构建可靠的知识问答系统？",
+      "axioms": [
+        "简单检索会遗漏关键信息（召回率不足）",
+        "LLM会编造不存在的信息（幻觉风险）",
+        "单一信息源可能出错（需要交叉验证）",
+        "高准确性场景需要可追溯性（引用溯源）"
+      ],
+      "rebuild": "从「可靠性」出发：多路检索提高召回（向量+BM25+SQL+知识图谱），Reflection Agent做交叉验证（自检-补充），引用溯源保证可追溯，故障恢复保证可用性。本质是用工程手段弥补LLM的不确定性。"
+    }
   }
 ]

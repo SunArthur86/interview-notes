@@ -482,5 +482,49 @@
       "rebuild": "从分布式运维需求出发：ConfigMap+Secret(配置分离)→Prometheus(指标监控+告警)→EFK(日志聚合搜索)→SkyWalking(全链路追踪)。三者互补形成完整的可观测性体系，缺一不可"
     },
     "images": []
+  },
+  {
+    "id": "note-xhs-sd-011",
+    "category": "system-design",
+    "subcategory": "高并发",
+    "difficulty": "L4",
+    "tags": [
+      "系统设计",
+      "时序数据库",
+      "Kafka",
+      "冷热分离",
+      "TDengine",
+      "滴滴面试",
+      "滴滴",
+      "行车轨迹"
+    ],
+    "question": "设计一个行车轨迹回放系统，支持高吞吐轨迹存储与快速查询架构。（滴滴Java后端三面）",
+    "answer": "## 一、需求分析\n\n```\n场景：滴滴行车轨迹回放系统\n功能：存储数百万司机的实时GPS轨迹，支持按时间段快速查询和回放\n\n核心挑战：\n  ① 写入吞吐极高：百万级GPS/秒\n  ② 存储量大：每条GPS ~100字节，100万/秒 → 100MB/秒 → 8.6TB/天\n  ③ 查询模式：按司机ID+时间范围查询（轨迹回放）\n  ④ 低延迟：轨迹回放P99 < 500ms\n```\n\n## 二、架构设计\n\n```\n┌─ 数据采集 ──────────────────────────────────┐\n│  司机APP → gRPC/WebSocket → 接入网关(Netty)   │\n│  每秒上报GPS（经度、纬度、速度、方向、时间戳）   │\n└──────────────────┬──────────────────────────┘\n                   ▼\n┌─ 消息缓冲 ──────────────────────────────────┐\n│  Kafka集群                                    │\n│  Topic: driver-gps-trace                     │\n│  100+分区（按driverId哈希）                    │\n│  批量写入 + LZ4压缩                           │\n└──────────────────┬──────────────────────────┘\n                   ▼\n┌─ 实时写入 ──────────────────────────────────┐\n│  Flink/Spark Streaming 消费                   │\n│  → 批量写入时序数据库                          │\n│  → 同时更新热数据缓存(Redis)                    │\n└──────┬───────────────────┬──────────────────┘\n       ▼                   ▼\n┌─ 时序数据库 ─────┐  ┌─ Redis热数据 ──────┐\n│  TDengine/InfluxDB│  │  最近1小时轨迹      │\n│  按司机ID+时间分区 │  │  Sorted Set存储    │\n│  冷热分离         │  │  支持实时查询       │\n└──────────────────┘  └────────────────────┘\n       ▼\n┌─ 对象存储（冷数据）─────────────────────────┐\n│  HDFS/S3/OSS                                 │\n│  超过30天的轨迹压缩归档                        │\n│  Parquet列式存储                              │\n└──────────────────────────────────────────────┘\n```\n\n## 三、存储选型\n\n### 为什么选时序数据库而非MySQL？\n\n```\nMySQL方案的问题：\n  表结构：trace(driver_id, timestamp, lng, lat, speed, ...)\n  索引：(driver_id, timestamp)\n  \n  问题1：数据量巨大 → 单表亿级 → 分库分表复杂\n  问题2：写入100万/秒 → MySQL扛不住\n  问题3：按时间范围扫描 → 即使有索引也慢\n\n时序数据库优势：\n  ✅ 为时间序列数据优化（列式存储+压缩）\n  ✅ 高吞吐写入（百万级TPS）\n  ✅ 按时间范围查询极快\n  ✅ 自动过期（冷热分离）\n```\n\n### TDengine方案\n\n```sql\n-- TDengine：超级表 + 子表（每个司机一张子表）\n-- 超级表定义\nCREATE STABLE driver_trace (\n    ts TIMESTAMP,\n    lng DOUBLE,\n    lat DOUBLE,\n    speed FLOAT,\n    heading FLOAT\n) TAGS (\n    driver_id BINARY(32),\n    city BINARY(16)\n);\n\n-- 自动创建子表（写入时自动建表）\nINSERT INTO d_10001 USING driver_trace TAGS ('10001', 'beijing')\nVALUES (now, 116.404, 39.915, 45.2, 180);\n\n-- 查询某司机某时段轨迹（极快）\nSELECT * FROM driver_trace\nWHERE driver_id = '10001'\n  AND ts >= '2026-07-04 08:00:00'\n  AND ts <= '2026-07-04 10:00:00'\nORDER BY ts ASC;\n```\n\n## 四、冷热数据分离\n\n```\n┌─ 热数据（最近1小时）──────────┐\n│  Redis Sorted Set              │\n│  Key: trace:{driverId}         │\n│  Score: timestamp              │\n│  Value: GPS JSON               │\n│  TTL: 1小时自动过期             │\n│  → 实时轨迹查询（毫秒级）        │\n└────────────────────────────────┘\n\n┌─ 温数据（1小时~30天）──────────┐\n│  TDengine                      │\n│  按天分区                       │\n│  → 轨迹回放（百毫秒级）          │\n└────────────────────────────────┘\n\n┌─ 冷数据（30天以上）────────────┐\n│  对象存储(S3/OSS)               │\n│  Parquet列式压缩                │\n│  → 历史分析（秒级，可接受）      │\n│  → 合规存档（监管要求）          │\n└────────────────────────────────┘\n```\n\n## 五、查询优化\n\n```java\n// 轨迹回放：分页加载 + 预加载\npublic List<GpsPoint> queryTrace(String driverId, long startTs, long endTs) {\n    // 1. 先查Redis热数据\n    List<GpsPoint> hot = redis.zrangeByScore(\n        \"trace:\" + driverId, startTs, endTs\n    );\n    if (!hot.isEmpty() && endTs > System.currentTimeMillis() - 3600_000) {\n        return hot;  // 热数据命中\n    }\n\n    // 2. 查时序数据库\n    List<GpsPoint> warm = tdengine.query(\n        \"SELECT * FROM driver_trace WHERE driver_id = ? AND ts BETWEEN ? AND ?\",\n        driverId, startTs, endTs\n    );\n\n    // 3. 冷数据异步加载\n    if (startTs < System.currentTimeMillis() - 30L * 24 * 3600 * 1000) {\n        CompletableFuture.runAsync(() -> {\n            List<GpsPoint> cold = s3.queryParquet(driverId, startTs, endTs);\n            // 异步返回或通知前端\n        });\n    }\n\n    return warm;\n}\n```\n\n## 六、面试加分点\n\n- 强调「冷热分离」——热数据Redis，温数据时序DB，冷数据对象存储\n- 提到TDengine的超级表+子表设计（每个司机一张表，查询极快）\n- 提到Kafka异步写入削峰填谷\n- 提到Parquet列式压缩节省存储成本\n- 对标滴滴/Uber的轨迹系统设计",
+    "follow_up": [
+      "TDengine和InfluxDB有什么区别？选型考虑哪些因素？",
+      "轨迹数据如何做实时异常检测（如司机偏航）？",
+      "如果前端要平滑播放轨迹动画，后端如何分页返回数据？",
+      "冷数据从S3加载延迟较高，如何优化用户体验？"
+    ],
+    "feynman": {
+      "essence": "轨迹回放系统 = 高吞吐写入（Kafka缓冲）+ 分级存储（热Redis/温时序DB/冷S3）+ 快速查询（时间范围索引）。",
+      "analogy": "想象一个超大型停车场监控：1）Kafka = 摄像头视频流（实时涌入）；2）TDengine = 硬盘录像机（存最近30天）；3）S3 = 档案室（旧录像打包存档）；4）Redis = 值班台屏幕（只看最近1小时）。查某辆车昨天去了哪 → 翻录像机；查半年前 → 去档案室。",
+      "key_points": [
+        "采集：APP→Netty→Kafka（百万TPS削峰）",
+        "存储：Redis热数据+TDengine温数据+S3冷数据",
+        "TDengine超级表：每司机一张子表，时间范围查询极快",
+        "查询：先Redis→再时序DB→异步加载冷数据"
+      ]
+    },
+    "first_principle": {
+      "problem": "如何在有限存储和计算资源下，支持海量轨迹数据的高吞吐写入和低延迟查询？",
+      "axioms": [
+        "写入吞吐 >> 查询吞吐（99%写入，1%查询）",
+        "近期数据查询频率 >> 远期数据（时间局部性）",
+        "时序数据天然有序（适合列式压缩）",
+        "存储成本与访问延迟成反比（RAM>SSD>HDD>S3）"
+      ],
+      "rebuild": "从写入吞吐出发：用Kafka缓冲削峰（解耦写入速度），时序数据库做温存储（列式压缩+时间索引），Redis做热缓存（最近数据毫秒级），S3做冷归档（低成本）。本质是用分级存储在成本和延迟之间找最优解。"
+    }
   }
 ]
