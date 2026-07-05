@@ -1,1 +1,363 @@
-[]
+[
+  {
+    "id": "note-xhs-fe-001",
+    "category": "frontend",
+    "subcategory": "Agent交互",
+    "difficulty": "L3",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "SSE",
+      "WebSocket",
+      "流式输出",
+      "实时通信",
+      "前端"
+    ],
+    "question": "什么是 SSE（Server-Sent Events）？它与 WebSocket 有什么区别？在 Agent 交互场景下如何选择？（滴滴 Agent 一面）",
+    "answer": "## SSE vs WebSocket：Agent 交互场景下的选型\n\n### 核心对比\n\n| 维度 | SSE (Server-Sent Events) | WebSocket |\n|------|--------------------------|-----------|\n| 通信方向 | 单向（Server -> Client） | 双向 |\n| 底层协议 | HTTP/1.1 或 HTTP/2 | 独立的 WS 协议 |\n| 重连机制 | 浏览器自动重连 | 需手动实现 |\n| 数据格式 | text/event-stream（文本） | 任意（文本/二进制） |\n| HTTP/2 复用 | 天然支持多路复用 | 独立连接 |\n\n### Agent 场景选型\n\n| 场景 | 推荐方案 |\n|------|---------|\n| LLM 流式回答（打字机效果） | SSE |\n| Agent 思考过程实时展示 | SSE |\n| 用户中途取消生成 | SSE + AbortController |\n| 多用户实时协作编辑 | WebSocket |\n| Agent 主动推送通知 | WebSocket |\n| 语音对话（实时音频流） | WebSocket |\n\n### 为什么 LLM 流式输出首选 SSE？\n\n1. 协议简单：LLM 输出是单向的，SSE 天然匹配\n2. 自动重连：网络断开后浏览器自动重连 + Last-Event-ID 续传\n3. HTTP/2 友好：多个 SSE 流共享一个 TCP 连接\n4. 基础设施兼容：Nginx/CDN/防火墙都天然支持 HTTP\n\n### SSE 实现示例\n\n```javascript\nconst eventSource = new EventSource('/api/agent/chat?session=xxx');\neventSource.onmessage = (event) => {\n  const data = JSON.parse(event.data);\n  if (data.type === 'token') {\n    appendToUI(data.content);\n  } else if (data.type === 'done') {\n    eventSource.close();\n  }\n};\n```\n\n### 关键坑点\n\n- HTTP/1.1 下浏览器对同域名限制 6 个并发连接\n- SSE 传输纯文本，二进制数据需 Base64 编码\n- 用 Fetch API 替代 EventSource 可获得更多控制权",
+    "follow_up": [
+      "SSE 如何实现断线重连？客户端和服务器分别需要怎么配合？",
+      "如何用 Fetch API 替代 EventSource 消费 SSE 流（支持 POST + 自定义 Header）？",
+      "HTTP/2 如何解决 SSE 的并发连接数限制？",
+      "如果 Agent 需要双向通信（如语音对话），WebSocket 的延迟和 SSE 比如何？"
+    ],
+    "feynman": {
+      "essence": "SSE 是服务器单向推送的轻量协议，适合 LLM 流式输出；WebSocket 是双向全双工通信，适合实时交互。Agent 流式回答选 SSE，实时协作选 WebSocket。",
+      "analogy": "SSE 像广播电台——服务器播，客户端听，断了自动调回频道。WebSocket 像打电话——双方都能说，但需要保持连接，断了得手动重拨。听新闻用广播（SSE），聊天用电话（WebSocket）。",
+      "key_points": [
+        "SSE = 单向(Server->Client) / WebSocket = 双向",
+        "LLM流式输出首选SSE（自动重连+HTTP/2复用+简单）",
+        "多用户协作/实时音视频用WebSocket",
+        "HTTP/1.1限制6个并发连接，HTTP/2解决了这个瓶颈"
+      ]
+    },
+    "first_principle": {
+      "problem": "LLM 生成回答是逐 token 的流式过程，前端需要实时接收并渲染。传统的 HTTP 请求-响应模式无法实现流式传输，需要一种持续接收服务器推送的机制。",
+      "axioms": [
+        "LLM 推理是流式的——token 一个一个生成",
+        "用户体验要求实时反馈——打字机效果更好",
+        "通信协议应匹配数据流向——单向数据用单向协议更简单",
+        "浏览器连接数是有限的——必须考虑连接复用"
+      ],
+      "rebuild": "从 LLM 流式输出需求出发：(1) 需要持续接收数据 -> SSE 或 WebSocket (2) LLM 输出是单向的 -> SSE 足够且更简单 (3) 需要断线恢复 -> SSE 内置 Last-Event-ID (4) 需要发送请求参数 -> 用 Fetch API 消费 SSE 流。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》一面 Q7"
+  },
+  {
+    "id": "note-xhs-fe-002",
+    "category": "frontend",
+    "subcategory": "Agent交互",
+    "difficulty": "L2",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "AbortController",
+      "Fetch API",
+      "流式中断",
+      "前端"
+    ],
+    "question": "介绍一下 Fetch API 的 AbortController，在前端 Agent 对话场景中，用户点击停止生成时，如何利用它中断请求？（滴滴 Agent 一面）",
+    "answer": "## AbortController 在 Agent 停止生成场景的应用\n\n### 核心问题\n\n用户在 LLM 流式输出过程中点击停止生成，前端需要立即中断正在进行的网络请求。\n\n### 基本用法\n\n```javascript\nconst controller = new AbortController();\n\nfetch('/api/agent/chat', {\n  method: 'POST',\n  body: JSON.stringify({ message: userMessage }),\n  signal: controller.signal\n}).catch(err => {\n  if (err.name === 'AbortError') {\n    console.log('用户主动取消了生成');\n  }\n});\n\n// 停止按钮\nstopButton.addEventListener('click', () => {\n  controller.abort();\n});\n```\n\n### Agent 场景完整实现\n\n```javascript\nclass AgentChat {\n  constructor() {\n    this.currentController = null;\n  }\n\n  async sendMessage(message) {\n    if (this.currentController) {\n      this.currentController.abort(); // 先取消旧请求\n    }\n    this.currentController = new AbortController();\n\n    try {\n      const response = await fetch('/api/agent/chat', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ message }),\n        signal: this.currentController.signal\n      });\n\n      const reader = response.body.getReader();\n      const decoder = new TextDecoder();\n      let partialContent = '';\n\n      while (true) {\n        const { done, value } = await reader.read();\n        if (done) break;\n        partialContent += decoder.decode(value, { stream: true });\n        updateUI(partialContent);\n      }\n    } catch (err) {\n      if (err.name === 'AbortError') {\n        markAsInterrupted(); // 保留已生成的部分\n      }\n    } finally {\n      this.currentController = null;\n    }\n  }\n\n  stop() {\n    if (this.currentController) {\n      this.currentController.abort();\n    }\n  }\n}\n```\n\n### 关键注意点\n\n1. abort() 不可逆——一个 Controller 只能 abort 一次\n2. abort 后 fetch 抛出 AbortError，需单独 catch\n3. ReadableStream 也支持 abort，reader.read() 会 reject\n4. 后端也应监听连接断开，停止 LLM 推理节省成本",
+    "follow_up": [
+      "abort() 之后，后端的 LLM 推理会自动停止吗？如何通知后端取消？",
+      "AbortController 除了 fetch，还能用在哪些异步操作上？",
+      "如果用户频繁点击发送→停止→发送，如何避免竞态条件？",
+      "XMLHttpRequest 时代如何实现请求中断？和 AbortController 有什么区别？"
+    ],
+    "feynman": {
+      "essence": "AbortController 是 Web API 的请求中断机制，通过 signal 关联到 fetch，调用 abort() 即可取消正在进行中的网络请求，在 Agent 场景中用于实现停止生成功能。",
+      "analogy": "AbortController 就像电视遥控器上的停止键。你发起了请求（换了台），看到一半不想看了，按下 abort（停止键），信号就断了。不同的是 fetch 断了你还能保留已收到的画面（部分内容）。",
+      "key_points": [
+        "new AbortController() → signal 传给 fetch",
+        "controller.abort() → fetch 抛出 AbortError",
+        "Agent场景：保留已生成的部分内容，标记为已中断",
+        "后端也应监听断开事件，停止LLM推理节省成本"
+      ]
+    },
+    "first_principle": {
+      "problem": "LLM 流式输出是一个持续数十秒的过程。用户可能中途想停止（改主意了、方向不对、太慢），但 HTTP 请求一旦发出，需要标准化的机制来主动中断。",
+      "axioms": [
+        "网络请求应该是可控的——发起方应该有权取消",
+        "流式传输的中断应该是优雅的——保留已接收的数据",
+        "中断信号应端到端传递——前端中断后端也应停止推理",
+        "一个请求只能被中断一次——需要新 Controller 来发起新请求"
+      ],
+      "rebuild": "从用户需要中断 LLM 生成的需求出发：(1) 需要取消网络请求 -> AbortController + signal (2) 需要保留部分内容 -> catch AbortError 时保存已有结果 (3) 需要避免竞态 -> 新请求前先 abort 旧请求 (4) 需要端到端取消 -> 后端监听连接断开。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》一面 Q10"
+  },
+  {
+    "id": "note-xhs-fe-003",
+    "category": "frontend",
+    "subcategory": "Agent交互",
+    "difficulty": "L3",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "流式渲染",
+      "打字机效果",
+      "requestAnimationFrame",
+      "性能优化",
+      "前端"
+    ],
+    "question": "前端如何实现大模型输出的流式（Stream）打字机渲染效果？需要注意哪些性能和交互细节？（滴滴 Agent 二面）",
+    "answer": "## 前端实现大模型流式打字机渲染\n\n### 核心挑战\n\n1. **频繁 DOM 更新导致重排重绘**：每收到一个 token 就更新 DOM，高频操作（100+次/秒）会卡顿\n2. **Markdown 实时渲染**：流式文本是不完整的 Markdown，如何做增量解析\n3. **代码高亮**：长代码块实时高亮的性能问题\n\n### 解决方案\n\n#### 1. requestAnimationFrame 节流渲染\n\n```javascript\nclass TypewriterRenderer {\n  constructor(element) {\n    this.el = element;\n    this.buffer = '';      // 接收缓冲区\n    this.displayed = '';   // 已渲染内容\n    this.rafId = null;\n  }\n\n  // 收到新数据时，放入缓冲区\n  push(chunk) {\n    this.buffer += chunk;\n    if (!this.rafId) {\n      this.rafId = requestAnimationFrame(() => this.flush());\n    }\n  }\n\n  // 每帧只渲染一次，合并这一帧内收到的所有 token\n  flush() {\n    this.rafId = null;\n    if (this.buffer) {\n      this.displayed += this.buffer;\n      this.buffer = '';\n      this.el.innerHTML = marked.parse(this.displayed); // Markdown渲染\n      this.el.scrollTop = this.el.scrollHeight;          // 自动滚动\n    }\n    if (this.buffer) {\n      this.rafId = requestAnimationFrame(() => this.flush());\n    }\n  }\n\n  done() {\n    if (this.rafId) cancelAnimationFrame(this.rafId);\n    this.flush(); // 最后冲刷\n  }\n}\n```\n\n#### 2. 局部状态隔离——避免全局重渲染\n\n```javascript\n// 错误：流式数据放全局状态 → 整个聊天列表重渲染\n{ messages: [...messages, streamingText] }  // 每个token触发整个list重渲染\n\n// 正确：打字机组件用独立的局部状态\nfunction StreamingMessage() {\n  const [text, setText] = useState('');\n  // 只有这个组件重渲染，不影响其他消息\n  return <div>{parseMarkdown(text)}</div>;\n}\n```\n\n#### 3. 代码块增量高亮\n\n- 使用 highlight.js 的 debounce 模式，只在代码块结束时高亮\n- 或使用 Web Worker 做语法分析，主线程只负责 DOM 更新\n\n### 性能指标\n\n| 指标 | 目标 | 工具 |\n|------|------|------|\n| FPS | > 55 | Chrome Performance |\n| DOM 更新频率 | < 60次/秒 | rAF 控制 |\n| 长文本渲染 | 无明显卡顿 | React Profiler |",
+    "follow_up": [
+      "流式输出时如何处理不完整的 Markdown（如半个代码块、半个表格）？",
+      "如果大模型返回的代码块非常长，如何实现流式输出过程中的实时代码高亮？",
+      "自动滚动到底部的逻辑怎么写？用户手动上滚查看历史时不能强制拉回来。",
+      "怎么解决大文本渲染时导致的浏览器重排（Reflow）和重绘（Repaint）问题？"
+    ],
+    "feynman": {
+      "essence": "流式打字机渲染的核心是用 requestAnimationFrame 合并高频 DOM 更新——把每 token 更新变成每帧更新，从 100+次/秒降到 60次/秒。",
+      "analogy": "就像快递分拣。如果每来一个包裹就送一次（每 token 更新 DOM），快递员跑断了腿。正确做法是把同一批到的包裹攒在一起，一车送出去（rAF 合并到每帧一次）。",
+      "key_points": [
+        "requestAnimationFrame合并高频DOM更新（100+/秒→60/秒）",
+        "打字机组件用局部状态，避免触发全局重渲染",
+        "代码块增量高亮：debounce或WebWorker",
+        "性能目标：FPS > 55，DOM更新 < 60次/秒"
+      ]
+    },
+    "first_principle": {
+      "problem": "LLM 流式输出每个 token 到达就触发 DOM 更新，高频操作（100+次/秒）会导致浏览器重排重绘风暴，页面卡顿。",
+      "axioms": [
+        "浏览器渲染帧率是 60fps（16.67ms/帧）——超过这个频率的 DOM 更新是浪费",
+        "React/Vue 全局状态更新会触发组件树 diff——流式数据放全局状态会引发连锁重渲染",
+        "Markdown 解析是 O(n) 的——每次全量解析越来越长的文本会越来越慢",
+        "用户感知的流畅度取决于帧率而非数据到达速度"
+      ],
+      "rebuild": "从高频 DOM 更新导致卡顿出发：(1) 降低更新频率 -> rAF 合并到每帧一次 (2) 避免连锁重渲染 -> 打字机组件独立局部状态 (3) 解决全量解析慢 -> 增量 Markdown 解析 (4) 解决代码高亮慢 -> debounce + Web Worker。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》二面 Q3"
+  },
+  {
+    "id": "note-xhs-fe-004",
+    "category": "frontend",
+    "subcategory": "性能优化",
+    "difficulty": "L4",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "画布",
+      "工作流",
+      "性能优化",
+      "React Flow",
+      "Canvas",
+      "WebGL"
+    ],
+    "question": "复杂 Agent 交互界面（如拖拽画布、工作流编辑器）的性能优化方案有哪些？（滴滴 Agent 二面）",
+    "answer": "## 复杂 Agent 交互界面的性能优化\n\n### 性能瓶颈分析\n\n```\n大量DOM节点渲染 ──→ 浏览器内存/CSS计算爆炸\n频繁鼠标事件   ──→ 主线程阻塞\n连线实时重绘   ──→ Canvas/SVG 重绘开销\n全局状态更新   ──→ 整个画布组件树重渲染\n```\n\n### 四层优化方案\n\n#### 1. 渲染选型\n\n| 场景 | 方案 | 原因 |\n|------|------|------|\n| < 500 节点 | SVG / DOM (React Flow) | 交互丰富，开发快 |\n| 500-5000 节点 | Canvas (Custom) | 平衡性能和交互 |\n| > 5000 节点 | WebGL (PixiJS/d3-force) | GPU 加速 |\n\n#### 2. 事件优化\n\n```javascript\n// 拖拽用 rAF 节流，不用 throttle\nlet rafId = null;\ncanvas.addEventListener('pointermove', (e) => {\n  if (rafId) return;\n  rafId = requestAnimationFrame(() => {\n    updateNodePosition(e);\n    rafId = null;\n  });\n});\n```\n\n#### 3. 视口裁剪（Viewport Culling）\n\n只渲染当前可见区域内的节点和连线，视口外的节点隐藏。\n\n#### 4. 状态读写分离\n\n```javascript\n// 错误：拖拽时频繁写全局状态\nonPointerMove: (e) => {\n  setNodes([...nodes, { x: e.x, y: e.y }]); // 整个画布重渲染！\n}\n\n// 正确：用 Ref 缓存临时坐标，pointerup 时才更新全局\nconst tempPos = useRef({ x: 0, y: 0 });\nonPointerMove: (e) => {\n  tempPos.current = { x: e.x, y: e.y };\n  nodeEl.current.style.transform = `translate(${e.x}px, ${e.y}px)`; // 直接操作DOM\n}\nonPointerUp: () => {\n  setNodes(prev => updateNode(prev, tempPos.current)); // 拖拽结束才更新全局\n}\n```",
+    "follow_up": [
+      "如何实现画布中两个节点之间自动避障的折线连接算法？",
+      "在 React Flow 中，如何避免自定义节点因为无关的全局状态变化而重复渲染？",
+      "连线计算算法（如贝塞尔曲线）在拖拽时高频执行，如何避免拖拽粘滞感？",
+      "上千个节点时，如何实现节点搜索并快速 Focus 到画布中央？"
+    ],
+    "feynman": {
+      "essence": "复杂画布性能优化四板斧：渲染选型(SVG/Canvas/WebGL按量级选) + 事件节流(rAF) + 视口裁剪(只渲染可见区域) + 状态读写分离(拖拽用Ref不用全局状态)。",
+      "analogy": "想象你在管理一个有 1000 个展位的展览馆。如果每个展位都有人盯着实时更新位置（全局状态），整个馆乱套了。正确做法：只管你看得见的展位（视口裁剪），搬东西时先记在纸上（Ref临时缓存），搬到位置了再更新总表（全局状态更新）。",
+      "key_points": [
+        "渲染选型：<500节点SVG/DOM，>5000用WebGL",
+        "事件节流：rAF替代throttle",
+        "视口裁剪：只渲染可见区域节点",
+        "状态分离：拖拽用Ref缓存，结束时更新全局"
+      ]
+    },
+    "first_principle": {
+      "problem": "画布编辑器的核心瓶颈是大量 DOM 节点的 CSS 计算 + 频繁鼠标事件 + 连线重绘三者叠加，导致主线程被占满。",
+      "axioms": [
+        "DOM 节点数与浏览器布局计算量正相关——超过5000个DOM节点性能急剧下降",
+        "高频事件（pointermove）的回调如果不节流会占满主线程",
+        "React/Vue 的全局状态更新触发组件树 diff——拖拽时不应触发全局更新",
+        "GPU 并行计算能力远超 CPU——大规模渲染应用 GPU"
+      ],
+      "rebuild": "从画布卡顿出发：(1) 节点太多 -> 视口裁剪 + WebGL 降级方案 (2) 事件太频繁 -> rAF 节流 (3) 全局状态引发连锁重渲染 -> 状态读写分离 (4) 连线计算慢 -> 算法移入 Web Worker。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》二面 Q4"
+  },
+  {
+    "id": "note-xhs-fe-005",
+    "category": "frontend",
+    "subcategory": "性能优化",
+    "difficulty": "L3",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "Web Worker",
+      "多线程",
+      "Tokenizer",
+      "WebLLM",
+      "前端"
+    ],
+    "question": "聊聊 Web Worker，在前端 Agent 场景下它有什么具体的应用价值？（滴滴 Agent 二面）",
+    "answer": "## Web Worker 在前端 Agent 场景的应用\n\n### 为什么 Agent 场景需要 Web Worker？\n\nLLM 应用的主线程已经很忙了：流式渲染、用户交互、DOM 更新。如果有 CPU 密集任务（如本地推理、大文件处理），会直接导致 UI 卡顿。\n\n### Agent 场景的 4 个核心应用\n\n#### 1. 本地 Tokenizer / Token 估算\n```javascript\n// worker.js — 在 Worker 中做 tokenizer 计算\nimport { Tiktoken } from 'tiktoken';\nlet encoder = null;\n\nself.onmessage = async (e) => {\n  if (!encoder) {\n    encoder = await Tiktoken.encoding_for_model('gpt-4');\n  }\n  const count = encoder.encode(e.data.text).length;\n  self.postMessage({ type: 'token_count', count });\n};\n\n// main.js — 主线程不卡\nconst worker = new Worker('./tokenizer.worker.js');\nworker.onmessage = (e) => {\n  updateTokenCounter(e.data.count);\n};\n```\n\n#### 2. 本地模型推理（WebLLM）\n- 使用 WebGPU + transformers.js 在浏览器中运行小模型\n- 推理全在 Worker 中，主线程保持流畅\n\n#### 3. 大文件 MD5 计算（分片上传）\n```javascript\n// 在 Worker 中计算大文件 hash，主线程不卡\nself.onmessage = (e) => {\n  const file = e.data.file;\n  const spark = new SparkMD5.ArrayBuffer();\n  // 分片读取计算...\n  self.postMessage({ hash: spark.end() });\n};\n```\n\n#### 4. 复杂算法离线计算\n- Agent 工作流的 DAG 依赖检测\n- 连线最短路径计算\n- Markdown 语法解析 + 代码高亮\n\n### Worker 通信最佳实践\n\n```javascript\n// Transferable Objects —— 零拷贝传输\nconst buffer = new ArrayBuffer(1024 * 1024);\nworker.postMessage({ data: buffer }, [buffer]); // 注意第二个参数\n\n// SharedArrayBuffer —— 共享内存（需要 COOP/COEP headers）\nconst shared = new SharedArrayBuffer(1024);\n```\n\n### 限制与注意事项\n\n- Worker 无法访问 DOM / window / document\n- 通信有序列化开销（postMessage 数据会被结构化克隆）\n- Worker 有启动开销（约 10-50ms），不适合频繁创建销毁\n- 模块 Worker（type: module）支持 import 但浏览器兼容性需确认",
+    "follow_up": [
+      "Worker 通信使用 Transferable Objects 和结构化克隆有什么区别？性能差多少？",
+      "SharedArrayBuffer 需要什么 HTTP Headers 才能启用？为什么？",
+      "在 Worker 中运行 WebLLM（浏览器端大模型），需要什么前置条件？",
+      "Worker 的启动开销约 10-50ms，频繁创建有什么优化方案？"
+    ],
+    "feynman": {
+      "essence": "Web Worker 让 CPU 密集任务（tokenizer计算/本地推理/大文件hash）在后台线程执行，主线程只管 UI 和用户交互，Agent 应用不卡顿。",
+      "analogy": "你是一个餐厅服务员（主线程），要同时招呼客人（用户交互）和洗碗（CPU密集任务）。如果边洗碗边招待，客人等急了。请一个洗碗工（Web Worker），你专心招待，碗洗好了他叫你。",
+      "key_points": [
+        "Agent四大应用：tokenizer/本地推理/大文件hash/复杂算法",
+        "Worker无法访问DOM，通过postMessage通信",
+        "Transferable Objects零拷贝传输 ArrayBuffer",
+        "Worker有启动开销，适合长生命周期任务"
+      ]
+    },
+    "first_principle": {
+      "problem": "JavaScript 是单线程的。Agent 应用既要做 UI 渲染和用户交互（延迟敏感），又要做 CPU 密集计算（tokenizer/hash/推理），两者争抢主线程会导致 UI 卡顿。",
+      "axioms": [
+        "JS 单线程——CPU密集任务会阻塞UI渲染",
+        "Web Worker 是真正的操作系统级线程——独立事件循环",
+        "线程间通信有序列化开销——不能频繁传递大数据",
+        "Worker 有创建开销——适合长生命周期、高计算密度的任务"
+      ],
+      "rebuild": "从主线程被 CPU 密集任务阻塞出发：(1) 需要并行计算 -> Web Worker (2) 需要低延迟通信 -> Transferable Objects 零拷贝 (3) 需要处理大数据 -> SharedArrayBuffer 共享内存 (4) 需要 Agent 场景具体落地 -> tokenizer/本地推理/MD5计算/DAG检测。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》二面 Q5"
+  },
+  {
+    "id": "note-xhs-fe-006",
+    "category": "frontend",
+    "subcategory": "架构设计",
+    "difficulty": "L5",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "工作流",
+      "可视化",
+      "React Flow",
+      "Zustand",
+      "DAG",
+      "前端架构"
+    ],
+    "question": "如果让你从零设计一个可视化 Agent 工作流（Workflow）搭建平台的前端架构，你的整体技术选型和架构方案是什么？（滴滴 Agent 三面）",
+    "answer": "## 可视化 Agent 工作流平台前端架构\n\n### 整体架构\n\n```\n┌──────────────────────────────────────────────┐\n│                 视图层 (View Layer)             │\n│   React Flow 画布 / 节点渲染 / 连线渲染 / 小地图  │\n├──────────────────────────────────────────────┤\n│               数据模型层 (Model Layer)          │\n│   图结构数据 / 节点属性 / 连线关系 / DAG 验证     │\n├──────────────────────────────────────────────┤\n│               控制层 (Control Layer)            │\n│   拖拽逻辑 / 连线逻辑 / 撤销重做 / 对齐网格       │\n├──────────────────────────────────────────────┤\n│               插件层 (Plugin Layer)             │\n│   自定义节点 / 自定义边 / 动态加载               │\n├──────────────────────────────────────────────┤\n│               导出层 (Export Layer)             │\n│   JSON DAG 导出 / 后端 Agent 引擎解析           │\n└──────────────────────────────────────────────┘\n```\n\n### 技术选型\n\n| 模块 | 选型 | 理由 |\n|------|------|------|\n| 画布引擎 | React Flow | 成熟的拖拽/连线/缩放/视口管理 |\n| 状态管理 | Zustand | 轻量、无 Context 穿透问题、适合高频更新 |\n| UI组件 | Ant Design / shadcn | 企业级组件库 |\n| 数据可视化 | D3.js（辅助） | 自定义连线算法 |\n\n### 关键设计\n\n#### 1. 节点插件化\n\n```typescript\n// 统一节点接口协议\ninterface NodeSchema {\n  type: string;\n  inputs: Port[];\n  outputs: Port[];\n  config: ConfigField[];\n  component: React.LazyComponent;  // 动态加载\n}\n\n// 注册自定义节点\nregistry.register('llm_call', {\n  type: 'llm_call',\n  inputs: [{ name: 'prompt', type: 'string' }],\n  outputs: [{ name: 'response', type: 'string' }],\n  config: [{ name: 'model', type: 'select', options: ['gpt-4', 'claude-3'] }],\n  component: lazy(() => import('./nodes/LLMCallNode'))\n});\n```\n\n#### 2. DAG 环路检测\n\n```javascript\nfunction hasCycle(nodes, edges) {\n  const graph = buildAdjacencyList(nodes, edges);\n  const visited = new Set();\n  const recursion = new Set();\n\n  function dfs(node) {\n    visited.add(node);\n    recursion.add(node);\n    for (const neighbor of graph[node] || []) {\n      if (!visited.has(neighbor)) {\n        if (dfs(neighbor)) return true;\n      } else if (recursion.has(neighbor)) {\n        return true; // 发现环\n      }\n    }\n    recursion.delete(node);\n    return false;\n  }\n\n  return nodes.some(n => !visited.has(n.id) && dfs(n.id));\n}\n```\n\n#### 3. 数据流设计\n\n- 画布数据采用单向数据流\n- 节点增删改通过 Action 统一触发\n- 支持导出为标准 JSON DAG 供后端解析",
+    "follow_up": [
+      "如何实现工作流的撤销（Undo）和重做（Redo）功能？数据结构怎么设计？",
+      "上千个节点时，如何实现节点搜索并快速 Focus 到画布中央？",
+      "节点内部的表单状态如何管理？实时同步到全局状态会导致画布重绘吗？",
+      "如何设计节点插件化机制，让业务线低成本扩展自定义 Tool 节点？"
+    ],
+    "feynman": {
+      "essence": "可视化 Agent 工作流平台 = 画布引擎(React Flow) + 分层架构(视图/模型/控制/插件) + 节点插件化(Schema协议) + DAG验证 + JSON导出。",
+      "analogy": "就像搭积木的蓝图设计工具。你拖拽不同类型的积木（节点），用线连起来（连线），搭出一个工作流程。每个积木内部可以配置参数（模型选择、温度等），搭好后导出成说明书（JSON DAG），后端照着说明书执行。",
+      "key_points": [
+        "技术选型：React Flow + Zustand + 分层架构",
+        "节点插件化：统一Schema协议 + 动态组件加载",
+        "DAG环路检测：DFS + recursion stack",
+        "单向数据流：节点增删改通过Action触发，导出JSON DAG"
+      ]
+    },
+    "first_principle": {
+      "problem": "Agent 的工作流本质上是一个有向无环图（DAG）——节点是工具/模型调用，边是数据流向。需要一个可视化编辑器让用户拖拽搭建这个 DAG，并导出给后端执行。",
+      "axioms": [
+        "工作流是 DAG——必须有环路检测防止死循环",
+        "节点是可扩展的——需要插件化机制让业务线自定义",
+        "画布是高频更新的——需要性能优化（视口裁剪、状态隔离）",
+        "前端定义的图必须能被后端解析——需要标准的数据导出格式"
+      ],
+      "rebuild": "从搭建可视化 DAG 编辑器的需求出发：(1) 需要画布渲染 -> React Flow (2) 需要管理图数据 -> 分层架构 + Zustand (3) 需要可扩展 -> 节点插件化 Schema (4) 需要安全 -> DAG 环路检测 (5) 需要可执行 -> JSON DAG 导出格式。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》三面 Q1"
+  },
+  {
+    "id": "note-xhs-fe-007",
+    "category": "frontend",
+    "subcategory": "架构设计",
+    "difficulty": "L4",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "前端监控",
+      "稳定性",
+      "TTFT",
+      "LLM",
+      "可观测性"
+    ],
+    "question": "如何设计一个前端监控与稳定性保障系统，特别是针对大模型（LLM）响应慢、易出错的特点？（滴滴 Agent 三面）",
+    "answer": "## Agent 前端监控与稳定性保障系统\n\n### 核心挑战\n\nLLM 应用不同于传统 Web 应用：响应慢（10-60秒）、易出错（幻觉/超时/限流）、流式输出可能中途断开。监控系统必须针对这些特点设计。\n\n### 监控指标体系\n\n#### 1. 常规指标\n\n| 指标 | 定义 | 告警阈值 |\n|------|------|---------|\n| JS Error Rate | JS异常率 | > 0.1% |\n| 页面白屏时间 | FCP | > 2s |\n| API 错误率 | 5xx / 总请求 | > 1% |\n\n#### 2. LLM 特有指标（Agent 核心）\n\n| 指标 | 定义 | 告警阈值 |\n|------|------|---------|\n| TTFT (Time To First Token) | 首字响应时间 | > 3s |\n| 总响应时间 | 请求到最后token | > 60s |\n| 流中断率 | 流式输出中途断开比例 | > 2% |\n| Token 消耗 | 每次对话Token数 | 超预算20% |\n| 幻觉率 | 用户标记回答有误比例 | > 5% |\n| 重试率 | 用户重新提问比例 | > 15% |\n| 满意度 | 点赞/点踩比例 | < 80% |\n\n### 架构设计\n\n```\n前端 SDK (采集)\n    │\n    ├── 性能指标 (TTFT/响应时间/FPS)\n    ├── 错误捕获 (JS异常/API错误/流中断)\n    ├── 用户行为 (重试/点赞/点踩/复制)\n    └── 自定义事件 (Tool调用/模型切换)\n    │\n    ▼\n数据上报 (Beacon API / 批量合并)\n    │\n    ▼\n处理层 (Flink 实时聚合)\n    │\n    ├── 实时大盘 (Grafana)\n    ├── 异常告警 (钉钉/Slack)\n    └── 离线分析 (Bad Case挖掘)\n```\n\n### 流中断检测实现\n\n```javascript\nclass StreamMonitor {\n  constructor() {\n    this.startTime = 0;\n    this.firstTokenTime = 0;\n  }\n\n  onStart() { this.startTime = Date.now(); }\n\n  onFirstToken() {\n    this.firstTokenTime = Date.now();\n    const ttft = this.firstTokenTime - this.startTime;\n    if (ttft > 3000) reportMetric('ttft_slow', { value: ttft });\n  }\n\n  onError(err) {\n    if (err.name === 'AbortError') reportEvent('stream_aborted_by_user');\n    else reportEvent('stream_broken', { error: err.message });\n  }\n\n  onDone() {\n    reportMetric('stream_total_time', { value: Date.now() - this.startTime });\n  }\n}\n```\n\n### 稳定性保障\n\n1. 超时兜底：超过60s自动提示重试\n2. 流中断恢复：自动重连（最多2次）\n3. 降级方案：LLM不可用时降级到规则引擎\n4. Token预算控制：单用户/单会话上限\n5. 灰度发布：新模型/新Prompt先灰度5%",
+    "follow_up": [
+      "如何定义和测量幻觉率（Hallucination Rate）？前端能做哪些自动检测？",
+      "流式输出中断后，如何判断是用户主动取消还是网络问题？",
+      "Token 预算控制如何实现？超预算后怎么优雅降级？",
+      "如何设计灰度发布机制，让新 Prompt/新模型安全上线？"
+    ],
+    "feynman": {
+      "essence": "Agent 监控系统的核心是针对 LLM 特有指标（TTFT/流中断率/Token消耗/幻觉率/重试率）设计监控，而非仅用传统 Web 监控指标。",
+      "analogy": "传统 Web 监控像量体温（快不快、有没有报错），Agent 监控像全面体检——除了体温，还要查内容对不对（幻觉率）、用户满意吗（重试率/点赞率）、话说到一半有没有断（流中断率）。",
+      "key_points": [
+        "LLM特有指标：TTFT/流中断率/Token消耗/幻觉率/重试率/满意度",
+        "监控SDK采集：性能+错误+用户行为+自定义事件",
+        "Beacon API批量上报，Flink实时聚合，Grafana大盘",
+        "稳定性保障：超时兜底/流中断恢复/降级方案/Token预算/灰度发布"
+      ]
+    },
+    "first_principle": {
+      "problem": "LLM 应用的失败模式与传统 Web 应用完全不同：响应可能 60 秒、输出可能幻觉、流式可能中断、成本与 Token 正相关。",
+      "axioms": [
+        "LLM 的延迟量级是秒级而非毫秒级——需要不同的 SLA 标准",
+        "LLM 可能输出看似正确但实际错误的内容，需要内容质量监控",
+        "流式输出可能在任意位置中断——需要端到端完整性检测",
+        "Token 消耗直接等于金钱成本——需要预算控制"
+      ],
+      "rebuild": "从 LLM 应用的独特失败模式出发：(1) 响应慢 -> TTFT监控 (2) 流中断 -> StreamMonitor (3) 幻觉 -> 用户反馈+重试率 (4) 成本失控 -> Token预算控制 (5) 不可用 -> 降级+灰度。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》三面 Q2"
+  },
+  {
+    "id": "note-xhs-fe-008",
+    "category": "frontend",
+    "subcategory": "架构设计",
+    "difficulty": "L4",
+    "tags": [
+      "滴滴",
+      "Agent",
+      "Context管理",
+      "状态同步",
+      "乐观更新",
+      "IndexedDB",
+      "WebSocket"
+    ],
+    "question": "在大模型前端应用中，如何设计一套通用的 Context（上下文）管理和状态同步机制？（滴滴 Agent 三面）",
+    "answer": "## 大模型前端应用的 Context 管理和状态同步\n\n### 统一 Message Schema\n\n```typescript\ninterface Message {\n  id: string;\n  role: 'user' | 'assistant' | 'system' | 'tool';\n  content: string | MultimodalContent[];\n  status: 'pending' | 'streaming' | 'completed' | 'error' | 'interrupted';\n  tools?: ToolCall[];\n  files?: FileAttachment[];\n  timestamp: number;\n  tokenCount?: number;\n}\n```\n\n### 乐观更新（Optimistic Updates）\n\n```javascript\nasync function sendMessage(text) {\n  // 1. 立即插入用户消息（不等网络）\n  addMessage({ id: genId(), role: 'user', content: text, status: 'completed' });\n\n  // 2. 立即插入占位AI消息\n  const aiMsg = { id: genId(), role: 'assistant', content: '', status: 'streaming' };\n  addMessage(aiMsg);\n\n  // 3. 流式更新\n  try {\n    for await (const token of streamChat(text)) {\n      updateMessage(aiMsg.id, { content: prev => prev + token });\n    }\n    updateMessage(aiMsg.id, { status: 'completed' });\n  } catch (err) {\n    updateMessage(aiMsg.id, { status: 'error', error: err.message });\n  }\n}\n```\n\n### 多端同步\n\n- 本地 IndexedDB（持久化，超5MB不用LocalStorage）\n- WebSocket 推送至其他设备\n- 后端持久化\n\n### 上下文裁剪策略\n\n- 清除历史：用户点击新对话\n- 引用特定消息：用户选择某条历史作为上下文\n- 自动截断：超过 Window 时截断最早消息\n- Token 估算：前端实时展示消耗",
+    "follow_up": [
+      "如何在前端估算一段文本的 Token 数量？精度和性能怎么平衡？",
+      "状态机（如 XState）在复杂 Agent 交互中（思考→调研→生成→报错重试）有什么优势？",
+      "历史消息过多时存 LocalStorage 会超 5MB 限制，IndexedDB 怎么设计存储结构？",
+      "流式接收数据时频繁更新全局状态导致整个聊天列表重渲染，怎么优化？"
+    ],
+    "feynman": {
+      "essence": "Agent 前端 Context 管理核心：统一 Message Schema + 乐观更新提升体验 + IndexedDB 持久化 + WebSocket 多端同步 + 上下文裁剪策略。",
+      "analogy": "就像微信聊天。你发消息秒显示（乐观更新），对方正在输入有动画（streaming状态），聊天记录存在手机里（IndexedDB），电脑上也能同步看到（WebSocket多端同步），聊天太长可以清空（上下文裁剪）。",
+      "key_points": [
+        "统一Message Schema：id/role/content/status/tools/files",
+        "乐观更新：用户消息秒显示，AI消息先占位再流式填充",
+        "IndexedDB持久化（>5MB不用LocalStorage）",
+        "上下文裁剪：清除/引用/截断/Token估算"
+      ]
+    },
+    "first_principle": {
+      "problem": "Agent 应用的状态管理比传统 SPA 复杂得多：需要管理流式消息的中间态、多模态内容、工具调用记录、多端同步、以及与 Context Window 的交互。",
+      "axioms": [
+        "用户体验需要即时反馈——乐观更新是必要的",
+        "消息是流式的——状态机是必需的",
+        "LocalStorage 有 5MB 限制——长对话必须用 IndexedDB",
+        "多端使用是常见场景——需要实时同步机制"
+      ],
+      "rebuild": "从 Agent 状态管理的复杂性出发：(1) 统一数据格式 -> Message Schema (2) 即时反馈 -> 乐观更新 (3) 流式状态 -> 消息状态机 (4) 大数据持久化 -> IndexedDB (5) 多端同步 -> WebSocket (6) Window 限制 -> 裁剪策略。"
+    },
+    "images": [],
+    "source": "小红书帖子《滴滴 Agent开发工程师面经（7月最新）》三面 Q3"
+  }
+]
