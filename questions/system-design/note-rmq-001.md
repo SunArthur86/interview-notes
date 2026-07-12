@@ -1,0 +1,227 @@
+---
+id: note-rmq-001
+difficulty: L3
+category: system-design
+subcategory: 消息队列
+tags:
+- Java
+- RocketMQ
+- 消息丢失
+- 消息可靠性
+- 大厂二面
+- 面经
+feynman:
+  essence: RocketMQ消息丢失本质是"消息在某一个环节没落盘/没消费"。完整链路是生产者→Broker存储→消费者三段，每段都需针对性保障：生产端用同步发送+重试，Broker用同步刷盘+主从同步，消费端用手动ACK+幂等重试。
+  analogy: 寄快递——生产者寄件（要确认快递收了），快递中转站（包裹不能丢），收件人签收（不能说没收到）。任何一环疏忽包裹就丢了。
+  key_points:
+  - 生产者端：同步发送(sync)替代异步(oneway)，失败重试
+  - Broker端：同步刷盘(SYNC_FLUSH)替代异步刷盘，主从同步复制
+  - 消费者端：手动提交offset(非自动)，消费失败重试+死信队列
+  - 终极保障：本地消息表+对账补偿，确保业务不丢
+  - 每一端都要想到：面试官问"消费者端呢"就是考你是否三端都答
+first_principle:
+  essence: 消息可靠性 = 生产不丢 + 存储不丢 + 消费不丢，三段链路每段都有保障机制
+  derivation: 消息从生产到消费经历网络传输→磁盘持久化→网络拉取→业务处理→ACK确认→每一步都可能失败→需在每一步设置确认/重试/持久化机制
+  conclusion: 没有银弹——可靠性和性能成反比，需根据业务容忍度选择对应级别
+follow_up:
+- RocketMQ的同步刷盘和异步刷盘性能差多少？
+- 消费者消费失败一直重试怎么办？（重试次数限制+死信队列DLQ）
+- 如果Broker主从都宕机了消息还能恢复吗？（磁盘恢复+跨机房容灾）
+- RocketMQ和Kafka在消息可靠性上有什么区别？
+memory_points:
+- 三端保障口诀：生产同步发+重试，Broker同步刷盘+主从同步，消费手动ACK+幂等
+- 面试常见追问顺序：生产者→"消费者端呢？"→"Broker呢？" 三端必须都答到
+- 同步刷盘 vs 异步刷盘：同步=写磁盘才返回ACK(可靠慢)，异步=写内存就返回(快但宕机丢)
+- 消费者必须幂等！因为网络超时会导致同一条消息被投递多次
+- 终极方案：本地消息表(业务表+消息表同库事务)，RocketMQ事务消息(半消息+回查)
+---
+
+# 【大厂二面】RocketMQ 消息丢失怎么处理？
+
+> 来源：小红书 Java大厂二面 RocketMQ踩坑复盘
+
+## 一、消息丢失可能发生在三个环节
+
+```
+┌──────────┐      1.发送阶段       ┌──────────┐      3.消费阶段      ┌──────────┐
+│  生产者   │ ──────────────────► │  Broker   │ ──────────────────► │  消费者   │
+│ Producer │   网络超时/丢失       │  存储     │   消费失败/宕机       │ Consumer │
+└──────────┘                      └──────────┘                      └──────────┘
+                                  2.存储阶段
+                                  宕机/磁盘故障
+```
+
+> **面试避坑**：面试官常先问"生产者怎么处理"，你答完他会追问"消费者端呢？"再追问"Broker呢？"——必须三端都准备好！
+
+## 二、三端保障方案
+
+### 第一端：生产者——确保消息成功到达Broker
+
+```
+发送方式对比
+
+┌─────────────┬──────────────────┬──────────┬───────────┐
+│   方式       │  机制             │ 可靠性   │ 性能       │
+├─────────────┼──────────────────┼──────────┼───────────┤
+│ oneway      │ 发完不等响应       │ 最低 ❌  │ 最高       │
+│ async       │ 异步回调通知       │ 中       │ 高         │
+│ sync        │ 同步等待Broker ACK │ 最高 ✅  │ 中         │
+└─────────────┴──────────────────┴──────────┴───────────┘
+```
+
+```java
+// ✅ 可靠发送：同步发送 + 重试
+DefaultMQProducer producer = new DefaultMQProducer("group");
+producer.setRetryTimesWhenSendFailed(3);       // 同步发送重试3次
+producer.setRetryTimesWhenSendAsyncFailed(3);  // 异步发送重试3次
+
+Message msg = new Message("OrderTopic", 
+    "TAG_A", orderData.getBytes());
+
+try {
+    SendResult result = producer.send(msg, 5000); // 同步发送，超时5s
+    if (result.getSendStatus() == SendStatus.SEND_OK) {
+        log.info("发送成功: {}", result.getMsgId());
+    } else {
+        // FLUSH_DISK_TIMEOUT / FLUSH_SLAVE_TIMEOUT / SLAVE_NOT_AVAILABLE
+        // 这些状态意味着消息可能没完全持久化
+        handleSendFailure(msg); // 降级处理
+    }
+} catch (Exception e) {
+    // 最终重试失败 → 写本地消息表，定时补偿
+    saveToLocalMsgTable(msg);
+}
+```
+
+### 第二端：Broker——确保消息持久化不丢
+
+```
+Broker 持久化两道防线
+
+┌─────────────────────────────────────────────┐
+│  防线1：刷盘策略                               │
+│  ├── ASYNC_FLUSH（默认）：写入OS PageCache    │
+│  │   就返回ACK → 快但宕机可能丢               │
+│  └── SYNC_FLUSH：写入物理磁盘后才返回ACK      │
+│      → 慢但不丢（金融场景必选）                │
+│                                              │
+│  防线2：主从复制                               │
+│  ├── ASYNC_SLAVE：异步复制（可能丢少量）       │
+│  └── SYNC_SLAVE：同步复制（强一致不丢）        │
+└─────────────────────────────────────────────┘
+```
+
+Broker配置（broker.conf）：
+
+```properties
+# 同步刷盘（可靠优先）
+flushDiskType = SYNC_FLUSH
+
+# 同步主从复制（可靠优先）
+brokerRole = SYNC_MASTER
+```
+
+```
+性能影响
+
+ASYNC_FLUSH + ASYNC_SLAVE → 10万 TPS   ← 默认，日志场景够用
+SYNC_FLUSH  + SYNC_SLAVE  → 1万 TPS    ← 金融/订单必须
+
+实际选择：核心交易用同步，日志/监控用异步
+```
+
+### 第三端：消费者——确保消息被正确消费
+
+```java
+// ✅ 可靠消费：手动ACK + 幂等 + 重试 + 死信
+@RocketMQMessageListener(
+    topic = "OrderTopic",
+    consumerGroup = "order_consumer_group",
+    messageModel = ConsumeMode.CONCURRENTLY
+)
+public class OrderConsumer implements RocketMQListener<MessageExt> {
+    
+    @Override
+    public void onMessage(MessageExt message) {
+        String msgId = message.getMsgId();
+        String body = new String(message.getBody());
+        
+        // 1. 幂等检查（核心！防止重复消费）
+        if (isProcessed(msgId)) {
+            return; // 已处理过，直接跳过（但仍返回成功）
+        }
+        
+        try {
+            // 2. 业务处理
+            processOrder(body);
+            // 3. 记录已处理（幂等标记）
+            markProcessed(msgId);
+            // 4. 方法正常返回 = 自动ACK
+        } catch (Exception e) {
+            // 5. 抛异常 = 消费失败 → RocketMQ自动重试
+            //    默认重试16次，间隔递增(1s,5s,10s,30s,1m,2m...)
+            //    超过重试上限 → 进入死信队列(DLQ)
+            log.error("消费失败: {}", msgId, e);
+            throw new RuntimeException(e);
+        }
+    }
+    
+    private boolean isProcessed(String msgId) {
+        // Redis或DB记录已处理的msgId
+        return redisTemplate.opsForValue()
+            .setIfAbsent("processed:" + msgId, "1", 24, TimeUnit.HOURS) == null;
+    }
+}
+```
+
+```
+RocketMQ 重试机制
+
+消息消费失败
+    │
+    ▼
+┌─────────────┐
+│ %RETRY%组名  │ ← 自动进入重试队列
+│ 重试16次     │   间隔：1s 5s 10s 30s 1m 2m 3m 4m 5m...
+└──────┬──────┘
+       │ 16次后仍失败
+       ▼
+┌─────────────┐
+│ %DLQ%组名    │ ← 死信队列(DLQ)
+│ 不再自动投递  │   需要人工介入处理
+└─────────────┘
+```
+
+## 三、终极方案——本地消息表 + 事务消息
+
+当三端保障仍不够时，使用本地消息表模式（详见分布式事务题）：
+
+```
+本地事务写入                    异步投递
+┌───────────┐  ┌───────────┐       ┌───────────┐
+│ orders表   │  │ msg_table │       │  RocketMQ │
+│ INSERT订单 │  │ INSERT消息 │──────►│  发送消息  │
+│            │  │           │       │           │
+│ 同一本地事务 │  │           │       └───────────┘
+└───────────┘  └───────────┘
+  要么都成功      要么都失败        定时扫描发送
+```
+
+RocketMQ 事务消息（半消息+回查）也是类似思路，但无需维护消息表。
+
+## 四、可靠性级别与选型
+
+| 级别 | 配置 | 性能影响 | 适用场景 |
+|------|------|---------|---------|
+| **L1-基础** | async发送+async刷盘 | 无 | 日志/监控 |
+| **L2-标准** | sync发送+async刷盘+消费幂等 | 小 | 大部分业务 |
+| **L3-高可靠** | sync发送+sync刷盘+主从同步 | 中 | 订单/支付 |
+| **L4-极致** | L3+本地消息表+对账补偿 | 大 | 金融核心 |
+
+## 五、面试加分点
+
+1. **三端思维**：上来就说"消息丢失要从生产者、Broker、消费者三端分别保障"
+2. **重试+死信**：能说出RocketMQ默认重试16次，超限进死信队列DLQ
+3. **幂等的必要性**：强调"消费者必须幂等，因为网络超时会导致重复投递"
+4. **性能权衡**：能说出同步刷盘性能约降10倍，按业务选择而非一律最高
+5. **事务消息**：提到RocketMQ事务消息的半消息+回查机制作为终极方案

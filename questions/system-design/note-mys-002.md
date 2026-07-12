@@ -1,0 +1,238 @@
+---
+id: note-mys-002
+difficulty: L4
+category: system-design
+subcategory: 分布式
+tags:
+- 美云智数
+- Java后端
+- 分布式事务
+- 2PC
+- TCC
+- 本地消息表
+- 终面
+- 面经
+feynman:
+  essence: 分布式事务要解决"跨库/跨服务的数据要么全成功要么全回滚"。2PC是强一致但阻塞，TCC是业务侵入但灵活，本地消息表是最终一致最可靠——三者按一致性要求从高到低选择。
+  analogy: 三人合伙开店——2PC是一个人统一指挥"大家同时转账"（必须等所有人准备好，慢但同步）；TCC是每人提前冻结资金（预留资源，灵活但代码复杂）；本地消息表是A先转，然后发微信通知B和C（最终都能收到，有延迟但最实用）。
+  key_points:
+  - 2PC：协调者统一指挥，prepare→commit两阶段，强一致但阻塞
+  - TCC：Try(预留)→Confirm(确认)→Cancel(回滚)，业务侵入大
+  - 本地消息表：业务表+消息表同库事务写入，异步投递MQ，最终一致
+  - Saga：长事务拆分为多个子事务，每个有补偿操作
+  - 选型：强一致选2PC/Seata AT，高性能选TCC，最可靠选本地消息表
+first_principle:
+  essence: 分布式事务 = CAP定理下的一致性选择——不可能同时满足强一致+高可用+分区容错
+  derivation: 网络分区不可避免(P)→C和A只能选一个→强一致(2PC)牺牲可用性→最终一致(消息表)牺牲即时一致性→业务决定能接受多大延迟
+  conclusion: 金融交易用2PC/TCC（钱不能错），普通业务用本地消息表（允许秒级延迟）
+follow_up:
+- Seata的AT模式和TCC模式有什么区别？
+- 本地消息表和事务消息（RocketMQ）有什么区别？
+- 分布式事务的性能瓶颈在哪里？
+- 如果消费者一直消费失败怎么办？（死信队列+人工介入）
+memory_points:
+- 2PC=两阶段提交(prepare+commit)，强一致但同步阻塞，协调者单点问题
+- TCC=Try预留+Confirm确认+Cancel回滚，需要每个服务实现三个接口
+- 本地消息表=业务操作和消息写入同库事务→异步投递→消费方幂等
+- 选型口诀：要钱要命选TCC，普通业务选消息表
+- 所有方案的消费者都必须实现幂等性！
+---
+
+# 【美云智数终面】分布式事务场景你遇到过几种？2PC、TCC、本地消息表分别适用什么业务场景？
+
+> 来源：小红书 美云智数 Java后端终面面经
+
+## 一、为什么需要分布式事务
+
+```
+单体架构（本地事务）              微服务架构（分布式事务）
+┌──────────────┐               ┌─────────┐ ┌─────────┐ ┌─────────┐
+│   订单服务     │               │ 订单服务  │ │ 库存服务  │ │ 支付服务  │
+│              │               │         │ │         │ │         │
+│ BEGIN;       │               │ 创建订单 │─│ 扣减库存 │─│ 扣款    │
+│ INSERT订单    │               │         │ │         │ │         │
+│ UPDATE库存    │               └─────────┘ └─────────┘ └─────────┘
+│ UPDATE余额    │                  各自独立数据库，本地事务管不了跨库
+│ COMMIT;      │                  
+└──────────────┘               问题：库存扣了但支付失败 → 数据不一致！
+   一个数据库，一个事务
+```
+
+## 二、三大方案详解
+
+### 方案1：2PC（两阶段提交）
+
+```
+┌──────────┐                 ┌──────────┐
+│ 协调者     │                 │ 参与者A   │  (订单库)
+│ (TM)      │                 │ (RM)     │
+│          │  Phase 1         │          │
+│          │  ──prepare──►    │ 锁定资源  │
+│          │  ◄──ok/abort──   │          │
+│          │                  │          │
+│          │  Phase 2         │          │
+│          │  ──commit──►     │ 提交/回滚 │
+│          │  ◄──done───      │ 释放锁    │
+└──────────┘                 └──────────┘
+```
+
+| 优点 | 缺点 |
+|------|------|
+| 强一致性（所有参与者同时提交） | 同步阻塞（prepare后锁不释放） |
+| 实现相对标准化（XA协议） | 协调者单点故障 |
+| 开发者无感知（数据库层实现） | 性能差（网络往返2轮+锁定时间） |
+
+**适用场景**：传统金融系统、同一数据中心内的强一致需求
+
+### 方案2：TCC（Try-Confirm-Cancel）
+
+```
+正常流程                          异常流程
+┌─────────┐                      ┌─────────┐
+│ Try     │ 预留资源              │ Try     │ 预留资源
+│ 冻结余额 │ 100→(冻结50,可用50)  │ 冻结余额 │ 100→(冻结50,可用50)
+└────┬────┘                      └────┬────┘
+     │ 全部Try成功                     │ 某个Try失败
+     ▼                                ▼
+┌─────────┐                      ┌─────────┐
+│ Confirm │ 确认扣减              │ Cancel  │ 释放预留
+│ 冻结50→0│ 扣减完成              │ 冻结50→ │ 余额恢复100
+│ 余额=50 │                      │ 可用100 │
+└─────────┘                      └─────────┘
+```
+
+**代码示例（库存服务TCC）**：
+
+```java
+// Try：冻结库存（不真正扣减）
+public boolean tryDeduct(String orderId, int quantity) {
+    // available_stock >= quantity 才能冻结
+    int rows = inventoryMapper.freezeStock(orderId, quantity);
+    return rows > 0;
+}
+
+// Confirm：确认扣减（从冻结中扣减）
+public boolean confirmDeduct(String orderId, int quantity) {
+    // frozen_stock -= quantity（幂等：先查是否已确认）
+    if (isConfirmed(orderId)) return true; // 幂等
+    inventoryMapper.confirmStock(orderId, quantity);
+    return true;
+}
+
+// Cancel：释放冻结（冻结量还给可用量）
+public boolean cancelDeduct(String orderId, int quantity) {
+    if (isCancelled(orderId)) return true; // 幂等
+    inventoryMapper.unfreezeStock(orderId, quantity);
+    return true;
+}
+```
+
+| 优点 | 缺点 |
+|------|------|
+| 性能好（不长期锁定资源） | 业务侵入大（每个服务写3个接口） |
+| 灵活（业务控制粒度） | Confirm/Cancel必须幂等 |
+| 最终一致性，不会长期阻塞 | 开发成本高 |
+
+**适用场景**：电商交易（订单+库存+支付）、需要较高性能的金融场景
+
+### 方案3：本地消息表（最终一致性）⭐ 最常用
+
+```
+┌─────────────────────────────────────────────────┐
+│              订单服务数据库                        │
+│  ┌──────────────┐    ┌──────────────┐          │
+│  │ orders 表     │    │ local_msg 表  │          │
+│  │ order_id     │    │ msg_id       │          │
+│  │ user_id      │    │ target_topic │          │
+│  │ amount       │    │ payload      │          │
+│  │ status       │    │ status(NEW)  │          │
+│  └──────────────┘    └──────────────┘          │
+│         同一个本地事务写入                         │
+└──────────────────────┬──────────────────────────┘
+                       │ 事务提交后
+                       ▼
+              ┌──────────────┐
+              │ 消息投递Worker │ (定时扫描status=NEW)
+              │ 发送到MQ      │
+              │ 更新status    │
+              └──────┬───────┘
+                     │
+                     ▼
+              ┌──────────────┐
+              │ 库存服务      │
+              │ 消费MQ消息    │
+              │ 扣减库存      │
+              │ 幂等处理      │
+              └──────────────┘
+```
+
+**核心代码**：
+
+```java
+@Service
+public class OrderService {
+    
+    @Transactional  // 本地事务：订单+消息同时写入
+    public void createOrder(OrderDTO dto) {
+        // 1. 写订单表
+        orderMapper.insert(dto);
+        // 2. 写本地消息表（同一事务）
+        LocalMessage msg = new LocalMessage();
+        msg.setMsgId(UUID.randomUUID().toString());
+        msg.setTopic("inventory-deduct");
+        msg.setPayload(JSON.toJSONString(dto));
+        msg.setStatus("NEW");
+        messageMapper.insert(msg);
+        // 事务提交后，订单和消息要么都成功要么都失败
+    }
+}
+
+// 定时任务扫描发送
+@Scheduled(fixedRate = 1000)
+public void sendMessages() {
+    List<LocalMessage> msgs = messageMapper.findByStatus("NEW", 100);
+    for (LocalMessage msg : msgs) {
+        try {
+            rocketMQTemplate.send(msg.getTopic(), msg.getPayload());
+            messageMapper.updateStatus(msg.getMsgId(), "SENT");
+        } catch (Exception e) {
+            // 下次重试
+        }
+    }
+}
+```
+
+| 优点 | 缺点 |
+|------|------|
+| 最可靠（本地事务保证消息不丢） | 有延迟（秒级到分钟级） |
+| 业务侵入小（只需加消息表） | 消费者必须幂等 |
+| 不阻塞主流程 | 需要维护消息表+定时任务 |
+
+**适用场景**：订单异步处理、跨服务数据同步、对实时性要求不高的业务
+
+## 三、方案对比与选型
+
+| 维度 | 2PC/XA | TCC | 本地消息表 | Saga |
+|------|--------|-----|-----------|------|
+| 一致性 | 强一致 | 最终一致 | 最终一致 | 最终一致 |
+| 性能 | 差（同步阻塞） | 中 | 好 | 好 |
+| 业务侵入 | 无 | 大（3接口） | 小（加消息表） | 大（补偿逻辑） |
+| 可靠性 | 中（协调者单点） | 高 | 最高 | 高 |
+| 适用场景 | 传统金融 | 电商交易 | 异步业务 | 长流程事务 |
+
+### 选型口诀
+
+```
+要钱要命（金融核心）  → TCC（性能+一致性平衡）
+普通业务（订单/物流） → 本地消息表（最可靠）
+同库强一致           → 2PC/XA（Seata AT模式）
+超长流程（旅行预订）  → Saga（每步可补偿）
+```
+
+## 四、面试加分点
+
+1. **能说出CAP理论**：分布式系统C和A不可兼得，分布式事务是C和A的权衡
+2. **强调幂等性**：所有最终一致方案的消费者都必须幂等（Token/唯一索引/状态机）
+3. **结合项目**：能说出项目中具体用哪个方案，为什么选它
+4. **Seata全家桶**：提到Seata支持AT/TCC/Saga/XA四种模式，AT最常用（无侵入）
+5. **RocketMQ事务消息**：能说出它本质是"半消息+回查"机制，类似本地消息表但无需维护消息表

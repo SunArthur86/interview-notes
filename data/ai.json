@@ -2152,5 +2152,134 @@
     },
     "images": [],
     "source": "小红书帖子《大厂一面 多用户场景下如何设计 Agent 的 Session Isolation 会话隔离与 Memory Isolation 记忆隔离》"
+  },
+  {
+    "id": "note-yz-001",
+    "difficulty": "L3",
+    "category": "ai",
+    "subcategory": "Agent",
+    "tags": [
+      "宇树科技",
+      "AI Agent",
+      "ReAct",
+      "循环检测",
+      "Agent调试",
+      "面经"
+    ],
+    "question": "【宇树科技二面】ReAct 循环中，如何检测并跳出无效的\"思考—行动\"循环？",
+    "answer": "# 【宇树科技二面】ReAct 循环中，如何检测并跳出无效的\"思考—行动\"循环？\n\n> 来源：小红书 宇树科技 AI Agent 三轮面试面经\n\n## 一、ReAct 循环问题是什么\n\n```\n正常 ReAct 流程                       陷入循环的 ReAct\n\nThought: 需要查询天气                    Thought: 需要查询天气\nAction: weather_api(\"北京\")             Action: weather_api(\"北京\")  \nObservation: 32°C, 晴                   Observation: API超时\nThought: 北京今天很热，回复用户          Thought: 查询失败，再试一次\n→ 结束 ✅                              Action: weather_api(\"北京\")     ← 循环！\n                                      Observation: API超时\n   ",
+    "full_answer": "# 【宇树科技二面】ReAct 循环中，如何检测并跳出无效的\"思考—行动\"循环？\n\n> 来源：小红书 宇树科技 AI Agent 三轮面试面经\n\n## 一、ReAct 循环问题是什么\n\n```\n正常 ReAct 流程                       陷入循环的 ReAct\n\nThought: 需要查询天气                    Thought: 需要查询天气\nAction: weather_api(\"北京\")             Action: weather_api(\"北京\")  \nObservation: 32°C, 晴                   Observation: API超时\nThought: 北京今天很热，回复用户          Thought: 查询失败，再试一次\n→ 结束 ✅                              Action: weather_api(\"北京\")     ← 循环！\n                                      Observation: API超时\n                                      Thought: 查询失败，再试一次\n                                      Action: weather_api(\"北京\")     ← 又循环！\n                                      ... 无限循环 ❌\n```\n\n**常见循环模式**：\n\n| 模式 | 表现 | 根因 |\n|------|------|------|\n| **工具重复** | 连续调用相同工具+相同参数 | 工具失败但Agent不知换方法 |\n| **推理重复** | 产生相同或高度相似的Thought | 模型陷入推理死胡同 |\n| **工具震荡** | A→B→A→B 来回切换 | 两个工具结果矛盾 |\n| **格式错误** | 不断产生格式错误的输出 | 解析失败→重试→还是错 |\n\n## 二、检测机制——三层防线\n\n### 第一层：工具调用序列去重（轻量、快速）\n\n```python\nclass LoopDetector:\n    def __init__(self, window_size=5, max_repeats=2):\n        self.action_history = []  # [(tool_name, params_hash), ...]\n        self.window_size = window_size\n        self.max_repeats = max_repeats\n    \n    def check(self, tool_name, params):\n        \"\"\"检查是否出现重复调用\"\"\"\n        params_hash = hash(json.dumps(params, sort_keys=True))\n        current = (tool_name, params_hash)\n        \n        # 看最近 window_size 步内是否重复\n        recent = self.action_history[-self.window_size:]\n        repeat_count = recent.count(current)\n        \n        self.action_history.append(current)\n        \n        if repeat_count >= self.max_repeats:\n            return True, f\"工具 {tool_name} 在最近{self.window_size}步内重复调用{repeat_count+1}次\"\n        return False, None\n```\n\n```\n序列去重检测示意\n\nStep 1: (weather_api, \"北京\")     → 历史无重复 → 继续\nStep 2: (weather_api, \"北京\")     → 最近5步内出现1次 → 继续\nStep 3: (weather_api, \"北京\")     → 最近5步内出现2次 → 触发！🚨\n        max_repeats=2 → 第3次相同调用就报警\n\n注意：参数不同不算重复！\nStep 1: (weather_api, \"北京\")     → 不重复\nStep 2: (weather_api, \"上海\")     → 不重复（参数不同）\nStep 3: (weather_api, \"广州\")     → 不重复（合理多次调用）\n```\n\n### 第二层：推理内容相似度检测（深度、精确）\n\n```python\nfrom sentence_transformers import SentenceTransformer\nimport numpy as np\n\nclass SemanticLoopDetector:\n    def __init__(self, threshold=0.92, window=4):\n        self.model = SentenceTransformer('all-MiniLM-L6-v2')\n        self.thoughts = []\n        self.threshold = threshold\n        self.window = window\n    \n    def check_thought(self, thought_text):\n        \"\"\"用embedding相似度检测推理内容是否重复\"\"\"\n        embedding = self.model.encode(thought_text)\n        \n        # 只看最近N步\n        recent = self.thoughts[-self.window:]\n        \n        for i, prev_emb in enumerate(recent):\n            similarity = np.dot(embedding, prev_emb) / (\n                np.linalg.norm(embedding) * np.linalg.norm(prev_emb))\n            if similarity > self.threshold:\n                return True, f\"与第{len(self.thoughts)-len(recent)+i}步推理相似度={similarity:.2f}\"\n        \n        self.thoughts.append(embedding)\n        return False, None\n```\n\n### 第三层：硬性上限（兜底防线）\n\n```python\nMAX_STEPS = 20          # 最大推理轮次\nMAX_TOKENS = 10000      # 最大Token消耗\nMAX_TOOL_FAILURES = 3   # 同一工具连续失败上限\n\nclass AgentGuard:\n    def __init__(self):\n        self.step_count = 0\n        self.total_tokens = 0\n        self.consecutive_failures = {}  # {tool_name: count}\n    \n    def should_stop(self, tool_name=None, success=True):\n        self.step_count += 1\n        \n        # 硬性步数上限\n        if self.step_count >= MAX_STEPS:\n            return True, f\"达到最大轮次 {MAX_STEPS}\"\n        \n        # Token上限\n        if self.total_tokens >= MAX_TOKENS:\n            return True, f\"Token消耗超限 {self.total_tokens}\"\n        \n        # 工具连续失败\n        if tool_name and not success:\n            self.consecutive_failures[tool_name] = \\\n                self.consecutive_failures.get(tool_name, 0) + 1\n            if self.consecutive_failures[tool_name] >= MAX_TOOL_FAILURES:\n                return True, f\"工具 {tool_name} 连续失败{MAX_TOOL_FAILURES}次\"\n        elif tool_name and success:\n            self.consecutive_failures[tool_name] = 0\n        \n        return False, None\n```\n\n## 三、跳出策略——检测到循环后怎么办\n\n```\n┌─────────────────────────────────────────────────┐\n│              跳出策略（优先级从高到低）              │\n├─────────────────────────────────────────────────┤\n│                                                  │\n│  1. 注入反思Prompt（首选）                        │\n│     → 在上下文中插入：\"你已尝试过X方法{N}次，       │\n│        请换一种完全不同的方法\"                     │\n│     → 成功率最高，模型能自主调整                    │\n│                                                  │\n│  2. 强制切换策略                                  │\n│     → 清除当前Thought历史                         │\n│     → 注入新的行动方向                             │\n│     → 如\"天气API不可用，请基于常识回答\"             │\n│                                                  │\n│  3. 返回部分结果                                  │\n│     → 已收集的信息整理成回答                       │\n│     → \"基于已有信息，部分回答如下...\"              │\n│                                                  │\n│  4. 直接终止 + 错误上报                           │\n│     → 兜底方案，告知用户无法完成                    │\n│     → 触发告警，人工介入                           │\n│                                                  │\n└─────────────────────────────────────────────────┘\n```\n\n```python\ndef break_loop(agent, loop_info, strategy=\"reflect\"):\n    if strategy == \"reflect\":\n        # 注入反思Prompt\n        reflection = f\"\"\"\n        ⚠️ 检测到循环：{loop_info}\n        你已经尝试了相同的方法但未成功。\n        请采取完全不同的策略：\n        - 换一个工具\n        - 修改请求参数\n        - 或者基于已有信息直接给出答案\n        \"\"\"\n        agent.inject_message(reflection)\n        \n    elif strategy == \"force_switch\":\n        # 强制切换：清除历史，注入新方向\n        agent.clear_recent_history(steps=3)\n        agent.inject_message(\"之前的尝试失败了，请从不同角度重新分析问题。\")\n        \n    elif strategy == \"partial_result\":\n        # 返回部分结果\n        partial = agent.summarize_current_progress()\n        return {\"status\": \"partial\", \"result\": partial}\n        \n    else:\n        # 终止\n        return {\"status\": \"failed\", \"reason\": loop_info}\n```\n\n## 四、面试加分点\n\n1. **三层检测体系**：序列去重（快）→ embedding相似度（准）→ 硬性上限（兜底）\n2. **区分合理重复**：参数不同=合理多次调用，参数相同=无效循环\n3. **反思Prompt效果最好**：注入\"你已试过X\"比强制终止更能让模型自主调整\n4. **根因分析**：循环的根因通常是Prompt不清晰/工具描述歧义/模型推理能力不足\n5. **工程化防护**：最大轮次+Token上限+超时控制+成本监控的多维度兜底\n",
+    "source": "小红书 宇树科技 AI Agent 三轮面试面经",
+    "feynman": {
+      "essence": "ReAct循环中Agent可能陷入\"思考→行动→观察→思考\"的无效死循环——反复调用同一工具或产生相同推理。检测方法是跟踪工具调用序列和推理内容，发现重复模式后通过强制跳出/注入新Prompt/限制最大轮次来中断。",
+      "analogy": "像导航软件不停说\"前方掉头\"然后又\"前方掉头\"——一直在转圈。解决方法是导航检测到你在原地打转，强制重新规划路线或停下来问你。"
+    },
+    "first_principle": {
+      "essence": "Agent循环 = 状态空间中的死循环，检测 = 识别状态重复，跳出 = 注入新信息打破循环",
+      "conclusion": "检测是被动防御（识别循环），跳出是主动干预（注入信息/切换策略/强制终止）"
+    },
+    "follow_up": [
+      "如何区分\"合理的多次调用同一工具\"和\"无效循环\"？（参数不同=合理，参数相同=循环）",
+      "最大轮次设多少合适？（通常10-20步，按任务复杂度调整）",
+      "Agent陷入循环的根因通常是什么？（Prompt不够清晰/工具描述有歧义/模型能力不足）",
+      "除了轮次限制还有什么防护？（Token上限/成本限制/超时控制）"
+    ]
+  },
+  {
+    "id": "note-yz-002",
+    "difficulty": "L3",
+    "category": "ai",
+    "subcategory": "RAG",
+    "tags": [
+      "宇树科技",
+      "AI Agent",
+      "RAG",
+      "Chunking",
+      "文本分块",
+      "面经"
+    ],
+    "question": "【宇树科技二面】RAG 的 Chunking 策略如何设计？遇到过哪些问题，如何调整？",
+    "answer": "# 【宇树科技二面】RAG 的 Chunking 策略如何设计？遇到过哪些问题，如何调整？\n\n> 来源：小红书 宇树科技 AI Agent 三轮面试面经\n\n## 一、Chunking 为什么重要\n\n```\nRAG 完整流程\n\n文档 ──► Chunking ──► Embedding ──► 存入向量库\n                                         │\n用户查询 ──► Query Embedding ──────────► 检索 Top-K\n                                         │\n                                    取回的 Chunk\n                                         │\n                                    LLM 生成答案\n\n         Chunking 是第一步，直接影响后续所有环节的质量\n         切得不好 → 检索不到 → LLM 无法回答\n```\n\n**Chun",
+    "full_answer": "# 【宇树科技二面】RAG 的 Chunking 策略如何设计？遇到过哪些问题，如何调整？\n\n> 来源：小红书 宇树科技 AI Agent 三轮面试面经\n\n## 一、Chunking 为什么重要\n\n```\nRAG 完整流程\n\n文档 ──► Chunking ──► Embedding ──► 存入向量库\n                                         │\n用户查询 ──► Query Embedding ──────────► 检索 Top-K\n                                         │\n                                    取回的 Chunk\n                                         │\n                                    LLM 生成答案\n\n         Chunking 是第一步，直接影响后续所有环节的质量\n         切得不好 → 检索不到 → LLM 无法回答\n```\n\n**Chunking 的核心矛盾**：\n\n```\n块太大(1000+ token)               块太小(50 token)\n┌──────────────────┐             ┌──────┐\n│ 包含多个主题       │             │ 单句   │\n│ embedding被稀释   │             │ 无上下文│\n│ 检索时不够精准     │             │ 答案片面│\n│ 但上下文完整       │             │ 但检索精准│\n└──────────────────┘             └──────┘\n      ↑                                ↑\n   需要在两者之间找到最优粒度\n```\n\n## 二、四种 Chunking 策略\n\n### 策略1：固定长度分块（最简单）\n\n```python\nfrom langchain.text_splitter import CharacterTextSplitter\n\nsplitter = CharacterTextSplitter(\n    chunk_size=500,        # 每块500字符\n    chunk_overlap=50,      # 相邻块重叠50字符\n    separator=\"\\n\"         # 按换行分割\n)\nchunks = splitter.split_text(document)\n```\n\n```\n固定长度分块示意\n\n原始文本: [AAAAAA\\nBBBBBB\\nCCCCCC\\nDDDDDD\\nEEEEEE...]\n                 ↑ 切割点\nchunk 1: [AAAAAA BBBB]     (500字符)\nchunk 2: [BBB CCCCCC DDD]  (重叠50字符)\nchunk 3: [DDD EEEEEE FFF]\n\n问题：可能从句子中间切开 → 语义断裂\n```\n\n### 策略2：按段落/标题分块（语义完整）\n\n```python\nfrom langchain.text_splitter import MarkdownHeaderTextSplitter\n\n# 按 Markdown 标题层级分割\nheaders_to_split_on = [\n    (\"#\", \"Header 1\"),\n    (\"##\", \"Header 2\"),\n    (\"###\", \"Header 3\"),\n]\n\nsplitter = MarkdownHeaderTextSplitter(headers_to_split_on)\nchunks = splitter.split_text(markdown_doc)\n# 每个 chunk 是一个完整的 section\n```\n\n```\nMarkdown 感知分块\n\n# 第一章：环境配置         ← Header 1\n## 1.1 安装Java           ← Header 2  \nJava需要JDK17...          ← 属于1.1的完整段落\n## 1.2 配置Maven          ← Header 2\nMaven配置如下...           ← 属于1.2的完整段落\n\n→ 每个 section 作为独立 chunk，保留标题作为元数据\n→ 优点：语义完整\n→ 缺点：section 长度不均（有的50字有的2000字）\n```\n\n### 策略3：递归分块（推荐，层次化）\n\n```python\nfrom langchain.text_splitter import RecursiveCharacterTextSplitter\n\nsplitter = RecursiveCharacterTextSplitter(\n    chunk_size=500,\n    chunk_overlap=50,\n    separators=[\n        \"\\n\\n\",    # 先按空行（段落）\n        \"\\n\",      # 再按换行\n        \"。\",      # 再按句号\n        \"；\",      # 再按分号\n        \" \",       # 最后按空格\n        \"\"         # 实在不行按字符\n    ]\n)\n# 优先用大粒度分割，超长时自动降级到小粒度\n```\n\n```\n递归分块逻辑\n\n文档(5000字)\n    │\n    ├── 按段落(\\n\\n)分割 → 段落1(800字), 段落2(300字), 段落3(1200字)...\n    │\n    ├── 段落1(800字) > 500? → 是 → 按句号(。)再分\n    │   └── 句子1(300字), 句子2(500字) → 合并到接近500字\n    │\n    └── 段落2(300字) < 500? → 是 → 保持原样，可能和下一段落合并\n\n效果：在保持语义完整的前提下尽量接近目标长度\n```\n\n### 策略4：语义分块（最精准）\n\n```python\nfrom sentence_transformers import SentenceTransformer\nimport numpy as np\n\nmodel = SentenceTransformer('all-MiniLM-L6-v2')\n\ndef semantic_chunk(text, threshold=0.5):\n    \"\"\"基于embedding相似度的语义分块\"\"\"\n    # 1. 按句子分割\n    sentences = text.split('。')\n    \n    # 2. 计算相邻句子的embedding相似度\n    embeddings = model.encode(sentences)\n    \n    # 3. 找相似度骤降的点 → 语义边界\n    chunks = []\n    current_chunk = [sentences[0]]\n    \n    for i in range(1, len(sentences)):\n        sim = cosine_similarity(embeddings[i], embeddings[i-1])\n        if sim < threshold:\n            # 语义断点 → 新的chunk\n            chunks.append('。'.join(current_chunk))\n            current_chunk = [sentences[i]]\n        else:\n            current_chunk.append(sentences[i])\n    \n    chunks.append('。'.join(current_chunk))\n    return chunks\n```\n\n## 三、参数调优经验\n\n### chunk_size 和 overlap 的选择\n\n| 文档类型 | 推荐 chunk_size | overlap | 原因 |\n|---------|----------------|---------|------|\n| **FAQ** | 100-200 token | 0 | 每条QA独立 |\n| **技术文档** | 300-500 token | 50 | 保持段落完整 |\n| **学术论文** | 500-800 token | 100 | 上下文依赖强 |\n| **法律条文** | 200-400 token | 50 | 条款独立性 |\n| **代码** | 按函数/类切分 | 0 | 代码块不可切断 |\n\n### 常见问题与调优\n\n```\n问题1：检索结果相关但不完整\n原因：chunk_size太小，上下文断裂\n解决：增大chunk_size 或 增加 overlap\n\n问题2：检索结果不相关\n原因：chunk_size太大，embedding被稀释\n解决：减小chunk_size 或 改用语义分块\n\n问题3：同一文档的不同chunk互相干扰\n原因：跨主题内容混在一起\n解决：按标题分块 + 保留metadata做过滤\n\n问题4：表格/代码被切断\n原因：固定长度分块不感知结构\n解决：用Markdown/代码感知的分割器\n```\n\n## 四、面试加分点\n\n1. **没有银弹**：能说出\"不同文档类型需要不同策略\"，展示工程判断力\n2. **overlap的必要性**：解释为什么需要重叠——避免边界信息丢失\n3. **评估方法**：提到用RAGAS的context precision/recall指标量化评估chunking效果\n4. **实践经验**：能说出具体调优案例（如\"FAQ文档每条一个chunk，技术文档递归分块500 token\"）\n5. **进阶方案**：提到Parent-Child分块（小块检索+大块返回上下文）和Late Chunking等前沿方法\n",
+    "source": "小红书 宇树科技 AI Agent 三轮面试面经",
+    "feynman": {
+      "essence": "Chunking是把长文档切成可检索的小块，策略直接影响RAG召回质量。核心是在\"语义完整性\"和\"检索精度\"之间平衡——块太大检索不精准，块太小丢失上下文。常见策略有固定长度、按段落、按语义边界、递归分块。",
+      "analogy": "像切蛋糕——均匀切（固定长度）简单但可能切开草莓；按花纹切（按段落）美观但大小不一；按草莓位置切（语义分块）每个都有完整草莓但形状不规则。"
+    },
+    "first_principle": {
+      "essence": "Chunking = 在信息完整性和检索精度之间寻找最优切分粒度",
+      "conclusion": "没有万能策略，需按文档类型（代码/FAQ/论文/法律）选择，并用eval指标验证效果"
+    },
+    "follow_up": [
+      "chunk_size设多少合适？（一般256-512 token，按模型和文档类型调）",
+      "overlap设多少？（通常10-20%的chunk_size）",
+      "如何评估chunking策略的好坏？（用RAGAS的context precision/recall指标）",
+      "中英文文档的chunking策略有什么区别？（中文按句号/段落，英文按.和换行）"
+    ]
+  },
+  {
+    "id": "note-xhs-ai-050",
+    "difficulty": "L3",
+    "category": "ai",
+    "subcategory": "推理优化",
+    "tags": [
+      "AI Infra",
+      "LLM",
+      "Prefix Cache",
+      "KV Cache",
+      "推理优化",
+      "面经"
+    ],
+    "question": "【AI Infra面经】Prefix Cache 的工作原理？为什么不同于 KV Cache 的普通复用？",
+    "answer": "# 【AI Infra面经】Prefix Cache 的工作原理？为什么不同于 KV Cache 的普通复用？\n\n> 来源：小红书 AI Infra 大厂面经 每日精选（7月12日）\n\n## 一、背景——LLM推理为什么慢\n\n```\nLLM 推理两个阶段\n\n1. Prefill 阶段（处理输入Prompt）\n   ┌─────────────────────────────────┐\n   │  System: 你是一个专业的翻译助手...  │  ← 公共前缀\n   │  Context: 之前的对话历史...        │  ← 公共前缀\n   │  User: 翻译这段话                  │  ← 变化部分\n   └─────────────────────────────────┘\n   → 计算所有输入token的KV状态（Attention计算）\n   → 这个阶段是计算密集型，耗时较长（TTFT的主要来源）\n\n2. Decode 阶段（逐个生成输出）\n   → 利用Prefill阶段计算的KV Cache逐个生成token\n   → 每个token生",
+    "full_answer": "# 【AI Infra面经】Prefix Cache 的工作原理？为什么不同于 KV Cache 的普通复用？\n\n> 来源：小红书 AI Infra 大厂面经 每日精选（7月12日）\n\n## 一、背景——LLM推理为什么慢\n\n```\nLLM 推理两个阶段\n\n1. Prefill 阶段（处理输入Prompt）\n   ┌─────────────────────────────────┐\n   │  System: 你是一个专业的翻译助手...  │  ← 公共前缀\n   │  Context: 之前的对话历史...        │  ← 公共前缀\n   │  User: 翻译这段话                  │  ← 变化部分\n   └─────────────────────────────────┘\n   → 计算所有输入token的KV状态（Attention计算）\n   → 这个阶段是计算密集型，耗时较长（TTFT的主要来源）\n\n2. Decode 阶段（逐个生成输出）\n   → 利用Prefill阶段计算的KV Cache逐个生成token\n   → 每个token生成都需要读取之前所有token的KV\n\n问题：每次请求都重新计算相同的公共前缀 → 浪费算力\n解决：Prefix Cache 缓存公共前缀的KV状态 → 跳过重复Prefill\n```\n\n## 二、Prefix Cache vs 普通 KV Cache\n\n```\n普通 KV Cache（单序列内复用）\n\n请求1: [System] [Context] [User1] → 生成回答...\n       └──────── KV Cache ────────┘\n       只在这个请求的Decode阶段复用\n       \n请求2: [System] [Context] [User2] → 生成回答...\n       └──────── 全部重新计算 ──────┘  ← 浪费！前缀和请求1相同\n\n\nPrefix Cache（跨请求共享）\n\n请求1: [System] [Context] [User1] → Prefill计算\n       └── 公共前缀 ──┘└─ 新增 ─┘\n       公共前缀的KV存入Prefix Cache\n\n请求2: [System] [Context] [User2]\n       └── 公共前缀 ──┘└─ 新增 ─┘\n       │               │\n       │  从Cache取     │ 只计算这部分\n       └──────────────  └──────────\n       跳过Prefill → 只计算新增部分 → TTFT大幅降低！\n```\n\n| 维度 | 普通 KV Cache | Prefix Cache |\n|------|-------------|--------------|\n| **作用域** | 单个请求/序列内 | 跨请求共享 |\n| **复用对象** | Decode阶段的历史KV | Prefill阶段的前缀KV |\n| **生命周期** | 随请求结束释放 | 跨请求保留，按策略淘汰 |\n| **存储位置** | GPU显存 | GPU显存（LRU管理） |\n| **典型场景** | 所有LLM推理 | 多轮对话、模板化Prompt |\n\n## 三、Prefix Cache 的核心机制\n\n### 缓存键设计\n\n```python\n# 缓存键必须绑定以下参数，确保不会错误复用\ncache_key = hash(\n    model_name,         # 不同模型的KV不兼容\n    model_version,      # 模型版本变了KV语义不同\n    tokenizer_version,  # 分词器变了token_id映射不同\n    adapter_id,         # LoRA Adapter不同则KV不同\n    prefix_tokens       # 前缀token序列的hash\n)\n```\n\n### 部分匹配机制\n\n```\n场景：请求1的前缀是 [A B C D E]，请求2的前缀是 [A B C F G]\n\nPrefix Cache中存储:\n  Block 0: [A B]  ← KV状态\n  Block 1: [C D]  ← KV状态  \n  Block 2: [E]    ← KV状态\n\n请求2来了 [A B C F G]:\n  Block 0: [A B]  ← 命中！直接复用\n  Block 1: [C ?]  ← 部分命中，C复用，D不同\n  → 需要重新计算 C 之后的KV\n\n块粒度的影响:\n  粗粒度(64 tokens/block): 命中率高但容易因一token不同整块失效\n  细粒度(8 tokens/block):  灵活匹配但碎片多，管理开销大\n  实践: 通常16-32 tokens/block\n```\n\n### Cache-Aware Routing\n\n```\n多GPU推理场景的调度优化\n\nGPU 0: Prefix Cache = {[System+Context_1] → KV}\nGPU 1: Prefix Cache = {[System+Context_2] → KV}\n\n新请求 [System+Context_1+User_new] 来了:\n  → Cache-Aware Router 检查哪个GPU有匹配的前缀缓存\n  → GPU 0 有！路由到GPU 0\n  → GPU 0 直接复用前缀KV，只计算新增部分\n  → TTFT降低 60%+\n\n如果不路由到有缓存的GPU:\n  → 所有计算从头开始 → 浪费\n```\n\n## 四、淘汰策略\n\n```\nPrefix Cache 淘汰决策因素\n\n┌─────────────────────────────────────────────┐\n│  1. 缓存大小 (Size)                          │\n│     → 显存有限，超限必须淘汰                   │\n│                                              │\n│  2. 重算成本 (Recomputation Cost)            │\n│     → 长前缀重算成本高 → 优先保留             │\n│     → 短前缀重算成本低 → 优先淘汰             │\n│                                              │\n│  3. 命中频率 (Hit Frequency)                 │\n│     → 高频访问的前缀优先保留                   │\n│     → LRU策略淘汰最久未访问的                  │\n│                                              │\n│  4. 租户配额 (Tenant Quota)                  │\n│     → 多租户场景需公平分配缓存空间              │\n│     → 避免一个大租户占满全部缓存                │\n│                                              │\n│  综合公式: priority = f(size, cost, freq,    │\n│                        tenant_quota)          │\n└─────────────────────────────────────────────┘\n```\n\n## 五、实际效果\n\n| 指标 | 无Prefix Cache | 有Prefix Cache | 提升 |\n|------|---------------|---------------|------|\n| TTFT (首字延迟) | 800ms | 300ms | -62% |\n| Prefill计算量 | 2048 tokens | 256 tokens | -87% |\n| GPU利用率 | 85% | 60% | 有余量接更多请求 |\n\n> 效果取决于前缀复用率——多轮对话（System Prompt固定）效果最好，单次请求无明显效果。\n\n## 六、面试加分点\n\n1. **核心区别讲清楚**：普通KV Cache=单序列Decode复用，Prefix Cache=跨请求Prefill复用\n2. **缓存键设计**：能说出必须绑定model_version/tokenizer/adapter等参数\n3. **块粒度权衡**：粗=高命中易失效，细=灵活但碎片多，实践选16-32 tokens/block\n4. **Cache-Aware Routing**：提到调度器应优先路由到有缓存前缀的GPU节点\n5. **淘汰策略全面**：不只说LRU，还要考虑重算成本和租户公平性\n",
+    "source": "小红书 AI Infra 大厂面经 每日精选（7月12日）",
+    "feynman": {
+      "essence": "Prefix Cache是缓存公共Prompt前缀经过Attention计算后的KV状态，后续相同前缀的请求可以跳过Prefill阶段直接复用。它与普通KV Cache的区别在于跨请求共享——普通KV Cache属于单个序列，Prefix Cache跨请求复用可共享的公共前缀块。",
+      "analogy": "就像备课——老师第一次讲新课需要认真备课（Prefill计算），但如果三个班上同一门课，备课内容可以复用（Prefix Cache），只需要为每个班补充不同的习题（Decode阶段）。"
+    },
+    "first_principle": {
+      "essence": "Prefix Cache = 避免对相同前缀重复做Attention计算，核心是\"KV状态可复用",
+      "conclusion": "Prefix Cache通过跨请求复用KV状态大幅降低首字延迟(TTFT)，对多轮对话和模板化Prompt场景效果显著"
+    },
+    "follow_up": [
+      "Prefix Cache的命中率受什么影响？（前缀长度、块粒度、请求模式）",
+      "缓存淘汰策略怎么设计？（LRU + 重算成本权重 + 租户公平性）",
+      "多租户场景如何隔离Prefix Cache？（按tenant_id隔离+配额管理）",
+      "Prefix Cache和Session Reuse有什么区别？"
+    ]
+  },
+  {
+    "id": "note-xhs-ai-051",
+    "difficulty": "L3",
+    "category": "ai",
+    "subcategory": "推理优化",
+    "tags": [
+      "AI Infra",
+      "LLM",
+      "量化",
+      "INT4",
+      "FP16",
+      "推理优化",
+      "面经"
+    ],
+    "question": "【AI Infra面经】消费级 GPU 部署量化模型，INT4 一定比 FP16 更快吗？",
+    "answer": "# 【AI Infra面经】消费级 GPU 部署量化模型，INT4 一定比 FP16 更快吗？\n\n> 来源：小红书 AI Infra 大厂面经 每日精选（7月12日）\n\n## 一、直觉 vs 现实\n\n```\n直觉判断：\n  INT4权重体积 = FP16的 1/4\n  → 读取快4倍 → 推理快4倍？\n  → 错！❌\n\n实际情况：\n  INT4可能更快，也可能更慢，取决于多个因素\n  → \"低精度 ≠ 无条件更快\"\n```\n\n## 二、为什么 INT4 不一定更快\n\n### 原因1：反量化开销\n\n```\nINT4权重的计算流程\n\n标准FP16推理:\n  HBM ──► FP16权重 ──► Tensor Core (FP16矩阵乘) ──► 输出\n  读2字节/token     直接计算\n\nINT4推理（无原生INT4指令时）:\n  HBM ──► INT4权重 ──► 解包 ──► 反量化到FP16 ──► Tensor Core ──► 输出\n  读0.5字节/token   额外操作！  额外转换！         FP16计算\n  \n  虽然HBM读取减少了，但增加了:\n  ",
+    "full_answer": "# 【AI Infra面经】消费级 GPU 部署量化模型，INT4 一定比 FP16 更快吗？\n\n> 来源：小红书 AI Infra 大厂面经 每日精选（7月12日）\n\n## 一、直觉 vs 现实\n\n```\n直觉判断：\n  INT4权重体积 = FP16的 1/4\n  → 读取快4倍 → 推理快4倍？\n  → 错！❌\n\n实际情况：\n  INT4可能更快，也可能更慢，取决于多个因素\n  → \"低精度 ≠ 无条件更快\"\n```\n\n## 二、为什么 INT4 不一定更快\n\n### 原因1：反量化开销\n\n```\nINT4权重的计算流程\n\n标准FP16推理:\n  HBM ──► FP16权重 ──► Tensor Core (FP16矩阵乘) ──► 输出\n  读2字节/token     直接计算\n\nINT4推理（无原生INT4指令时）:\n  HBM ──► INT4权重 ──► 解包 ──► 反量化到FP16 ──► Tensor Core ──► 输出\n  读0.5字节/token   额外操作！  额外转换！         FP16计算\n  \n  虽然HBM读取减少了，但增加了:\n  - 解包操作（INT4 → 拆出两个4bit值）\n  - 反量化计算（INT4 × scale → FP16）\n  这些额外计算可能抵消访存节省的收益\n```\n\n### 原因2：Prefill vs Decode 阶段差异\n\n```\nLLM推理的两个阶段\n\n┌──────────────────────────────────────────────┐\n│  Prefill 阶段（处理输入Prompt）                 │\n│  特征：计算密集型 (compute-bound)              │\n│  瓶颈：GPU算力(TFLOPS)                        │\n│  │                                            │\n│  INT4在此阶段：                                │\n│  → GEMM(矩阵乘)是核心操作                       │\n│  → 如果GPU没有高效INT4 Tensor Core             │\n│  → INT4 GEMM利用率 < FP16 GEMM利用率           │\n│  → 反而可能更慢 ❌                              │\n│  │                                            │\n│  除非：GPU有原生INT4 Tensor Core（如某些NPU）  │\n│  → INT4 GEMM吞吐 > FP16 GEMM吞吐              │\n│  → 才会更快 ✅                                 │\n└──────────────────────────────────────────────┘\n\n┌──────────────────────────────────────────────┐\n│  Decode 阶段（逐token生成）                    │\n│  特征：访存密集型 (memory-bound)               │\n│  瓶颈：HBM带宽(显存读写速度)                    │\n│  │                                            │\n│  INT4在此阶段：                                │\n│  → 每生成1个token需读取全部权重                │\n│  → INT4权重 = FP16的1/4                        │\n│  → HBM读取量减少75%                            │\n│  → 即使有反量化开销，净收益通常为正 ✅           │\n│  → 这个阶段INT4通常确实更快                     │\n└──────────────────────────────────────────────┘\n```\n\n### 原因3：GPU硬件差异\n\n| GPU型号 | INT4 Tensor Core | FP16 Tensor Core | INT4收益 |\n|---------|-----------------|-----------------|---------|\n| A100 | 支持有限 | 高效 | Decode快，Prefill持平 |\n| H100 | FP8高效 | 高效 | FP8可能比INT4更好 |\n| RTX 4090 | INT4支持有限 | 高效 | 不一定快 |\n| RTX 5090 | INT4改进 | 高效 | 有提升 |\n| 某些NPU/ASIC | 原生INT4 | FP16 | INT4全面更快 |\n\n## 三、量化格式的影响\n\n```\n量化粒度对性能的影响\n\nPer-tensor量化（最粗）:\n  整个张量用一个scale\n  → 反量化最简单（1次乘法）\n  → 但精度损失大\n\nPer-channel量化:\n  每个输出通道一个scale\n  → 精度更好\n  → 反量化稍复杂\n\nGroup-wise量化（如GPTQ/AWQ常用）:\n  每128个元素一组，各自一个scale\n  → 精度最好\n  → 反量化最复杂，Kernel优化难度大\n  → 可能影响实际推理速度\n```\n\n## 四、如何正确评测\n\n```\n评测铁律：控制变量！\n\n必须固定的参数:\n  ├── 模型（相同基座，如 Llama-3-8B）\n  ├── 输入长度（如 1024 tokens）\n  ├── 输出长度（如 256 tokens）  \n  ├── 并发度（batch size = 1 vs 8）\n  ├── 采样参数（temperature, top_p）\n  └── 硬件（相同GPU型号和驱动）\n\n必须测量的指标:\n  ├── TTFT (首字延迟)\n  ├── TPOT (每token生成时间)\n  ├── Throughput (吞吐量 tokens/s)\n  └── GPU利用率 (SM occupancy)\n\n常见错误：\n  ❌ INT4用batch=1测，FP16用batch=8测 → 不可比\n  ❌ INT4输入100 token，FP16输入2000 token → Prefill占比不同\n  ❌ 只测Decode不测Prefill → 遗漏一半信息\n```\n\n## 五、结论与选型建议\n\n```\nINT4 何时更快：\n  ✅ Decode阶段（访存瓶颈，权重小→读取快）\n  ✅ GPU有原生INT4 Tensor Core支持\n  ✅ batch=1或小batch场景（访存主导）\n  ✅ 显存不够跑FP16时（INT4是唯一选择）\n\nINT4 何时不一定快：\n  ⚠️ Prefill阶段（计算瓶颈，INT4 GEMM可能不如FP16）\n  ⚠️ GPU缺乏INT4硬件支持（反量化开销大）\n  ⚠️ 大batch场景（计算占比上升）\n  ⚠️ 量化格式复杂（group-wise反量化慢）\n\n工程建议:\n  显存充裕 + 质量优先 → FP16 或 FP8\n  显存受限 + 可接受质量损失 → INT8 (GPTQ/AWQ)\n  极致压缩 + 端侧部署 → INT4 (GGUF Q4_K_M)\n  消费级GPU推理 → 先测再选，别假设INT4更快\n```\n\n## 六、面试加分点\n\n1. **不是简单的\"4bit比16bit快\"**：要分析Prefill(compute-bound)和Decode(memory-bound)的区别\n2. **反量化开销**：能说出INT4计算时可能需要解包+反量化到FP16再算\n3. **GPU硬件依赖**：不同GPU的INT4 Tensor Core支持不同，H100的FP8可能比INT4更好\n4. **评测方法论**：强调控制变量——固定模型/输入输出/并发度/采样参数\n5. **工程选型**：给出按场景选型建议而非一概而论\n",
+    "source": "小红书 AI Infra 大厂面经 每日精选（7月12日）",
+    "feynman": {
+      "essence": "INT4不一定比FP16更快。INT4减少了权重占用和HBM读取，在memory-bound的Decode阶段通常更快；但INT4的Kernel可能需要解包、反量化到FP16再计算，额外操作可能抵消收益。实际速度取决于GPU低精度指令支持和量化格式的Kernel优化。",
+      "analogy": "像搬家时用小箱子（INT4）vs大箱子（FP16）——小箱子省空间（显存），但如果每个小箱子拆开都要倒到大箱子里才能用（反量化），反而可能更慢。"
+    },
+    "first_principle": {
+      "essence": "推理速度 = max(计算时间, 访存时间)，INT4降低访存量但可能增加计算开销",
+      "conclusion": "INT4在Decode阶段(访存瓶颈)有优势，在Prefill阶段(计算瓶颈)不一定快，整体取决于GPU硬件支持和工作负载特征"
+    },
+    "follow_up": [
+      "哪些GPU对INT4支持好？（H100的FP8 Tensor Core, 某些消费卡INT4支持有限）",
+      "INT4量化对模型质量的影响？（精度下降，需要评估 perplexity/benchmark）",
+      "除了INT4还有哪些量化方案？（INT8/FP8/GPTQ/AWQ/GGUF）",
+      "如何选择量化方案？（质量要求高选FP8/INT8, 极致压缩选INT4+GPTQ）"
+    ]
   }
 ]
