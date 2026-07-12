@@ -1,0 +1,192 @@
+---
+id: note-sp-002
+difficulty: L3
+category: ai
+subcategory: RAG
+tags:
+- 意图识别
+- 评估指标
+- HitAtK
+- 虾皮
+- 面经
+- 检索系统
+feynman:
+  essence: Hit@K表示正确答案在前K个预测结果中的比例。意图识别用hit@3而非hit@1，是因为用户表达往往模糊多义，正确意图可能排在第2或第3位，hit@3容许"前几名里有对的就算成功"，更贴近下游可补救的实际效果。
+  analogy: 就像考试做选择题——hit@1是"第一个选的必须对"，hit@3是"给你三次机会，选到对的就算过"。如果考题本身有歧义(用户表述模糊)，给三次机会显然更公平。而且如果后续有澄清机制，从前3个里找到正确意图就能继续。
+  first_principle: 意图识别的下游价值不是"排名第一"而是"能被正确路由"。当后续有澄清/多轮交互能力时，Top-3包含正确意图已经足以通过澄清确认，因此hit@3是更贴合业务价值的评估指标。
+  key_points:
+  - 'hit@1过于严格：用户表达模糊时，模型可能把正确意图排到第2-3位'
+  - 'hit@3反映实际可用性：配合澄清机制，Top-3命中即可补救'
+  - '指标选择取决于下游设计：无澄清→hit@1，有澄清→hit@3'
+  - '不应只看单一指标：需结合准确率/召回率/F1综合评估'
+first_principle:
+  essence: 评估指标应与业务目标对齐。意图识别的最终目标是"正确路由用户请求"，而非"模型第一预测必须对"。
+  derivation: 用户意图本身具有模糊性(同一句话可能对应多个意图) → 模型输出概率分布而非单一答案 → 下游有澄清/交互机制 → Top-K中包含正确意图即有价值 → 所以hit@3比hit@1更贴合实际效果
+  conclusion: 指标选择不是技术决定，是业务决定——看下游是否有多轮澄清能力
+follow_up:
+- hit@3也不够高怎么办？怎么提升意图识别准确率？
+- hit@1和hit@3差距很大说明了什么问题？
+- 除了hit@K，还有哪些意图识别的评估指标？
+- 如果没有澄清机制，应该看hit@1还是hit@3？
+memory_points:
+- hit@K = 正确答案在前K个预测中的比例
+- 指标选择取决于下游架构：无澄清用hit@1，有澄清用hit@3
+- hit@1到hit@3差距大 → 排序质量差，需优化Rerank
+- 补充指标：MRR(平均倒数排名)、Precision@K、Fallback率
+---
+
+# 意图识别准确率为什么统计hit@3而不是hit@1？
+
+## 🎯 本质
+
+Hit@K是排序评估指标，衡量正确答案出现在前K个预测中的概率。选择hit@3而非hit@1，是因为**意图识别的下游价值取决于"能否被正确路由"，而非"排名第一必须对"**。
+
+## 🧒 费曼类比
+
+考试做选择题——hit@1是"第一次必须选对"，hit@3是"给你三次机会"。当题目有歧义时，给三次机会更公平。而且如果后面还有"确认"环节（比如反问"你是想问退款还是退货？"），前三名里有正确答案就够了。
+
+## 📊 概念图
+
+```
+用户输入: "我的订单怎么还没到"
+                    
+              ┌─── 意图分类器 ───┐
+              │                  │
+    Intent Scores (概率排序):
+    ┌────────────────────────────────────┐
+    │ 1. 物流查询    0.45  ◀── 合理     │ ← hit@1: ✗ (不是排名第一)
+    │ 2. 投诉建议    0.30              │
+    │ 3. 订单状态查询 0.15  ◀── 也合理  │ ← hit@3: ✓ (在前3名中)
+    │ 4. 退款申请    0.10              │
+    └────────────────────────────────────┘
+    
+    标准答案: 物流查询 / 订单状态查询 (多标签)
+    
+    hit@1 = 0.45 (物流查询排第1 → 命中)  ← 但如果答案是"订单状态查询"呢？
+    hit@3 = 命中 (两个合理意图都在Top3)
+    
+    ┌─── 下游处理 ───┐
+    │ Top-3 → 澄澄清 │
+    │ "您是想查物流   │
+    │  还是订单状态？"│
+    └────────────────┘
+```
+
+## 🔧 专业详解
+
+### Hit@K 指标体系
+
+| 指标 | 定义 | 适用场景 |
+|------|------|---------|
+| **Hit@1** | 正确答案是否排在第1位 | 无澄清、严格路由 |
+| **Hit@3** | 正确答案是否在前3位 | 有澄清/多轮交互 |
+| **MRR** | 平均倒数排名(1/rank) | 关注排名质量 |
+| **Precision@K** | 前K中正确预测的比例 | 多标签场景 |
+
+### 为什么 hit@3 比 hit@1 更合适？
+
+**1. 用户表达天然模糊**
+
+```
+用户: "我的东西坏了怎么办"
+  → 意图1: 退换货申请  (0.40)
+  → 意图2: 售后维修    (0.35)  ← 也合理
+  → 意图3: 投诉理赔    (0.25)  ← 也合理
+  
+hit@1: 只有意图1算命中 → 40%
+hit@3: 三个都可能正确 → 90%+
+```
+
+**2. 下游有澄清机制可补救**
+
+```python
+def intent_pipeline(user_query: str):
+    scores = intent_classifier.predict(user_query)
+    top3 = scores[:3]
+    
+    # 如果Top1置信度足够高，直接路由
+    if top3[0].score > 0.8:
+        return route(top3[0].intent)
+    
+    # 否则用Top3做澄清
+    if top3[0].score - top3[1].score < 0.2:  # 分数接近
+        return ask_clarification(top3[:3])
+    return route(top3[0].intent)
+```
+
+**3. 多标签场景下hit@1过于严苛**
+
+实际业务中，一个用户查询可能同时属于多个意图（如"退款流程"既是"退款"又是"流程咨询"），强制选一个会低估模型质量。
+
+### hit@1 vs hit@3 差距分析
+
+| 差距 | 含义 | 优化方向 |
+|------|------|---------|
+| 差距小（<5%） | 模型排序质量高 | 关注hit@1提升 |
+| 差距大（>15%） | 模型能召回但排序差 | 加Rerank/特征工程 |
+| hit@3高但hit@1低 | 候选集好但精排差 | 提升分类器判别能力 |
+
+## 💻 代码示例
+
+```python
+import numpy as np
+
+def hit_at_k(y_true: str, predictions: list[str], k: int = 3) -> int:
+    """计算hit@K"""
+    return 1 if y_true in predictions[:k] else 0
+
+def mrr(y_true: str, predictions: list[str]) -> float:
+    """Mean Reciprocal Rank"""
+    for i, pred in enumerate(predictions):
+        if pred == y_true:
+            return 1.0 / (i + 1)
+    return 0.0
+
+def evaluate_intent_model(test_set, model, k=3):
+    """完整评估"""
+    hits, mrrs = [], []
+    for query, true_intent in test_set:
+        preds = model.predict_topk(query, k=k)
+        hits.append(hit_at_k(true_intent, preds, k))
+        mrrs.append(mrr(true_intent, preds))
+    
+    return {
+        f'hit@{k}': np.mean(hits),
+        f'hit@1': np.mean([hit_at_k(t, p, 1) for t, p in 
+                          [(q[1], model.predict_topk(q[0], k)) for q in test_set]]),
+        'MRR': np.mean(mrrs)
+    }
+
+# 业务决策：何时需要提升hit@1
+def should_improve_hit1(hit1_score, hit3_score):
+    gap = hit3_score - hit1_score
+    if gap > 0.15:
+        return "排序质量差，建议加Rerank或特征工程"
+    elif hit1_score < 0.7:
+        return "整体准确率低，需重新训练或增加数据"
+    else:
+        return "指标健康，关注其他维度"
+```
+
+## 💡 例子
+
+**虾皮客服系统**：
+- 意图体系有20+类（物流、退款、售前、投诉...）
+- 用户"我要退货"可能对应：退货申请/退款咨询/投诉
+- 用hit@3评估 → 模型hit@3=88%，hit@1=72%
+- 16%的差距说明模型能识别候选但排序不够精确
+- 加Rerank(用更重的模型做二次排序)后hit@1提升到80%
+
+## ❓ 苏格拉底式面试追问
+
+1. **"如果hit@3是88%，那12%没命中的case你怎么分析？"**
+   → 分析bad case分布：是意图体系设计问题(标签重叠) vs 模型能力问题 vs 数据标注问题
+
+2. **"hit@3到hit@5的提升很小，说明什么？"**
+   → 模型的候选集生成能力已到瓶颈，需要优化的是排序而非召回
+
+3. **"如果业务要求无澄清直接路由，hit@3还有意义吗？"**
+   → 意义在于评估模型上限和定位问题，但实际应该看hit@1
+
+4. **"多标签场景下，hit@K怎么定义？"**
+   → 任意一个正确标签在Top-K中即算命中；也可用Precision@K(前K中正确标签比例)

@@ -329,5 +329,44 @@
       ],
       "rebuild": "从「频率相同=异位词」出发：维护窗口的字符频率数组，每次滑动时增量更新（加入右边、移除左边），比较窗口频率和p的频率。时间复杂度O(n)。"
     }
+  },
+  {
+    "id": "note-sp-005",
+    "category": "algorithm",
+    "subcategory": "树",
+    "difficulty": "L2",
+    "tags": [
+      "BST",
+      "二叉树",
+      "DFS",
+      "虾皮",
+      "面经",
+      "LeetCode98"
+    ],
+    "question": "验证二叉搜索树（LeetCode 98）",
+    "answer": "## 🎯 本质\n\n验证一棵二叉树是否是有效的BST。**关键：每个节点必须大于左子树的所有节点、小于右子树的所有节点**（不是只比直接子节点）。\n\n## 🧒 费曼类比\n\n查字典页码：左边所有页码 < 当前页 < 右边所有页码。不能只看左右相邻页，因为中间夹的页可能也乱序。\n\n## 📊 图解\n\n```\n      常见错误判断:              正确判断:\n          \n       5                         5\n      / \\                       / \\\n     1   4  ← 只看4>5?NO!      1   7\n        / \\                       / \\\n       3   6                    6    8\n     \n  ✗ 错误: 4<5所以右子OK?       ✓ 正确: 7>5✓, 6<7但6>5✓\n  实际上4<5违反BST!             8>7且8>5✓ → 有效BST\n  (右子树所有节点必须>5)\n  \n  正确判断逻辑:\n  ┌─────────────────────────────────────┐\n  │ 节点5: 值域(-∞, +∞)                │\n  │   节点1: 值域(-∞, 5) → 1 ✓        │\n  │   节点7: 值域(5, +∞) → 7 ✓        │\n  │     节点6: 值域(5, 7) → 6 ✓       │\n  │     节点8: 值域(7, +∞) → 8 ✓      │\n  │ 全部通过 → 有效BST ✓               │\n  └─────────────────────────────────────┘\n```\n\n## 🔧 专业详解\n\n### 方法对比\n\n| 方法 | 思路 | 时间 | 空间 | 推荐度 |\n|------|------|------|------|--------|\n| **中序遍历** | BST中序遍历必严格递增 | O(n) | O(h) | ⭐ 直观 |\n| **递归值域** | 传递(min, max)合法区间 | O(n) | O(h) | ⭐⭐ 最优 |\n| **暴力验证** | 每个节点找左max/右min | O(n²) | O(h) | ✗ 太慢 |\n\n### 方法1：递归值域法（推荐）\n\n```python\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass Solution:\n    def isValidBST(self, root: TreeNode) -> bool:\n        def validate(node, min_val, max_val):\n            # 空节点是有效BST\n            if not node:\n                return True\n            \n            # 当前节点值必须在合法区间内\n            if node.val <= min_val or node.val >= max_val:\n                return False\n            \n            # 左子树: 所有值 < node.val → 上界变为node.val\n            # 右子树: 所有值 > node.val → 下界变为node.val\n            return (validate(node.left, min_val, node.val) and\n                    validate(node.right, node.val, max_val))\n        \n        return validate(root, float('-inf'), float('inf'))\n```\n\n**执行轨迹示例**：\n```\n        5\n       / \\\n      1   7\n         / \\\n        6   8\n\nvalidate(5, -∞, +∞) → 5在(-∞,+∞) ✓\n  validate(1, -∞, 5) → 1在(-∞,5) ✓\n    validate(null, -∞, 1) → ✓\n    validate(null, 1, 5) → ✓\n  validate(7, 5, +∞) → 7在(5,+∞) ✓\n    validate(6, 5, 7) → 6在(5,7) ✓\n    validate(8, 7, +∞) → 8在(7,+∞) ✓\n→ True\n```\n\n### 方法2：中序遍历法\n\n```python\nclass Solution:\n    def isValidBST(self, root: TreeNode) -> bool:\n        prev = None  # 记录前一个访问的节点值\n        \n        def inorder(node):\n            nonlocal prev\n            if not node:\n                return True\n            \n            # 左\n            if not inorder(node.left):\n                return False\n            \n            # 中：检查是否严格递增\n            if prev is not None and node.val <= prev:\n                return False\n            prev = node.val\n            \n            # 右\n            return inorder(node.right)\n        \n        return inorder(root)\n```\n\n### 方法3：迭代中序（避免递归栈溢出）\n\n```python\nclass Solution:\n    def isValidBST(self, root: TreeNode) -> bool:\n        stack = []\n        prev = None\n        curr = root\n        \n        while curr or stack:\n            while curr:\n                stack.append(curr)\n                curr = curr.left\n            \n            curr = stack.pop()\n            if prev is not None and curr.val <= prev:\n                return False\n            prev = curr.val\n            curr = curr.right\n        \n        return True\n```\n\n## 💻 复杂度分析\n\n```\n时间复杂度: O(n) — 每个节点访问一次\n空间复杂度: O(h) — 递归栈/迭代栈深度 = 树高\n  最优(平衡树): O(log n)\n  最差(链表): O(n)\n\n测试用例:\n✅ [2,1,3] → True\n✅ [5,1,4,null,null,3,6] → False (3 < 5 但在右子树)\n✅ [1,null,1] → False (重复值，非严格递增)\n✅ [] → True (空树是BST)\n✅ [2147483647] → True (处理边界值)\n```\n\n## 💡 例子\n\n**虾皮笔试场景**：面试官给出 `[5,1,4,null,null,3,6]`\n\n```\n     5\n    / \\\n   1   4\n      / \\\n     3   6\n```\n\n逐层分析：\n- `5` 在 (-∞,+∞) ✓\n- `1` 在 (-∞,5) ✓\n- `4` 在 (5,+∞) → **4 < 5 ✗** → 返回False\n\n这就是为什么只比较直接子节点会出错——`4 < 5` 看起来作为右子节点违反了BST定义。\n\n## ❓ 苏格拉底式面试追问\n\n1. **\"如果允许重复值呢？BST定义要怎么改？\"**\n   → 左 <= 根 < 右 (或 左 < 根 <= 右)，中序遍历改为非严格递增\n\n2. **\"为什么用float('-inf')而不是INT_MIN？\"**\n   → 避免节点值恰好等于INT_MIN时的边界问题\n\n3. **\"这题的递归和迭代解法哪个更好？\"**\n   → 逻辑等价。迭代避免栈溢出但代码更长；递归更清晰。面试推荐先写递归再写迭代\n\n4. **\"如果树很大，递归会栈溢出吗？怎么处理？\"**\n   → 改用迭代中序遍历(Morris遍历可以做到O(1)空间)",
+    "follow_up": [
+      "BST和二叉树的区别是什么？",
+      "如何把一个有序数组转化为平衡的BST？",
+      "BST的删除操作怎么处理？",
+      "如果BST节点值有重复，怎么处理？"
+    ],
+    "feynman": {
+      "essence": "验证BST = 检查每个节点是否满足\"左子树所有节点 < 当前节点 < 右子树所有节点\"。关键陷阱是只检查直接子节点不够，必须确保整棵左子树的最大值 < 当前节点 < 整棵右子树的最小值。",
+      "analogy": "就像查字典的页码——左边所有页码必须比当前页小，右边所有页码必须比当前页大。不能只看相邻页，因为中间穿插的页也可能乱序。",
+      "first_principle": "BST的定义是全局有序——每个节点的值必须大于左子树中的所有节点值，小于右子树中的所有节点值。不是局部的\"左子<根<右子\"，而是全局的。",
+      "key_points": [
+        "方法1: 中序遍历必须严格递增 → 最直观",
+        "方法2: 递归传递合法值域(min, max) → 最高效",
+        "陷阱: 只比较节点和直接子节点是错误的",
+        "注意: BST定义可能包含等于(左<=根<右)或不包含(严格不等)，LeetCode用严格不等"
+      ]
+    },
+    "first_principle": {
+      "essence": "BST的有效性是递归传递的——每个节点的合法值域由其所有祖先节点共同决定。",
+      "derivation": "根节点无约束 → 左子节点必须 < root → 左子节点的右子节点必须 > 左子节点 但 < root → 所以每个节点的合法值域是(max_of_left_ancestors, min_of_right_ancestors)",
+      "conclusion": "递归传递(min, max)边界是第一性原理的解法"
+    },
+    "images": []
   }
 ]
