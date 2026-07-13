@@ -30,10 +30,10 @@ follow_up:
 - RocketMQ的事务消息原理是什么？
 - 如果MQ宕机了怎么办？怎么保证高可用？
 memory_points:
-- RabbitMQ: AMQP + Exchange灵活路由 + 万级TPS + Erlang底层
-- RocketMQ: 事务消息 + 定时消息 + 十万级TPS + Java底层 + 阿里开源
-- ActiveMQ: JMS全功能 + 性能最弱 + 遗留系统维护
-- 选型矩阵: 低吞吐高可靠→RabbitMQ, 高吞吐→RocketMQ, 大数据流→Kafka
+- "RabbitMQ: AMQP + Exchange灵活路由 + 万级TPS + Erlang底层"
+- "RocketMQ: 事务消息 + 定时消息 + 十万级TPS + Java底层 + 阿里开源"
+- "ActiveMQ: JMS全功能 + 性能最弱 + 遗留系统维护"
+- "选型矩阵: 低吞吐高可靠→RabbitMQ, 高吞吐→RocketMQ, 大数据流→Kafka"
 ---
 
 # RabbitMQ、RocketMQ和ActiveMQ的主要差异及选型

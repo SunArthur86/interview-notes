@@ -29,10 +29,10 @@ follow_up:
 - ES的深度分页性能问题怎么解决？
 - 什么场景不适合用ES？
 memory_points:
-- ES适用: 全文搜索/多维度过滤/聚合统计/模糊匹配
-- 同步方案: Canal(binlog)增量同步 + 定时全量补偿 + MQ削峰
-- 一致性: 秒级最终一致(非强一致) + 对账机制
-- ES Mapping设计: keyword(精确) vs text(分词) + 分片数 = 数据节点数
+- "ES适用: 全文搜索/多维度过滤/聚合统计/模糊匹配"
+- "同步方案: Canal(binlog)增量同步 + 定时全量补偿 + MQ削峰"
+- "一致性: 秒级最终一致(非强一致) + 对账机制"
+- "ES Mapping设计: keyword(精确) vs text(分词) + 分片数 = 数据节点数"
 ---
 
 # Elasticsearch查询场景与MySQL数据同步

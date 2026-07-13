@@ -29,10 +29,10 @@ follow_up:
 - 多用户场景下记忆怎么隔离？
 - 记忆系统和RAG知识库的区别是什么？
 memory_points:
-- Claude Code: CLAUDE.md(项目指令) + 会话上下文 → 轻量文件驱动
-- Hermes: Memory(跨会话持久) + Skills(程序性知识) + Session(会话内) + Profile(隔离)
-- 记忆四层模型: 工作记忆(当前任务) → 短期(会话) → 长期(持久) → 元认知(反思)
-- 设计原则: 记忆价值 = 频率 × 重要度 - 噪声成本
+- "Claude Code: CLAUDE.md(项目指令) + 会话上下文 → 轻量文件驱动"
+- "Hermes: Memory(跨会话持久) + Skills(程序性知识) + Session(会话内) + Profile(隔离)"
+- "记忆四层模型: 工作记忆(当前任务) → 短期(会话) → 长期(持久) → 元认知(反思)"
+- "设计原则: 记忆价值 = 频率 × 重要度 - 噪声成本"
 ---
 
 # Claude Code和Hermes在记忆系统上的差别
