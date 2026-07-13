@@ -220,3 +220,49 @@ with ThreadPoolExecutor(max_workers=5) as executor:
 - GIL限制：因GIL同一时刻只允许单线程执行，故多线程仅适合IO密集型任务
 - 线程安全：多线程操作共享变量必须加锁，推荐用 with lock 上下文管理自动释放
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Python 多线程你说 `threading.Thread` 传 target/args，但为什么不推荐继承 Thread 类重写 run？两种方式有本质区别吗？**
+
+两种方式都能创建线程，但"传 target 函数"是组合，"继承 Thread"是继承。组合优于继承的理由：一、Python 是多继承语言，继承 Thread 占用了一个继承位（虽然可以多继承但复杂）；二、传函数更灵活——同一个函数可以给多个 Thread 用（不同参数）、也可以用线程池（ThreadPoolExecutor）执行，继承 Thread 的类只能实例化 Thread 对象；三、关注点分离——线程的"执行逻辑"（函数）和"线程管理"（Thread 类）分离，函数可独立测试。继承 Thread 的合理场景是"需要重写线程的生命周期方法"（如 start 前后做 hook、自定义 is_alive 逻辑），但 99% 场景不需要。所以推荐"传 target"，符合"组合优于继承"的通用设计原则。
+
+### 第二层：证据与定位
+
+**Q：你强调"严禁直接调 run()，要调 start()"，调 run() 会怎样？怎么向面试官演示这个错误？**
+
+`start()` 创建新操作系统线程并在新线程里调 `run()`；直接调 `run()` 是"普通方法调用"，在当前线程同步执行，没有新线程。演示：写一个继承 Thread 的类，`run` 里 `print(threading.current_thread().name)`，`start()` 后打印的是 "Thread-N"（新线程），`run()` 直接调打印的是 "MainThread"（当前线程）。所以"start 只能调一次"（线程已启动再调 start 抛 RuntimeError），run 可以多次调（但只是普通方法）。这个区别是初学者常犯的错误——以为"调 run 就是多线程"，实际是单线程同步执行，完全失去了多线程的意义。
+
+### 第三层：根因深挖
+
+**Q：GIL 你说"同一时刻只允许单线程执行字节码"，但 threading.Thread 创建的线程在操作系统层面是真的多线程吗？**
+
+是的，Python 的 threading.Thread 是真正的操作系统线程（POSIX thread 或 Windows thread）。可以用 `top -H` 或 `ps -eLf` 看到 Python 进程下有多个线程。GIL 是"Python 解释器层的锁"，限制的是"哪个线程能执行 Python 字节码"，不是限制线程的存在。多线程在操作系统调度下都处于"可运行"状态，但抢到 GIL 的才能执行 Python 代码，其他线程在操作系统层面可能 Running（CPU 上跑）但"等待 GIL"（空转或 park）。所以 Python 多线程的代价：一、创建线程有系统开销（线程栈默认 8MB、调度开销）；二、GIL 切换有开销（约微秒级）；三、但 I/O 阻塞时 GIL 释放，线程真正在 I/O 上阻塞，其他线程能执行。所以 Python 多线程"I/O 密集有效、CPU 密集无效"的根源是 GIL 的释放时机，不是线程本身是假线程。
+
+**Q：那为什么 Python 多线程操作共享变量要加锁？不是有 GIL 保护吗？**
+
+GIL 保证"同一时刻只有一个线程执行字节码"，但一条 Python 语句可能对应多条字节码。如 `count += 1` 编译成 LOAD（读 count）、ADD（加 1）、STORE（写 count）三条字节码。GIL 在每条字节码后可能切换（每 100 tick 检查），所以线程 A 执行到 LOAD 和 ADD 之间，GIL 可能切给线程 B，B 也 LOAD 读到旧值，A 和 B 都基于旧值加 1，最终 count 只加了 1（应该加 2）。GIL 保护的是"单条字节码的原子性"，不保护"多字节码组合的原子性"。所以要加锁（threading.Lock）把"读改写"包成临界区。锁的语义是"多字节码的原子性"，GIL 是"单字节码的原子性"，两者层级不同。这是 Python 多线程最常见的坑——以为有 GIL 就线程安全，实际仍要加锁。
+
+### 第四层：方案权衡
+
+**Q：Python 多线程受 GIL 限制，那为什么还有那么多框架（如 Flask、Django）用多线程处理请求？**
+
+因为 Web 请求是"I/O 密集"——大部分时间在等数据库、等下游 API、等网络。GIL 在 I/O 阻塞时释放，所以一个请求等 I/O 时，其他请求的线程能执行 Python 代码。多线程在 Web 场景能提升并发——单线程只能串行处理请求（一个请求等 I/O 时其他请求都阻塞），多线程让多个请求的 I/O 等待重叠。Flask/Django 默认用线程池（如 gunicorn 的 worker）处理请求，每个 worker 内多线程。但要注意"CPU 密集的请求"在多线程下不会加速（GIL 限制），如果业务有 CPU 密集计算（如大 JSON 解析、正则匹配），多线程反而因 GIL 切换变慢。这类场景要异步（asyncio）或多进程。所以 Web 框架用多线程是"I/O 密集场景的合理选择"，不是"无视 GIL"。
+
+**Q：为什么不用 asyncio（协程）替代多线程处理 Web 请求？协程不是更轻量吗？**
+
+协程确实更轻量（单线程内调度，无线程切换开销），但要"全栈 async"——框架（FastAPI、aiohttp）、HTTP 客户端（httpx.AsyncClient）、数据库驱动（asyncpg、aiomysql）都要 async。如果混用同步库（如 requests、pymysql），会在事件循环里阻塞，整个服务卡住。Flask 是同步框架（route 函数是 def 不是 async def），强行用 asyncio 要用 `run_in_executor` 把同步代码丢线程池，复杂度高。Django 3.0+ 支持 async view 但生态仍在迁移。所以"用协程"要看生态——新项目用 FastAPI + async 全栈最优，老项目（Flask/Django 同步生态）保持多线程。我的实践：新项目首选 FastAPI（协程 + 自动文档），老项目维护用 gunicorn + 多线程。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证 Python 多线程在 I/O 密集场景真的提升并发，而不是被 GIL 拖累？**
+
+对比实验：一、I/O 密集任务（如 `time.sleep(1)` 模拟网络等待）——单线程串行 10 次 = 10 秒，10 线程并发 ≈1 秒（GIL 在 sleep 时释放，并发有效）；二、CPU 密集任务（如 `sum(range(10**7))`）——单线程 10 次 = 10 秒，10 线程 ≈10 秒（GIL 限制，无加速甚至更慢因切换）；三、混合任务（I/O + CPU）——10 线程比单线程快但不达 10 倍（I/O 部分并发、CPU 部分串行）。验证手段：用 `time.perf_counter()` 计时，用 `py-spy record` 抓火焰图看"GIL 持有时间 vs I/O 等待时间"。线上监控：线程数（`threading.active_count()`）、各线程 CPU 时间（`thread.get_native_id()` + top -H）。这些验证确保"多线程用对了场景"。
+
+**Q：这道题做完，你沉淀出了什么可复用的 Python 并发模式选择经验？**
+
+三场景模式：一、I/O 密集 + 同步库 → 多线程（threading 或 concurrent.futures.ThreadPoolExecutor）；二、I/O 密集 + async 库 → asyncio 协程（单线程高并发）；三、CPU 密集 → 多进程（multiprocessing 或 concurrent.futures.ProcessPoolExecutor）。核心原则："先看任务类型（I/O 还是 CPU），再看库生态（async 还是 sync），最后选并发模式。" 这套模式也适用于其他语言——Java 的 I/O 用线程池、CPU 用 ForkJoinPool、Go 的 goroutine 天然并发（无 GIL 限制）。理解了 GIL 的本质，遇到任何 Python 性能问题都能快速定位"是 GIL 瓶颈还是别的"。

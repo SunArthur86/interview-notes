@@ -197,3 +197,49 @@ class ReplayEngine:
 - Trace查节点：记录Prompt到Tool调用的树形Span结构，用于定位错误链路和Token成本
 - 核心监控指标：任务完成率、工具调用成功率、P99延迟和Token成本追踪
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Agent Harness 的 Eval/Trace/Replay/Safety 四能力，为什么 LLM 本身提供不了，非要外挂？**
+
+因为 LLM 是无状态的随机黑盒。Eval——LLM 输出有随机性（temperature>0），跑一次不能代表质量，必须外部跑多次统计；Trace——LLM 不记录自己的 prompt/tool_call/中间推理，必须外部埋点；Replay——LLM 无状态，同一输入可能不同输出，必须外部持久化执行轨迹才能复现；Safety——LLM 不理解业务安全（可能调危险工具、死循环、成本爆炸），必须外部 Guardrail 约束。四能力都是"LLM 不提供但生产必需"的，只能靠 Harness 外挂。
+
+### 第二层：证据与定位
+
+**Q：你的 Agent 线上任务完成率从 85% 掉到 70%，你怎么用 Trace 定位是哪个环节退化？**
+
+按 Trace 的树形 Span 结构分层归因。看每个节点（LLM 调用、tool_call、规则校验）的失败率变化——哪个节点的失败率涨幅最大，就是退化源头。常见情况：如果是 LLM 推理节点失败率涨，可能是模型版本被切（API provider 更新模型）；如果是 tool_call 失败率涨，是下游服务问题（如 RPC 超时）；如果是规则校验拦截率涨，是输入分布变化（如用户 query 类型变了）。Trace 的价值是"把整体退化拆到节点级"，精准定位而非瞎猜。
+
+### 第三层：根因深挖
+
+**Q：你发现 Trace 显示 Agent 的 token 成本突然涨了 3 倍，根因是什么？**
+
+看 Trace 的 token 明细。可能是：一是 prompt 变长（如 RAG 召回的 chunk 数从 5 涨到 20，或历史 Memory 注入太多）；二是步数变多（Agent 在某类任务上死循环或多走了几步）；三是模型被切到更贵的版本。按 trace_id 查高 token 任务的明细，看是 prompt 涨（input token 大）还是生成涨（output token 大）。常见根因是 RAG 的 top_k 被调大（"召回更多提升质量"），导致每次 prompt 注入大量 chunk，成本爆炸但质量没提升。
+
+**Q：那为什么不直接对每个请求设硬 token 上限（如 max_tokens=1000），省得成本失控？**
+
+max_tokens 限制的是单次生成的 output token，限制不了 prompt（input）和总步数。且硬限制会截断输出——如果任务需要 1200 token 才能完成，1000 截断后任务失败，反而触发重试更耗 token。正确做法是"预算控制"而非"单次硬限制"：设单任务的总 token 预算（如 input+output 总和 5000），Agent 框架累计 token，超预算时停止并返回"任务过长"兜底。这样既控成本又不武断截断正常任务。预算控制是 Harness 的 Safety 能力之一。
+
+### 第四层：方案权衡
+
+**Q：Trace 数据量很大（每任务几十 KB），你全存还是采样？采样会不会漏掉关键 case？**
+
+分级存储 + 采样。全存成本扛不住（万 QPS × 每天 = TB 级），策略是：成功 case 采 10%（够统计指标和趋势分析），失败 case 100% 存（debug 必需），超时/成本异常 case 100% 存（优化必需）。采样是随机的，不会系统性漏掉某类 case（只要采样率够）。对关键业务（如涉及资金的 Agent），可以提高到 30% 采样。冷热分层：热数据（7 天）存 ES/ClickHouse 支持查询，冷数据转 S3 归档。token 级明细只存采样 case，全量 case 只存聚合指标。
+
+**Q：为什么不直接用 OpenTelemetry（OTel）这种通用 tracing，还要搞 LLM 专用的 Trace 格式？**
+
+OTel 的 span 模型是微服务调用链（RPC/DB），表达不了 LLM 语义——prompt 内容、token 数、model 名称、tool schema 这些 LLM-specific 字段 OTel 默认不支持。虽然 OTel 在推 GenAI semantic conventions，但成熟度不够。LLM 专用 Trace（如 LangSmith/Langfuse）内置了 prompt diff、token 成本分析、LLM 调用树可视化，开箱即用。选型上：如果团队已有 OTel 基建，用 OTel + GenAI convention 扩展；如果没有，用 LLM-native 平台省事。Trace 的核心是"能表达 LLM 语义"，工具是其次。
+
+### 第五层：验证与沉淀
+
+**Q：Harness 的 Eval 你说要"跑多次取平均"，具体跑几次？怎么判断差异是随机还是真退化？**
+
+跑 n_runs 次（通常 3-5 次），看成功率的均值和方差。判断退化的方法是：对比两个版本（如改 prompt 前后），各跑 n_runs，做统计检验（如配对 t 检验或 bootstrap），如果 p<0.05 且新版成功率低，才算真退化；如果 p>0.05，差异可能是随机噪声，不能下结论。n_runs 太少（如 1 次）无法区分随机和真退化，太多（如 20 次）成本高。生产级评测集建议 n_runs=5，配合统计检验，可信度和成本平衡。
+
+**Q：Agent Harness 怎么沉淀成团队标配？**
+
+固化成"无 Harness 不上线"的规范：所有 Agent 必须接 Trace（自动埋点）、必须配置 Safety（max_steps/cost_limit/tool_whitelist）、必须接 Eval 看板（每次改动跑回归评测）。提供统一的 Harness SDK（封装 Trace/Safety/Eval），业务侧接入即获得能力。沉淀"Trace 字段标准""Safety 配置模板""Eval 评测集规范"，新 Agent 按模板配。把 Harness 的四大能力做成 Agent 上线的 checklist 项，强制执行，避免"裸跑 Agent"上线后出事。
+

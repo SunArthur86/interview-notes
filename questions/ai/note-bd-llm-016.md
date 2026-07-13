@@ -404,3 +404,49 @@ class SessionKVCacheManager:
 - 复杂度：计算量从O(N²)降为O(N)，显存随序列长度和层数线性增加。
 - 优化：多轮对话Cache命中率低时，可用Prefix Caching/PD分离/Radix Tree优化。
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：KV Cache 缓存 Attention 的 K/V 矩阵，为什么缓存的是 K/V 而不是 Q（Query）？**
+
+因为 Attention 计算时，历史 token 的 K 和 V 会被当前 token 复用，但 Q 不复用。Attention 公式 $\text{Attention}(Q,K,V) = \text{softmax}(QK^T/\sqrt{d_k})V$，生成第 $t$ 个 token 时，需要算"第 $t$ 个 token 的 Q"对所有历史 token 的 K 的点积（$Q_t \cdot K_i$ for $i \le t$），再用 softmax 权重对所有历史 token 的 V 加权求和。历史 token 的 $K_i$ 和 $V_i$（$i < t$）不变，每生成一个新 token 都要重用它们。而 $Q$ 只有当前 token 的 $Q_t$ 是新的，历史的 $Q_i$（$i < t$）不再被使用（当前 token 不需要"作为 query 去查询"）。所以缓存 K/V 省去了重复计算历史 token 的 KV 投影，是 Attention 加速的关键。
+
+### 第二层：证据与定位
+
+**Q：多轮对话系统，第 5 轮的响应延迟比第 1 轮慢很多。你怎么判断是 KV Cache 失效（重新算历史）还是 Decode 阶段本身变慢？**
+
+看 Prefill 和 Decode 的时间分解。如果第 5 轮的 Prefill 时间剧增（如第 1 轮 200ms、第 5 轮 1500ms），是 KV Cache 失效——前几轮的历史 KV 没缓存住，每轮重新 Prefill 全部历史（历史越长 Prefill 越久）。如果 Prefill 时间稳定但 Decode 时间增加（如每 token 从 20ms 涨到 50ms），是 Decode 变慢——因为 Attention 要对更长的历史 KV 做 attention（KV Cache 命中但 size 大，attention 计算量随 history 长度增长）。前者查缓存失效原因（如 Session 复用没配、前缀变化、多用户调度驱逐），后者是 Attention 计算量增长（需要 Flash Attention 等优化）。
+
+### 第三层：根因深挖
+
+**Q：多轮对话中 KV Cache 命中率低，根因是什么？你说用 Prefix Caching 优化，原理是什么？**
+
+根因是"前缀变化导致缓存失效"。KV Cache 命中的前提是"输入的前缀和缓存时一致"——系统 prompt + 历史对话作为前缀，每轮对话历史增长，如果每轮都重新拼接 prompt + 全历史且缓存策略简单（按完整输入 hash 缓存），每次输入不同（历史变长），缓存全失效。更隐蔽的是 Chat Template 变化（不同请求的特殊 token 位置不同）和动态截断（历史过长时中间消息被压缩）。Prefix Caching 的原理是"按前缀树存 KV"——系统 prompt 的 KV 固定不变（缓存一次），历史对话的 KV 增量缓存（每轮只缓存新增部分），新请求进来时按最长前缀匹配复用缓存。这样系统 prompt 的 KV 命中率 100%，历史部分也能部分命中。
+
+**Q：那为什么不直接把所有历史 KV 永久缓存（永不淘汰），命中率不就 100% 了吗？**
+
+显存吃不消。KV Cache 占用的是 GPU 显存（不是普通内存），每个 token 的 KV 大小 = $2 \times \text{layers} \times \text{hidden\_dim} \times \text{precision}$。以 Llama-2-70B 为例，每个 token 的 KV 约 2.5MB（FP16），一个 1000 token 的会话占 2.5GB 显存，多用户并发时显存爆炸。所以必须淘汰——LRU 策略淘汰最久未用的会话缓存，或按用户活跃度优先缓存。Prefix Caching 只缓存"高频共享的前缀"（如系统 prompt、常见 few-shot 模板），个性化历史部分按容量淘汰。显存是硬约束，命中率与并发数 tradeoff（缓存多 = 支持并发少）。
+
+### 第四层：方案权衡
+
+**Q：KV Cache 占显存大，你提到用 PagedAttention（vLLM）优化。原理是什么，为什么不直接增大显存？**
+
+PagedAttention 借鉴操作系统的虚拟内存分页。传统 KV Cache 是"连续分配"——每个请求预分配一段连续显存（按 max_tokens 预留），但实际生成长度不定，大部分请求用不满，显存碎片化和浪费严重（内部碎片，利用率仅 20-40%）。PagedAttention 把 KV Cache 切成固定大小的"块"（如每块 16 token），按需分配——请求用多少块分配多少，不预留。显存利用率提升到 95%+。为什么不增大显存——显存贵且有限（A100 80GB），即使增大也浪费在碎片上；PagedAttention 是软件层面的优化，不增硬件即可提升 2-3 倍吞吐。增大显存是"加硬件"，PagedAttention 是"提效率"，后者更经济。
+
+**Q：为什么不直接用 GQA/MQA（减少 KV 头数）从模型层面减少 KV Cache 大小，省得搞 PagedAttention？**
+
+GQA/MQA 确实减少 KV Cache（MQA 把 KV 头数从全部减到 1 个，KV Cache 缩小 N 倍），但有精度损失——KV 头数少意味着多个 Q 头共享 KV，表达能力下降，模型质量降（benchmark 掉 1-3%）。且 GQA/MQA 是"训练时的模型设计"，推理时无法改（要重新训练或微调）。PagedAttention 是"推理时的显存管理优化"，不碰模型结构，精度零损失，适用于任何模型。两者不冲突——可以同时用 GQA 模型 + PagedAttention 推理，双重省显存。但如果模型已训练好（如用 Llama 标准版），只能用 PagedAttention，不能改 GQA。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么衡量 KV Cache 优化的效果，证明 Prefix Caching / PagedAttention 真的提速了？**
+
+定义指标：一是 KV Cache 命中率（Prefix Caching 命中的 token 数 / 总 token 数），应 >70%；二是 Prefill 时间（首 token 延迟 TTFT），优化后应降低（如从 800ms 降到 200ms）；三是吞吐量（tokens/s 或并发请求数），PagedAttention 应提升 2-3 倍；四是显存利用率（实际用 / 总容量），应 >80%。做对照实验：关闭 Prefix Caching vs 开启，同负载下测 TTFT 和吞吐；关闭 PagedAttention（连续分配）vs 开启，测最大并发数。关键指标是"成本效率"——同等延迟下支持多少并发，或同等并发下延迟降多少。
+
+**Q：KV Cache 优化方案怎么沉淀成推理服务的标配？**
+
+固化成"推理服务优化基线"：默认开启 Prefix Caching（系统 prompt + few-shot 前缀）、PagedAttention（分页管理）、Continuous Batching（动态组批）。沉淀"各模型的 KV Cache 大小估算表"（token 数 × 每 token KV 大小 = 显存需求）、"并发数与延迟的 tradeoff 曲线"、"缓存淘汰策略的配置经验"。配套监控：KV Cache 命中率、显存利用率、TTFT、吞吐量，异常（命中率骤降/显存 OOM）告警。把"KV Cache 优化"作为推理服务的默认配置，而非可选项，新模型部署即获得基础优化。
+

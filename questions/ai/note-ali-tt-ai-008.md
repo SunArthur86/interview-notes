@@ -252,3 +252,49 @@ setInterval(() => {
 3. **提到SSE vs WebSocket的性能对比**：SSE连接更轻量（纯HTTP头），WebSocket握手开销更大但连接后效率更高
 4. **提到安全性**：SSE天然走HTTPS，WebSocket的wss://也需要TLS，两者安全等级相同
 5. **提到边缘场景**：如果需要二进制传输（如音视频流），必须用WebSocket（SSE只支持文本）
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：所有主流 LLM（ChatGPT/Claude/Gemini）的流式输出都用 SSE 而不是 WebSocket，为什么？SSE 哪里比 WebSocket 适合这个场景？**
+
+因为 LLM 流式输出是"服务端单向推流"，SSE 天然契合。SSE 基于标准 HTTP（走 80/443 端口、过 nginx/CDN/负载均衡无需特殊配置、复用 HTTP 鉴权），而 WebSocket 需要协议升级（Upgrade: websocket）、独立端口配置、且中间件（nginx/CDN）要单独支持。SSE 自带断线重连（浏览器 EventSource 自动重连）和事件 ID（Last-Event-ID 续传），WebSocket 要手写这些。LLM 输出是单向的（模型 → 用户），不需要双向，用 WebSocket 是过度设计。SSE 的简单性是它在 AI 场景胜出的关键。
+
+### 第二层：证据与定位
+
+**Q：你的 SSE 流式输出在用户端偶尔卡顿（流到一半停了），怎么定位是网络问题、nginx 配置、还是后端？**
+
+分段排查。一是看后端是否在持续 yield 事件——查后端日志的事件时间戳是否连续；二是看 nginx 是否有 buffering——SSE 要求 `proxy_buffering off` 和 `X-Accel-Buffering: no`，否则 nginx 会攒一批再发，造成卡顿；三是看是否有超时——nginx 默认 `proxy_read_timeout 60s`，如果模型思考超过 60 秒没输出，连接被断。最常见的是 nginx buffering 没关，用 `curl -N`（无缓冲）直连后端验证，如果直连流畅但过 nginx 卡，确认是 nginx 配置。
+
+### 第三层：根因深挖
+
+**Q：SSE 流式在移动端弱网下频繁断连，每次断连丢一段 token，根因是什么？**
+
+根因是 SSE 的断线重连不保证不丢事件。SSE 协议有 `Last-Event-ID` 头支持续传，但需要后端配合——给每个事件分配递增 id，重连时前端带 `Last-Event-ID: <最后收到的 id>`，后端从该 id 之后继续发。如果没实现这个，弱网重连就丢事件。对 LLM 流式更麻烦——token 是增量生成的，重连后模型不会从中间继续生成，要重新跑。治本：对弱网用户做"整体重试"（断连后重新发起完整请求），或用 WebSocket（有状态连接、支持心跳检测连接活性、断连更快感知）。
+
+**Q：那为什么不直接用 WebSocket 替代 SSE，双向通信、有心跳、断连感知更可靠？**
+
+LLM 流式输出是单向场景（服务端推、客户端只接收），WebSocket 的双向能力和心跳是"用不上的复杂度"。WebSocket 要手写重连逻辑、心跳机制、消息边界处理，而 SSE 浏览器原生支持 EventSource（自动重连、自动解析事件）。只有需要客户端实时发指令（如中途取消生成、追加要求）时才值得用 WebSocket。纯输出流用 SSE 的工程成本低 3-5 倍。且 SSE 过 CDN/反向代理零配置，WebSocket 要逐个配 upgrade，运维成本高。
+
+### 第四层：方案权衡
+
+**Q：SSE 你说走 HTTP，那 HTTP/1.1 的浏览器连接数限制（同域 6 个）会不会卡住多会话场景？**
+
+会。HTTP/1.1 下浏览器对同域最多 6 个并发连接，如果用户开多个 tab 每个都有 SSE 流，6 个就占满，第 7 个连接阻塞。解法有三种：一是上 HTTP/2（多路复用，一个 TCP 连接跑多个流，无 6 连接限制），现代浏览器和 nginx 都支持；二是用不同子域名分散连接（如 sse1.example.com、sse2.example.com，绕过同域限制）；三是限制客户端并发流数（同时只允许一个活跃 SSE）。生产环境首选 HTTP/2，一劳永逸。
+
+**Q：为什么不直接用 HTTP chunked transfer（分块传输）做流式，省得搞 SSE 协议？**
+
+HTTP chunked 是传输层机制（把响应体分块发送），没有事件语义。SSE 在 chunked 之上定义了事件格式（`data: ...\n\n`、`event: type`、`id: xxx`、`retry: ms`），让客户端能按事件解析而非按字节流解析。直接用 chunked 要自己定义事件边界和解析逻辑，且没有断线重连和 Last-Event-ID 续传。SSE 是"chunked + 事件语义 + 重连机制"的标准化封装，对 AI 流式场景开箱即用。重复造轮子不如用标准协议。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证 SSE 流式输出的体验质量，而不是只看"能跑通"？**
+
+量化两个指标：TTFT（Time To First Token，首 token 延迟）——用户发出请求到收到第一个 token 的时间，应 <500ms 才有"开始响应"的体感；token 间隔（连续 token 之间的时间间隔）——应 <100ms 才有"流畅打字"的体感，间隔过大用户感觉卡。用前端埋点采集这两个指标，做 A/B 实验（如对比 SSE vs 非流式），看用户满意度和任务完成率。同时监控弱网场景的重连率和事件丢失率。
+
+**Q：SSE 的工程实现怎么沉淀成团队通用能力？**
+
+封装统一的 SSE 工具链：后端 `sse_stream(events)` 生成器（自动加事件 id、heartbeat 保活、错误处理），前端 `useSSE()` hook（自动重连、Last-Event-ID 续传、事件分发）。沉淀"nginx SSE 配置模板（buffering off + timeout 调长）""HTTP/2 部署 checklist""弱网降级策略（重试/WebSocket fallback）"。新 AI 流式场景接入时按模板，不重复踩 buffering 和 timeout 的坑。

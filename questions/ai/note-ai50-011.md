@@ -205,3 +205,49 @@ class AgentController:
 - 控制能力：防止Agent陷入死循环或调用危险工具，限制成本和步数
 - 评估迭代：支持A/B测试与指标监控，量化对比不同模型或Prompt的效果
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Agent Harness 解决的"不可调试、不可复现、不可控"三大黑洞，为什么 LLM 本身解决不了？**
+
+LLM 是随机系统（temperature>0 时同输入不同输出），且是黑盒（无法看内部状态）。不可调试——出错了不知道是 prompt 问题、检索问题还是模型推理问题；不可复现——同一条 query 重跑结果不同，无法定位是偶发还是必现；不可控——可能死循环（反复调同一工具）、调用危险工具（删库）、成本爆炸（跑 100 步）。Harness 通过 Trace（可调试）、Replay（可复现）、Guardrail（可控）补上这些能力，因为 LLM 本身不提供这些工程语义。
+
+### 第二层：证据与定位
+
+**Q：你的 Agent 线上出现"成本异常"（单次任务花了 $5），怎么定位是哪一步烧的钱？**
+
+靠 Trace 的 token 级追踪。每个 LLM 调用记录 prompt token 数、completion token 数、model 名称，按 model 单价算费用。线上任务 $5 意味着要么步数爆炸（跑了 50+ 步），要么单步 prompt 过长（Observation 塞了大段数据）。按 trace_id 查看该任务的每步 token 明细，找 token 峰值步骤。常见根因：ReAct 死循环（前一步 Observation 触发后一步重复 Action）或 RAG 召回过多 chunk 全塞进 prompt。
+
+### 第三层：根因深挖
+
+**Q：Trace 显示 Agent 在第 8 步和第 9 步之间死循环（重复调同一工具同样参数），根因是什么？**
+
+根因是 Agent 没有正确处理"已经做过的动作"。ReAct 的 prompt 累积所有历史，理论上模型应该看到"第 8 步已经调过这个工具"，但实际上长上下文下模型对历史注意力衰减（lost in the middle），忘了第 8 步做过，第 9 步重复。治本有三招：一是 prompt 里显式加"已执行的步骤"摘要；二是用 visited_actions 集合做去重，重复 Action 直接拦截；三是设 max_steps 上限（如 15 步）强制终止。
+
+**Q：那为什么不直接用有状态的 FSM（如 LangGraph）替代 ReAct，状态图天然防死循环？**
+
+LangGraph 的状态图能定义明确的节点转移（A→B→C），理论上能防死循环，但牺牲了灵活性。ReAct 的优势是动态决策（下一步做什么由模型基于 Observation 决定），适合不确定环境；LangGraph 的转移是预定义的，适合流程固定的场景。正确姿势是混合：用 LangGraph 定义粗粒度状态（如"检索→生成→校验"），每个状态内部用 ReAct 做细粒度执行。死循环问题用 max_steps + visited_actions 去重兜底，不必为了防循环放弃 ReAct 的灵活性。
+
+### 第四层：方案权衡
+
+**Q：Harness 的 Trace 你记录了 prompt/response/tool_call，数据量很大，怎么存？全存成本扛不住？**
+
+分级存储。热数据（最近 7 天的 Trace）存 Elasticsearch/ClickHouse，支持快速查询和告警；冷数据（7 天以上）转存 S3/OSS，按 trace_id 索引，需要时再捞。采样策略：成功 case 采 10%（够统计指标），失败 case 100% 存（用于 debug）。token 级明细只存采样 case 的，全量 case 只存聚合指标（总 token 数、总费用、总步数）。这样存储成本可控，且失败 case 不漏。
+
+**Q：为什么不直接用 OpenTelemetry 这种通用 tracing，还要搞专门的 LLM Harness？**
+
+OpenTelemetry 的 span 模型是为微服务调用链设计的（RPC/DB call），无法表达 LLM 特有的语义——prompt 内容、token 数、model 名称、tool schema。LLM Harness 在 OTel 基础上扩展了 LLM-specific 的 attribute（如 `llm.prompt_tokens`、`llm.model`、`gen_ai.tool.name`），现在 OpenTelemetry 也有 GenAI semantic conventions 在跟进。选型上：如果团队已有 OTel 基建，用 OTel + GenAI convention 扩展；如果没有，用 LangSmith/Langfuse 这种 LLM-native 的 Harness 平台，开箱即用。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明 Harness（Trace + Guardrail）真的提升了 Agent 的线上可靠性，而不是心理安慰？**
+
+看两个指标的改善：一是平均故障定位时间（MTTD）——Harness 上线前，一个"Agent 偶发答错"的 bug 要复现 N 次才能定位，MTTD 可能是几天；上线后 Trace 直接显示哪步出错，MTTD 降到分钟级。二是线上事故率——Guardrail（max_steps、cost_limit、危险工具拦截）拦截了多少潜在事故，统计拦截次数。把"被 Guardrail 拦截的 case"分类（死循环/成本爆炸/危险调用），证明每一类 Guardrail 都有实际触发，不是摆设。
+
+**Q：Harness 怎么沉淀成团队标配能力？**
+
+固化成 Agent 开发框架：所有 Agent 必须接入 Trace（自动埋点，业务无感）、必须配置 Guardrail（max_steps、cost_limit、tool_whitelist）、必须接评估看板（成功率、token 成本、P99 延迟）。沉淀"Trace 字段标准""Guardrail 配置模板""常见事故 case 库"，新人开发的 Agent 自动获得可调试可控制能力。把"无 Harness 不上线"写进 Agent 上线 checklist，强制执行。
+

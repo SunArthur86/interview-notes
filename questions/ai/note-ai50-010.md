@@ -252,3 +252,49 @@ async def safe_agent_stream(query):
 - 后端实现：LangChain调用astream_events(version='v2')，按事件类型分别yield数据
 - 前端体验：用EventSource接收，让用户实时看到思考与工具执行过程，消除等待焦虑
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Agent 流式输出为什么要拆成 token 流、action_start、observation 等独立事件，而不是等最终结果一次性返回？**
+
+动机是用户体验和感知延迟。Agent 多步任务可能跑 10-30 秒，一次性返回让用户干等，体感"卡死了"；流式输出让用户实时看到"模型正在思考...→ 调用搜索工具 → 拿到结果 → 正在总结"，把 30 秒的等待拆成可感知的进度。拆成独立事件是因为不同事件的前端渲染不同——token 流增量渲染文字、action_start 渲染工具卡片、observation 渲染结果区，不能混在一起。
+
+### 第二层：证据与定位
+
+**Q：用户反馈"Agent 卡住没反应"，但后端日志显示在正常跑。你怎么定位是哪个环节断了？**
+
+按链路分段排查：一是后端 LangChain 的 `astream_events` 是否在 yield——看后端日志的事件时间戳是否连续推进；二是 SSE 连接是否断开——看 nginx/gateway 的连接日志，是否有 timeout 或 connection reset；三是前端 EventSource 是否在接收——看浏览器 DevTools 的 Network 面板，SSE 请求是否在持续收 data。最常见的是中间网关（如 nginx）默认 60 秒断长连接，要配 `proxy_read_timeout` 和心跳。
+
+### 第三层：根因深挖
+
+**Q：SSE 流式输出在移动端弱网下频繁断连重连，每次重连丢一段事件。根因是什么？**
+
+根因是 SSE 基于 HTTP 长连接，弱网下连接不稳定且没有断点续传。SSE 协议有 `Last-Event-ID` 头支持续传，但需要后端配合——给每个事件分配递增 id，重连时前端带上最后收到的 id，后端从该 id 之后继续发。如果不实现这个，弱网重连就丢事件。治本是实现 `Last-Event-ID` 续传，或改用 WebSocket（有状态连接、支持心跳和重连），或在事件层做幂等（前端用事件 id 去重，后端重发）。
+
+**Q：那为什么不直接用 WebSocket 替代 SSE，双向通信更可靠还支持心跳？**
+
+SSE 对 Agent 流式场景更合适：一是 SSE 是单向（服务端推），Agent 输出正好是单向流，用 WebSocket 是过度设计；二是 SSE 基于 HTTP，走现有基础设施（nginx、CDN、鉴权）无需额外配置，WebSocket 要单独配 upgrade 和 keepalive；三是 SSE 浏览器原生支持 EventSource API，断线自动重连，WebSocket 要手写重连逻辑。只有需要客户端实时发指令（如中途取消任务）时才上 WebSocket，纯输出流用 SSE 足够。
+
+### 第四层：方案权衡
+
+**Q：你用 LangChain 的 `astream_events(version='v2')`，事件类型有哪些？为什么这么拆？**
+
+核心事件包括：`on_chat_model_stream`（LLM token 流，增量渲染文字）、`on_tool_start`（工具开始调用，渲染工具卡片）、`on_tool_end`（工具返回，渲染结果）、`on_chain_end`（整个链路结束，收尾）。这么拆是因为前端要按事件类型做不同 UI——token 流要增量拼接且打字机效果，tool_start 要展示工具名和参数，tool_end 要展示结果且可能折叠。如果只给一个"最终结果"事件，就退化成非流式，失去体验优势。
+
+**Q：为什么不直接用 OpenAI 的 stream=True（纯 token 流），省得拆事件类型？**
+
+OpenAI 的纯 token 流只能渲染文字，渲染不了"工具调用"这个动作。Agent 的核心价值是调用工具，用户要看到"现在在调哪个工具、参数是什么、结果是什么"，这些不是 token 流能表达的——工具调用是结构化事件，不是自然语言 token。纯 token 流适合单轮问答（ChatGPT 风格），Agent 场景必须用结构化事件流才能完整表达执行过程。LangChain 的 `astream_events` 就是为了把 LLM token 流和工具事件流统一抽象。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明流式输出比非流式提升了用户体验，而不是只是"看着好看"？**
+
+量化两个指标：一是感知延迟（Time to First Token，TTFT）——流式 <500ms 用户感觉"开始响应了"，非流式要等 10-30 秒用户感觉"卡死"；二是任务放弃率（用户在等待中刷新/关闭的比例）——流式应显著低于非流式。做 A/B 实验：对照组非流式，实验组流式，各 50% 流量跑 1 周。如果实验组放弃率降 40%+ 且 TTFT <1s，证明流式的体验价值。这是产品指标，不是技术指标。
+
+**Q：流式输出的工程框架怎么沉淀成可复用能力？**
+
+封装统一的 `agent_stream(agent, query)` 异步生成器，内部调 LangChain `astream_events`，对外 yield 标准化事件（type: token/tool_start/tool_end/done，payload）。前端封装统一的 `useAgentStream()` hook，自动处理 EventSource 连接、事件分发、断线重连、错误兜底。沉淀"SSE 网关配置模板（nginx timeout/心跳）""弱网续传方案""事件类型设计规范"，新 Agent 接入时按模板，不重复踩坑。
+

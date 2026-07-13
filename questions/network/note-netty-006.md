@@ -164,3 +164,49 @@ new Thread(() -> socket.getOutputStream().write("world".getBytes())).start();
 而 Netty Channel 不需要你加任何锁——它的线程模型在框架层就保证了串行化。
 
 > **面试记忆口诀**：**"Channel 线程安全，因为它把所有 I/O 绑定到了一个 EventLoop 线程"**——这是 Netty 无锁化设计的精髓，也是聊天室场景能轻松实现广播的根本原因。
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Channel 你说是"线程安全"的，但网络连接天然是共享资源，Netty 怎么做到的？**
+
+线程安全的实现是"Channel 的所有操作都路由到绑定的 EventLoop 线程串行执行"。每个 Channel 注册到 EventLoop 时绑定一个 EventLoop（绑定后不变），之后该 Channel 的所有 IO 操作（write/flush/read/close）都被提交到这个 EventLoop 的任务队列，由 EventLoop 单线程串行执行。所以即使多个业务线程同时调 channel.writeAndFlush()，这些 write 操作在 EventLoop 队列里排队，串行执行，无需加锁。这就是"单线程串行无锁"模型——不是 Channel 自己加锁，而是"所有操作归集到单线程"。这比"每个操作加 synchronized"高效得多（无锁竞争）。所以 Channel 线程安全的本质是"EventLoop 的单线程串行保证"，不是 Channel 内部的并发控制。
+
+### 第二层：证据与定位
+
+**Q：你说 Channel 绑定一个 EventLoop 不变，那如果该 EventLoop 线程崩溃了，Channel 怎么办？**
+
+EventLoop 线程不会"崩溃退出"——EventLoop 是设计为"永不退出"的事件循环（除非显式 shutdown EventLoopGroup）。如果 EventLoop 里执行的某个任务抛未捕获异常，Netty 会捕获（在 run 方法里 try-catch），记录日志，但不退出循环（继续处理后续任务）。所以 EventLoop 线程是健壮的，单个 handler 异常不会拖垮 EventLoop。如果 EventLoopGroup 被 shutdown（如应用关闭），所有 EventLoop 退出，所有 Channel 被关闭（连接断开）。这是正常关闭流程，不是异常。真正"绑定失效"的场景：Channel deregister 后重新 register 到另一个 EventLoop（如 Netty 内部优化），但这是 Netty 自动管理，开发者无感。所以"绑定不变"是从开发者视角（Channel 的操作总在同一 EventLoop 线程），底层细节由 Netty 管。
+
+### 第三层：根因深挖
+
+**Q：Channel.write 和 ChannelHandlerContext.write 你说有区别，根因是什么？从 Pipeline 哪里开始？**
+
+区别是"出站事件的起点"。Channel.write 从 Pipeline 的 tail 开始向前找下一个 Outbound handler，经过所有出站 handler（编码→flush）。ChannelHandlerContext.write 从当前 ctx 的前一个 Outbound handler 开始，跳过当前 ctx 之前的 handler。所以 ctx.write 适合"在某个 handler 内部把结果直接发给底层，不经过后续 handler"。场景：业务 Handler 处理完消息后，用 ctx.writeAndFlush(response) 直接发给 outbound handler（如 encoder），不经过 pipeline 中"在当前 handler 之后注册的 outbound handler"。Channel.write 经过整个 Pipeline，可能被后续 handler（如日志 handler）拦截。所以 ctx.write 更精确（起点是当前 ctx），Channel.write 更全面（起点是 tail）。编码器一般用 ctx.write（跳过自己之后的 handler），业务 handler 通常用 Channel.write（完整 Pipeline 处理）。
+
+**Q：那为什么不所有 write 都用 Channel.write，反正它会经过整个 Pipeline？**
+
+因为有些场景要"跳过部分 handler"。如一个 Encoder handler 内部要把编码后的 ByteBuf 直接发给 socket，不应该再经过"日志 handler"（日志 handler 会记录原始对象不是 ByteBuf）或"另一个编码器"（重复编码）。用 ctx.write 从当前 ctx 出发，跳过这些后续 handler，直接到达底层。如果用 Channel.write（从 tail 出发），会经过所有 outbound handler，可能重复处理或错误处理。所以 ctx.write 是"精确控制出站路径"，Channel.write 是"走完整路径"。选择看需求——简单场景用 Channel.write（兜底完整处理）、精细控制用 ctx.write。Netty 4 推荐在 handler 内用 ctx.write（明确意图、避免意外），Channel.write 适合业务调用方（非 handler 内部）。
+
+### 第四层：方案权衡
+
+**Q：Channel 是抽象，NioSocketChannel 和 EpollSocketChannel 是实现，切换时要改代码吗？**
+
+要改少量代码。Channel 实现的 API 一致（都实现 Channel 接口），但 EventLoopGroup 和 ChannelFactory 要对应——NioSocketChannel 配 NioEventLoopGroup、EpollSocketChannel 配 EpollEventLoopGroup。所以切换时改两行：`new NioEventLoopGroup()` → `new EpollEventLoopGroup()`、`.channel(NioSocketChannel.class)` → `.channel(EpollSocketChannel.class)`。其余代码（ChannelHandler、Pipeline、ByteBuf）完全不变。这是 Netty 的"transport 抽象"——上层 API 一致，底层 transport 可切换。所以可以"开发用 NIO（跨平台）、生产切 Epoll（Linux 性能）"，代码几乎不动。代价：Epoll 是 Linux only，部署平台受限。权衡：跨平台用 NIO、Linux 极致性能用 Epoll。
+
+**Q：为什么不让 Channel 接口屏蔽所有差异，连 EventLoopGroup 都自动选？**
+
+因为不同 transport 的特性差异大，自动选可能选错。如 Epoll 支持 SO_REUSEPORT（多进程共享端口）、TCP_FASTOPEN（快速握手），NIO 不支持。如果自动选，开发者不知道这些特性可用与否，无法充分利用。显式选择让开发者"知道自己用的是什么"，并能用对应特性（如 EpollEventLoopGroup 支持 `option(EpollChannelOption.TCP_CORK, true)`）。所以 Netty 让 transport 选择显式化，而非完全屏蔽。代价是切换 transport 要改代码（两行），但收益是"特性透明 + 不意外"。这是"显式优于隐式"的设计原则。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证 Channel 的线程安全（多线程 write 不出问题）和绑定关系（操作在同一线程）？**
+
+两类验证：一、绑定关系——开多个 Channel，多线程并发调用 channel.writeAndFlush，在 handler 里 `Thread.currentThread().getName()` 应恒为该 Channel 绑定的 EventLoop 线程名（如 `nioEventLoopGroup-2-1`），不变；二、线程安全——100 个业务线程并发 write 同一 Channel 1 万次，所有 write 应成功（不抛异常）、对端收到的消息数 = write 次数（无丢失）、消息顺序按 write 调用顺序（串行保证）。验证手段：在 handler 里记录线程名 + 计数，对比预期。线上监控：Channel 的 pending writes（出站缓冲区）、EventLoop 的线程名（应稳定），如 EventLoop 线程频繁"换名"说明绑定失效（异常情况）。
+
+**Q：这道题做完，你沉淀出了什么可复用的 Netty Channel 使用经验？**
+
+四条经验：一、相信 Channel 线程安全——多线程 write 同一 Channel 无需加锁，Netty 保证串行；二、handler 内用 ctx.write——精确控制出站路径，避免意外经过后续 handler；三、异步 write + 监听——writeAndFlush 返回 ChannelFuture，addListener 处理成功/失败，不要 await（阻塞）；四、资源释放——出站 ByteBuf 在 flush 后由 Netty 自动 release、入站 ByteBuf 在 SimpleChannelInboundHandler 自动 release、自定义传递要 retain/release 配对。核心："Channel 是线程安全的抽象、EventLoop 是无锁串行的保证、ctx vs Channel.write 是路径控制、资源管理是引用计数。" 这套经验用于所有 Netty 编程，避免并发 bug 和资源泄漏。

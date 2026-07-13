@@ -193,3 +193,49 @@ public class MyServerHandler extends ChannelInboundHandlerAdapter {
 ```
 
 > 你写的是"事件来了怎么办"（channelActive/channelRead/exceptionCaught），底层网络的收发、线程调度、缓冲管理全由 Netty 的异步事件驱动机制搞定——这就是它的设计哲学。
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Netty 的"异步事件驱动"你说是核心，但"异步"和"事件驱动"是两个概念，分别解决什么问题？**
+
+"异步"解决"等待"问题——传统同步 BIO 的 read 会阻塞线程等数据，异步的 writeAndFlush 立即返回 ChannelFuture，数据写入完成后回调。这让 EventLoop 线程不阻塞、能服务其他连接。"事件驱动"解决"调度"问题——不是主循环轮询各连接状态，而是"事件发生时回调对应 handler"（如 channelActive、channelRead、exceptionCaught）。两者结合：EventLoop 监听 Selector 事件（accept/read/write），事件就绪时触发对应的 ChannelHandler 方法，handler 内部用异步操作（如异步 DB 查询返回 Future）避免阻塞。所以"异步"是"不阻塞线程等待"，"事件驱动"是"由事件触发处理"，两者协同实现高并发——单线程串行处理大量连接的事件流。
+
+### 第二层：证据与定位
+
+**Q：Netty 的事件类型有哪些？ChannelInboundHandler 和 ChannelOutboundHandler 的区别怎么记？**
+
+事件分两大类：一、Inbound（入站）——从底层到上层（socket → 应用），如 channelRegistered、channelActive、channelRead（读到数据）、channelInactive。对应 ChannelInboundHandler，处理"收到的事件"。数据流向：字节流 → 解码 → 业务处理。二、Outbound（出站）——从上层到底层（应用 → socket），如 bind、connect、write、flush、close。对应 ChannelOutboundHandler，处理"发出的操作"。数据流向：业务处理 → 编码 → 字节流。记忆口诀：Inbound 是"读"（数据进来）、Outbound 是"写"（数据出去）。ChannelDuplexHandler 同时实现两个接口，可处理入站和出站（如编解码器既要解码入站又要编码出站）。Pipeline 中 Inbound handler 从 head 往 tail 触发，Outbound 从 tail 往 head 触发（方向相反）。
+
+### 第三层：根因深挖
+
+**Q：Netty 的"异步"你说是"writeAndFlush 返回 ChannelFuture"，但这个 Future 什么时候完成？怎么知道成功失败？**
+
+writeAndFlush 的 ChannelFuture 在"数据真正写入到 socket"或"写入失败"时完成。具体：writeAndFlush 把消息加到 Channel 的出站缓冲区（ChannelOutboundBuffer），EventLoop 异步处理（调用 codec 编码、flush 到 socket）。如果 socket 缓冲区没满，数据写入内核缓冲区成功，Future 完成（success）；如果 socket 缓冲区满或连接断开，写入失败，Future 完成（failure，带异常）。监听完成：`future.addListener(future -> { if (future.isSuccess()) { 成功 } else { future.cause().printStackTrace(); } })`。注意：writeAndFlush 返回时数据可能还没到 socket（在缓冲区排队），Future 完成才表示"写入 socket 完成"，但不等于"对端收到"（对端收到要等 ACK，Netty 不暴露这层）。所以"异步"的含义是"不阻塞当前线程等写入完成"，由 EventLoop 异步处理 + Future 回调通知。
+
+**Q：那为什么不直接同步 write + flush，等写完再返回，不更直观吗？**
+
+同步 write + flush 会阻塞 EventLoop 线程——如果 socket 缓冲区满（对端慢或网络拥塞），flush 要等缓冲区有空间，期间 EventLoop 卡住，该 EventLoop 上所有其他 Channel 都无法处理。异步 writeAndFlush 立即返回（数据进 ChannelOutboundBuffer），EventLoop 继续处理其他 Channel，后续由 EventLoop 在空闲时 flush 到 socket。这是"用缓冲区解耦生产者和消费者"——业务生产数据（writeAndFlush）和 socket 发送（flush）异步，业务不被 socket 速度拖慢。代价是"背压"问题——如果业务生产远快于 socket 发送，ChannelOutboundBuffer 无限堆积 OOM。Netty 用高低水位线（writeBufferHighWaterMark）解决——超过水位时 channel.isWritable() 返回 false，业务应停止 write（背压）。所以异步 + 水位线是高并发网络框架的标准设计。
+
+### 第四层：方案权衡
+
+**Q：Netty 的事件驱动你说是"ChannelHandler 回调"，为什么不用响应式（Reactor/Flux）或协程？**
+
+历史和定位。Netty 4（2013 年）设计时，响应式（Reactor）和协程（Kotlin）还没普及，回调是最成熟的异步方案。回调的优势：一、零依赖——纯 Java，不依赖 Reactor/Kotlin；二、性能——回调是直接方法调用，无响应式流的订阅/发布开销；三、控制流清晰——handler 链按 Pipeline 顺序执行，调试栈直观。劣势是"回调地狱"——多层异步嵌套时代码难读（如 write 的 listener 里再 write）。Netty 5 曾尝试支持响应式但失败（性能下降、复杂度增加），Netty 4 的回调模型保留至今。上层框架（如 Spring WebFlux、Reactor Netty）在 Netty 之上提供响应式 API，让业务用 Flux/Mono 写，底层仍是 Netty 回调。所以"Netty 用回调"是底层选择，"业务用响应式"是上层选择，两者通过适配器衔接。
+
+**Q：为什么不直接用同步 BIO + 协程（如 Kotlin/Goroutine），让"同步代码看起来像异步"，避免回调？**
+
+协程确实让异步代码写成同步样式（`val result = asyncWrite().await()`），可读性好。但两个问题：一、JVM 生态——Java 直到 21（Project Loom 的虚拟线程）才有官方协程，Netty 4 设计时 Java 没协程；二、协程不解决"线程模型"——协程仍要调度到线程（如 Netty 的 EventLoop 或 Loom 的 carrier thread），如果 EventLoop 上跑协程且协程阻塞（await 内部），EventLoop 仍卡住。Loom 的虚拟线程解决了"thread per connection 模型的连接数限制"（虚拟线程轻量），但 Netty 的 Reactor 模型（少量线程 + 多路复用）仍高效，两者不互斥。未来可能"Netty 用虚拟线程跑阻塞 handler"，但核心 EventLoop 仍是无回调的 Reactor。所以协程是上层编程模型，不替代 Netty 的事件驱动底层。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证 Netty 的事件驱动和异步机制在实际运行中高效（无线程阻塞、回调及时）？**
+
+三类验证：一、EventLoop 无阻塞——`jstack` 抓 EventLoop 线程栈，不应长时间停留在业务方法（如 DB 调用），应快速返回到 select；二、回调及时——writeAndFlush 后的 listener 应在毫秒级触发（不是秒级），如果延迟大说明 EventLoop 被其他 handler 阻塞或负载过高；三、背压生效——快速 writeAndFlush 大量数据，channel.isWritable() 应在缓冲区达高水位时变 false，业务停止 write 后缓冲区下降、isWritable 恢复 true。监控：Netty 的 `ChannelOutboundBuffer` 的 pending size（待发送字节，持续增长说明对端慢或网络拥塞）、EventLoop 的 task queue length（积压任务，增长说明 handler 慢）。线上告警：EventLoop 任务积压 > 1000 告警（可能 handler 阻塞）、出站缓冲区 > 10MB 告警（可能对端慢）。
+
+**Q：这道题做完，你沉淀出了什么可复用的 Netty 异步编程经验？**
+
+五条原则：一、EventLoop 不阻塞——handler 内的 IO 必须异步（writeAndFlush 不 await、用 addListener 回调），耗时业务丢业务线程池；二、Future/Promise 用 addListener——不要 future.await()（阻塞 EventLoop），用 addListener 异步回调；三、背压处理——write 前检查 channel.isWritable()，false 时停止 write（让缓冲区消化）；四、异常处理——exceptionCaught 要处理，否则异常吞掉连接泄漏；五、资源释放——ByteBuf 用完 release（引用计数），用 SimpleChannelInboundHandler 自动释放入站消息。核心："异步回调 + 无阻塞 + 背压 + 异常处理 + 资源管理"是 Netty 编程的五要素，缺一会出线上问题。

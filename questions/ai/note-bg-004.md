@@ -376,3 +376,49 @@ def choose_method(task_type, resources, data):
 - DAPO优化：因全对全错样本梯度为0，故动态剔除以提升有效梯度密度
 - DPO本质：直接偏好优化，通过构造闭式解跳过RL和RM，全离线训练
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：PPO 已经是 RLHF 的主流，为什么 DeepSeek 还要搞 GRPO？它解决了 PPO 的什么核心痛点？**
+
+PPO 要训一个 Critic（Value Network）估计 baseline，意味着除了 Policy、Reference、Reward Model，还要再加载一个 Critic 模型——4 个 7B 模型同时驻留显存，单卡根本放不下。Critic 还要单独训，收敛慢、不稳。GRPO 的核心洞察是：与其学一个 Critic 估 baseline，不如对同一个 prompt 采 G 个回答，用组内 reward 的均值/标准差做归一化作为优势值 A=(r-mean)/std，免掉 Critic。这样显存砍掉 25%，训练成本大幅下降，这是 DeepSeekMath/R1 能训起来的关键工程优化。
+
+### 第二层：证据与定位
+
+**Q：你说 GRPO 去掉 Critic 更省显存，但采样 G 个回答（通常 G=8 或 16）不是增加了采样成本吗？怎么算总账？**
+
+算总账：PPO 每个 prompt 采 1 个回答但要 forward Policy+Critic+RM+Ref 四个模型；GRPO 每个 prompt 采 G=8 个回答，但只 forward Policy+RM+Ref 三个模型（无 Critic）。单 prompt 的 forward 次数：PPO 是 4×1=4，GRPO 是 3×8=24。表面看 GRPO 多了，但 GRPO 的 G 个回答共享同一 prompt 的 KV-Cache（prefix 复用），实际 forward 成本是 1+8（prompt 算一次 + 8 个回答）。而且 GRPO 不用训 Critic 的反向传播，省掉 Critic 的优化器状态（Adafactor 状态约等于模型参数量）。实测 DeepSeek 的报告：GRPO 总训练成本比 PPO 低 30-40%。
+
+### 第三层：根因深挖
+
+**Q：GRPO 用组内 reward 归一化当优势值，这有什么隐患？在什么场景下会失效？**
+
+失效场景：当 G 个回答的 reward 全相同时（全对或全错），std=0，归一化除零，优势值无定义——这就是 DAPO 要解决的"零奖励样本"问题。另一个隐患：组内归一化丢失了"绝对质量"信息。比如一个简单 prompt，8 个回答 reward 都是 0.9，归一化后优势值都接近 0，模型学不到"这个 prompt 本来就简单，已经做得不错了"；反过来一个超难 prompt 8 个回答都是 0.1，归一化后优势值也接近 0，模型学不到"这个 prompt 难，需要更多探索"。这就是 GRPO 在极端难度分布上不如 PPO 的原因。
+
+**Q：既然 GRPO 在全对/全错场景失效，为什么不直接回到 PPO，而要搞 DAPO 这个中间方案？**
+
+因为 PPO 的 Critic 成本太高（回到第一层的问题），DAPO 是在 GRPO 基础上做最小改动解决失效：1）动态采样——检测到一批 prompt 的 G 个回答 reward 方差为 0（全对/全错）就丢弃这批，重新采样直到拿到有梯度的 prompt；2）解耦裁剪——把 PPO 的 clip 上界 ε_high 和下界 ε_low 解耦，上界放宽（鼓励探索高 reward 回答），下界收紧（快速淘汰低 reward）。这样既保住 GRPO 无 Critic 的成本优势，又解决了零梯度样本问题。
+
+### 第四层：方案权衡
+
+**Q：PPO、GRPO、DPO、DAPO 这四个，实际项目里怎么选？有决策树吗？**
+
+按"数据 + 算力"决策：1）只有偏好对数据（chosen-rejected pair），没有在线 reward signal → 选 DPO（全离线，最省）；2）有 reward model + 算力充足 + 追求 SOTA → PPO（最稳但有 Critic 成本）；3）有 reward model + 算力紧张 + 工程能力强 → GRPO（DeepSeek 路线，省 Critic）；4）GRPO 跑通后发现大量零梯度样本 → 升级 DAPO。实务上 80% 的中小团队用 DPO（数据好搞、训练简单），大厂追求极致上 PPO/GRPO，DAPO 是 GRPO 的进阶版。
+
+**Q：为什么不直接用 DPO 跑所有场景？它最省事，不需要 RM 也不需要 PPO。**
+
+DPO 有三个硬伤：1）离线——它用静态偏好对训练，无法在线探索新的"更好回答"，上限被偏好数据质量锁死；2）对偏好对质量极敏感——标注噪声（标反了的 pair）会让 DPO 学反，而 PPO/GRPO 在线采样有自我纠正能力；3）分布漂移——DPO 训练时模型分布会偏离 SFT 初始化，没有 KL 约束到 ref 会越训越偏（虽然有 β 正则但弱）。所以追求 SOTA 的场景（如 R1 级推理能力）还是用 GRPO/PPO 在线 RL，DPO 适合快速迭代和资源受限。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明 GRPO 训出来的模型确实比 PPO 好，而不是"省了钱但效果也差了"？**
+
+对照实验：同样的 SFT 初始化、同样的 reward model、同样的数据，分别跑 PPO 和 GRPO 到同样步数，在三个维度对比：1）能力——AlpacaEval/MMLU/GSM8K 分数；2）稳定性——reward 曲线方差、KL 是否平稳；3）效率——达到 PPO 同等效果（如 AlpacaEval 持平）用了多少 GPU 小时。如果 GRPO 能力持平甚至更高、稳定性不差、GPU 小时少 30%，就证明 GRPO 在该任务上优于 PPO。DeepSeekMath 论文就是这套对照，GRPO 在 MATH 上超 PPO 2-4 个点且成本更低。
+
+**Q：这次 GRPO/DAPO 的选型经验怎么沉淀成团队默认方案？**
+
+整理成一份"RLHF 算法决策 SOP"：1）场景分类表——任务类型（对话/推理/代码）× 数据类型（在线 reward/离线偏好对）× 算力预算，每个格子推荐一个算法；2）默认配方——中小项目默认 DPO，大项目默认 GRPO+DAPO，标注了为什么不用 PPO（Critic 成本）和 DPO（离线上限）；3）对照实验模板——固定 SFT init、RM、eval set 的实验脚本，新人切换算法时一键复现对照。再配一个训练监控 dashboard，自动检测零梯度样本比例（GRPO/DAPO 的关键健康指标），超过阈值告警。

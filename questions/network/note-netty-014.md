@@ -217,3 +217,49 @@ pipeline.addLast(new MyBusinessHandler());        // 业务逻辑（只收到完
 | **协议预置** | SSL / HTTP / WebSocket / UDP / PB |
 
 > **面试记忆口诀**：**"解码入站字节变对象，编码出站对象变字节，拆包解码器治粘包半包，预置编解码器覆盖 HTTP/SSL/WebSocket"**。Codec 是特殊的 ChannelHandler，让业务只关心对象。
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Netty 的编解码器你说是"Handler 的特化"，为什么要分编解码器而不是用普通 Handler 手动处理？**
+
+编解码器解决"半包粘包 + 类型转换"两个高频痛点。普通 Handler 处理原始 ByteBuf 要自己：一、处理半包——TCP 是流，一次 read 可能是半条消息或两条半消息拼接，要自己维护"已读缓冲"，拼接完整消息才处理；二、粘包——多条消息在一次 read 里，要自己分割；三、字节到对象——手动从 ByteBuf 读字段构造对象（如 readInt、readBytes），易错。编解码器（如 LengthFieldBasedFrameDecoder + ProtobufDecoder）封装这些——Decoder 自动处理半包粘包（按长度字段分帧）+ 自动反序列化（Protobuf 解码），业务 Handler 直接拿到完整对象。所以编解码器是"为协议处理优化的 Handler 基类"，把高频逻辑（分帧、序列化）封装，让业务聚焦"对象处理"。Netty 自带几十种编解码器（HTTP、WebSocket、Protobuf、Redis 协议等），覆盖主流协议。
+
+### 第二层：证据与定位
+
+**Q：半包粘包你说是 TCP 流的特性，具体表现是什么？怎么用 Netty 的 FrameDecoder 解决？**
+
+表现：一、半包——一条业务消息（如 1000 字节）被 TCP 拆成两次 read（先 500 字节、再 500 字节），Handler 第一次 channelRead 拿到的是半条消息；二、粘包——两条消息（各 500 字节）被 TCP 合并成一次 read（1000 字节），Handler 一次 channelRead 拿到两条消息拼接。FrameDecoder 的解决：一、LengthFieldBasedFrameDecoder——协议里有"长度字段"（如前 4 字节是消息长度），Decoder 读长度字段，按长度从已读缓冲里切出完整消息（不够则继续读，多了则剩余留给下次）；二、LineBasedFrameDecoder——按换行符分帧（文本协议）；三、DelimiterBasedFrameDecoder——按自定义分隔符分帧。Decoder 内部维护"累积缓冲"（ByteBuf），每次 read 追加，按规则切出完整消息传给下一个 Handler，不完整的留着等下次。所以 FrameDecoder 是"分帧层"，处理 TCP 流到消息的边界。
+
+### 第三层：根因深挖
+
+**Q：LengthFieldBasedFrameDecoder 你说按"长度字段"分帧，但长度字段的位置、长度、字节序怎么配？配错会怎样？**
+
+LengthFieldBasedFrameDecoder 的核心参数：maxFrameLength（最大帧长，防 OOM）、lengthFieldOffset（长度字段的偏移，如协议头有 magic 则 offset=4）、lengthFieldLength（长度字段本身的字节数，1/2/4/8）、lengthAdjustment（长度字段值到实际消息体的调整，如长度字段包含自己则 adjust=-4）、initialBytesToStrip（分帧后丢弃的字节数，如丢掉长度字段则 strip=4）。配错的后果：一、长度字段读错——读到错误长度，切错帧，业务解析失败；二、字节序——Netty 默认大端（网络字节序），如果协议是小端要配 lengthFieldOrder（但 Netty 不直接支持，要自定义）；三、OOM——maxFrameLength 过大，恶意发送超大长度字段，Decoder 累积大缓冲 OOM。所以 LengthFieldBasedFrameDecoder 的配置要严格匹配协议规范，配错会解析错误或被攻击。
+
+**Q：那为什么不直接用 Protobuf 的 Decoder（自动处理长度），而要先 LengthFieldBasedFrameDecoder 再 ProtobufDecoder？**
+
+因为 Protobuf 的二进制格式内部没有"长度字段"——Protobuf 编码后是"紧凑的字段序列"，不知道整体消息边界。所以 Protobuf 协议通常约定"4 字节长度 + Protobuf 数据"（长度前缀），解码时分两步：一、LengthFieldBasedFrameDecoder 按 4 字节长度切出完整消息（ByteBuf）；二、ProtobufDecoder 把 ByteBuf 反序列化成 Protobuf 对象。两步分离让"分帧"和"反序列化"解耦——LengthFieldBasedFrameDecoder 通用（任何带长度前缀的协议都能用）、ProtobufDecoder 专用（只处理 Protobuf 格式）。组合起来灵活（如换 JSON 序列化，只换第二步 Decoder）。所以"分帧 + 反序列化"分层是 Netty 编解码器的标准设计。
+
+### 第四层：方案权衡
+
+**Q：编码器（Encoder）和解码器（Decoder）你说方向相反，为什么不合成一个 Codec？**
+
+合成 Codec 的场景存在（如 ChannelDuplexHandler 兼顾入站解码和出站编码），但分开更常见。分开的理由：一、职责清晰——Decoder 是 Inbound（处理读到的字节）、Encoder 是 Outbound（处理要写的对象），方向不同、Pipeline 位置不同；二、可复用——Decoder 可在"只读"场景用（如客户端只收不发）、Encoder 在"只写"场景用（如服务端只发不收），合在一起则冗余；三、Netty 提供 MessageToByteEncoder（出站对象→字节）、ByteToMessageDecoder（入站字节→对象），子类只需实现 encode/decode 方法，比 Duplex 简单。所以分开是"单一职责 + 灵活组合"的体现。但确有"既编又解"的场景（如字符串编解码 StringEncoder/StringDecoder 在同一协议用），可用 Codec（Netty 的 StringUtil 提供），按需选。
+
+**Q：为什么不直接用序列化框架（如 Jackson、Gson）替代 Netty 的编解码器？**
+
+序列化框架（Jackson/Gson）只做"对象↔JSON 字符串"，不处理"半包粘包"和"字节↔对象"的完整链路。Netty 的编解码器是"分帧 + 序列化"一体的——Decoder 先按长度分帧（得到完整消息的字节），再调 Jackson 反序列化（字节→对象）。如果只用 Jackson，要自己先处理半包粘包（拿完整字节），再交给 Jackson，等于手动实现了 FrameDecoder 部分。所以 Netty 编解码器和序列化框架是"互补"——Netty 管"分帧和 Pipeline 集成"、序列化框架管"对象↔字节"。实际用法：自定义 FrameDecoder（分帧）+ Jackson/Gson（反序列化），或直接用 Netty 的 JsonObjectDecoder（自带 JSON 分帧）+ Jackson。所以两者不是替代，是协作。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证编解码器配置正确（分帧准确、序列化无丢失）？**
+
+三类验证：一、分帧——构造"半包"（模拟 TCP 拆包，分两次发一条消息）和"粘包"（一次发两条消息）的测试用例，Decoder 应正确切分（不丢消息、不错位）；二、序列化——对象编码后解码，对比解码结果与原对象（深比较），应完全一致（特别是大对象、嵌套对象、特殊字符）；三、压力测试——百万消息压测，解码无误（如计数错误说明某消息被丢或重复）。验证 OOM 防护：发送超长消息（如长度字段声明 1GB），Decoder 应抛 TooLongFrameException（不 OOM）。线上监控：解码失败次数（持续增长说明协议不兼容或恶意数据）、平均消息大小（异常大可能是攻击或 bug）、解码耗时（长说明消息过大或反序列化慢）。
+
+**Q：这道题做完，你沉淀出了什么可复用的编解码器设计经验？**
+
+五条经验：一、先分帧再反序列化——LengthFieldBasedFrameDecoder（或 LineBased/Delimiter）切出完整消息，再交给 ProtobufDecoder/Jackson 反序列化；二、maxFrameLength 必须设——防恶意大消息 OOM；三、Decoder 内累积缓冲要释放——继承 ByteToMessageDecoder，框架自动管理；四、Encoder 简单——MessageToByteEncoder 实现 encode，对象写 ByteBuf 即可；五、对称设计——Encoder 写什么格式、Decoder 就按什么格式读（如都用大端、都用长度前缀）。核心："编解码器是 Netty 处理协议的核心，正确配置分帧参数 + 选对序列化框架，能让业务 Handler 拿到干净的对象，聚焦业务逻辑而非协议细节。"

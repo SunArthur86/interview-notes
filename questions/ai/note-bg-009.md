@@ -410,3 +410,49 @@ vLLM在通用场景持平或略优（更成熟的kernel优化）
 - SGLang核心：RadixAttention自动复用共享前缀(如System Prompt)的KV-Cache
 - 适用对比：通用高并发选vLLM，而复杂Agent多轮/共享前缀场景选SGLang
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：LLM 推理框架那么多（vLLM、SGLang、TensorRT-LLM），为什么 vLLM 成了通用首选？它解决了传统推理的什么核心痛点？**
+
+传统推理（如 HuggingFace transformers 原生）有三大浪费：1）KV-Cache 显存碎片——按最长序列预分配，实际利用率只有 60%，高并发就 OOM；2）静态 batching——一个 batch 内长短不一，短请求要等长请求完成才能继续，padding 浪费算力；3）请求串行——新请求要等当前 batch 跑完。vLLM 的 PagedAttention 把显存按"页"（block）动态分配，消除碎片，利用率提到 95%+；Continuous Batching 让请求随到随走（iteration-level scheduling），短请求完成立刻释放，吞吐提升 3-5 倍。这两个创新直击痛点，是 vLLM 成为标配的原因。
+
+### 第二层：证据与定位
+
+**Q：你说 PagedAttention 把显存利用率从 60% 提到 95%，这个数字怎么测出来的？**
+
+测两个值：理论最大并发数 vs 实际可服务并发数。理论最大并发 = 显存总量 / 单请求 KV-Cache 大小。7B 模型、A100 80G，单请求 KV-Cache（seq=2048）约 1.1GB，理论并发 ≈ 70。传统框架因为有碎片和预分配，实际并发只能到 40-50（利用率 60%）。vLLM 分页后能到 66-70（利用率 95%）。实测方法：压测工具（vLLM 自带 benchmark）逐步加并发直到 OOM 或延迟超阈值，记录最大稳定并发数。对比 vLLM 和 HF transformers 的 max_concurrency，比值就是利用率提升倍数。
+
+### 第三层：根因深挖
+
+**Q：PagedAttention 的"分页"具体是怎么做的？它怎么避免 attention 计算时的性能损失（毕竟 KV 散落在不同物理块）？**
+
+PagedAttention 借鉴 OS 虚拟内存。逻辑上每个序列的 KV-Cache 是连续的，物理上被切成固定大小的 block（如每 block 存 16 个 token 的 K/V），通过 block table 映射逻辑 block 到物理 block。这消除碎片：新序列按需申请 block，释放的 block 立刻复用。attention 计算时，kernel 根据 block table 遍历物理块——这里有个工程优化：GPU kernel 被重写成"块级 attention"，一个 warp 处理一个 block 的 attention，配合共享内存缓存，性能损失 <5%（远小于碎片浪费的 40%）。所以分页的"代价"是 kernel 改写，"收益"是显存利用率翻倍，净收益巨大。
+
+**Q：分页机制下，prefix sharing（多个请求共享同一前缀）怎么复用 KV？vLLM 支持吗？**
+
+vLLM 有基础的前缀复用（ Automatic Prefix Caching，APC），但实现较简单——按 token 序列 hash 匹配，共享物理 block 的引用计数。SGLang 的 RadixAttention 更彻底——用 Radix Tree（基数树）管理所有序列的 KV-Cache，新请求来了在树上匹配最长公共前缀，直接复用那部分物理 block，只算不匹配的后缀。这对 Agent 场景收益巨大：10 个请求共享同一个 system prompt（如 2000 token），传统方案算 10 次，RadixAttention 只算 1 次 + 10 次少量后缀。所以 Agent 多轮场景 SGLang 的首 token 延迟比 vLLM 低 60%（200ms vs 80ms）。
+
+### 第四层：方案权衡
+
+**Q：vLLM 和 SGLang 怎么选？有没有 vLLM 明显优于 SGLang 的场景？**
+
+场景化选：1）通用 API 服务（问答、续写、单轮）——选 vLLM，它的 Continuous Batching 成熟、kernel 优化深（PagedAttention、chunked prefill）、生态最广，吞吐和稳定性经过大规模验证；2）Agent 多轮 / 结构化生成（JSON 输出）/ 共享长 system prompt——选 SGLang，RadixAttention 的前缀复用让 Agent 场景吞吐高 40-75%，结构化生成（regex/JSON 约束）保证 100% 格式正确（vLLM 用 outlines 等外挂，95%）；3）追求极致硬件优化——选 TensorRT-LLM（NVIDIA 官方，kernel 最优但灵活性差）。实务：通用服务用 vLLM，Agent 系统用 SGLang，两者 API 接口兼容（OpenAI 格式），切换成本低。
+
+**Q：为什么不直接在 vLLM 上做 Agent 场景的前缀缓存优化，而要用 SGLang？vLLM 也有 APC 啊。**
+
+vLLM 的 APC 是"块级精确匹配"——只有完全相同的前缀 token 序列才复用，且实现相对晚、场景覆盖窄。Agent 场景的复杂性在于：1）多轮对话的前缀是动态拼接的（system+history+new turn），APC 的 hash 匹配命中率不稳定；2）前缀可能被中途修改（如 history 摘要后重写），APC 的引用计数管理复杂。SGLang 的 RadixAttention 从设计之初就为"树状前缀共享"优化——Radix Tree 天然支持部分匹配、增量更新、自动 GC，在 Agent 多轮场景的前缀命中率比 vLLM APC 高 30%+。所以重度 Agent 系统选 SGLang 是架构优势，不是配置差异。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明 vLLM 上线后真的提升了服务吞吐，而不是"换了框架但瓶颈在别处"？**
+
+压测对比：同样的模型、GPU、请求分布，分别测 HF transformers、vLLM、SGLang。指标：1）QPS（吞吐）——固定延迟约束（如 P99<2s）下的最大 QPS；2）首 token 延迟——TTFT P50/P99；3）单 token 生成延迟——TPOT；4）显存利用率——nvidia-smi 看 GPU memory used/total。如果 vLLM 的 QPS 是 HF 的 3-5 倍、TTFT 降低 50%，证明框架升级有效。还要排除其他瓶颈——如果 GPU 计算利用率已 95%（不是显存瓶颈），换 vLLM 收益有限；vLLM 解决的是显存和调度瓶颈，计算 bound 的场景要换量化/蒸馏。
+
+**Q：推理框架的选型和调优经验怎么沉淀成团队 SOP？**
+
+整理成"场景 → 框架 → 配置"对照表：通用 API→vLLM（推荐 tensor_parallel_size=GPU 数，max_num_seqs=256）；Agent 系统→SGLang（开启 RadixAttention，配 regex 约束）；极致性能→TensorRT-LLM（按 NVIDIA 模板）。每项配默认参数模板和压测基线（QPS、TTFT、显存）。再把压测脚本（wrk/locust + vLLM benchmark）集成到部署流程，每次新模型上线前自动跑一遍，对比基线不达标就告警。最后建一个推理优化手册：显存不够（启 KV-Cache 量化、降 max_num_seqs）、延迟高（启 chunked prefill、speculative decoding）、吞吐低（调 batching 策略），让运维照着排查。

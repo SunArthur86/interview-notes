@@ -488,3 +488,49 @@ class ProductionJSONGenerator:
 - 实现库：Outlines用FSM，llama.cpp用GBNF语法实现Schema限制。
 - JSON Mode：API级约束保证整体是合法JSON，但不约束内部字段类型。
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：你把 JSON 输出方案排成"Function Calling > 约束解码 > JSON Mode > 后处理 > Few-shot"。为什么 Function Calling 最可靠，它和约束解码本质区别是什么？**
+
+Function Calling 是"模型 + API 协议"双重约束。模型训练时就学了"生成 tool_call 要符合声明的 Schema"（如 OpenAI 的 function calling 模型经过专门微调），API 层面传入 tools 参数声明 Schema，模型生成时受训练约束 + Schema 引导，可靠性最高（99%+）。约束解码（如 Outlines/GBNF）是"推理时 token 级掩码"——用有限状态机（FSM）跟踪当前生成位置允许的 token，非法 token 的 logit 设 $-\infty$（概率归零），保证语法正确（100% 合法 JSON），但不保证语义（字段值可能错，如 age 写成 "abc" 虽然类型对但值错）。区别：Function Calling 靠模型学到的语义理解 + API 约束（语义和格式都对），约束解码靠硬掩码（只保证格式）。前者更自然，后者更硬核。
+
+### 第二层：证据与定位
+
+**Q：线上用 Function Calling，突然某天 JSON 解析失败率从 0.1% 飙到 5%。怎么定位是模型版本变了、Schema 设计问题、还是 API bug？**
+
+三步定位。一是看失败样本——失败的 tool_call 长什么样，是格式错（缺括号/非法 JSON）还是 Schema 不符（字段类型错/缺必填字段）。如果格式错（Function Calling 不该出格式错），查 API/模型版本（是否升级了模型，新版本 function calling 行为变了）；如果 Schema 不符（如某个枚举字段生成了非法值），查 Schema 设计（枚举值是否清晰、是否有歧义）和输入（某些复杂 query 是否让模型困惑）。二是查模型版本——服务端是否切换了模型（如从 GPT-4-0613 换成新版本，新版本的 function calling 训练可能有 regression）。三是查 API 响应——看 tool_call 的原始返回，是否有 finish_reason 异常（如 length 截断导致 JSON 不完整）。通常 5% 飙升多因模型版本 regression 或 Schema 边界 case。
+
+### 第三层：根因深挖
+
+**Q：约束解码（Outlines/GBNF）你说用 FSM 保证语法正确，但如果字段值语义错（如 age="abc" 但类型是 string），约束解码能拦住吗？**
+
+约束解码拦不住语义错误，只拦语法。FSM 基于"语法规则"（如 JSON 的 GBNF 文法：object = "{" members "}"，string = '"' chars '"'），它能保证 age 字段的值是合法的 string（有引号、合法字符），但保证不了 age 的值是合理的数字（如 "abc" 是合法 string 但语义错）。要拦语义错，需要在 FSM 里加"语义约束"——如定义 age 字段的值匹配 `\d+`（只允许数字字符串），这样 "abc" 会被 FSM 拒绝。Outlines 支持用正则/Pydantic 模型定义更细的约束（如 `age: int` 会让 FSM 只允许数字 token）。所以约束解码能拦"类型级语义错"（age 不是数字），但拦不住"业务级语义错"（age=999 是合法数字但不合理）——后者要靠后处理校验。
+
+**Q：那为什么不直接用 Pydantic 模型做约束解码（Outlines 支持），把所有字段约束写死，连业务级语义错也拦住？**
+
+Pydantic 能定义字段级约束（如 `age: int = Field(ge=0, le=150)`，约束解码时 FSM 只允许 0-150 的数字），但局限在于：一是复杂业务规则难用 Pydantic 表达（如"如果 type=A 则 field_b 必填，否则选填"这种条件约束，Pydantic 的 validator 能写但 Outlines 转 FSM 困难）；二是 FSM 越复杂，生成时可选 token 越少，模型可能"卡住"（无合法 token 可选）或生成质量下降（约束太强，模型被迫生成不自然的表达）；三是性能开销——复杂 FSM 的每步 token 掩码计算开销大，推理速度降。所以约束解码适合"结构化约束"（字段类型、枚举值、简单范围），复杂业务规则用后处理校验（Pydantic validate + 业务逻辑校验 + 重试）。
+
+### 第四层：方案权衡
+
+**Q：Function Calling 最可靠，但有些场景你用 JSON Mode（OpenAI 原生）而非 Function Calling。为什么？什么时候选 JSON Mode？**
+
+JSON Mode 适合"只要合法 JSON，不需要严格 Schema"的场景。Function Calling 要求预先定义 tool 的 Schema（字段名、类型、描述），适合"调用工具"场景（如查天气、下单）。但如果场景是"自由生成结构化内容"（如生成一份报告，字段不固定），用 Function Calling 强制 Schema 会限制模型灵活性（模型被迫按 Schema 填，可能漏掉想表达的内容）。JSON Mode 只保证"输出是合法 JSON"（格式对），不约束 Schema（字段随意），模型能自由组织内容。代价是字段不可控（可能多字段、少字段、字段名变），需要后处理适配。选型：工具调用用 Function Calling，自由结构化用 JSON Mode + 后处理容错。
+
+**Q：为什么不直接用 Prompt + Few-shot（给几个 JSON 示例让模型学），省得依赖 Function Calling 或约束解码这些特殊机制？**
+
+Prompt + Few-shot 是"软约束"——模型"大概率"按示例格式输出，但没有强制保证（可能漏字段、加字段、格式跑偏），可靠性约 90-95%（看模型和 prompt）。Function Calling 和约束解码是"硬约束"——可靠性 99%+。生产场景（如对接下游系统解析 JSON）对可靠性要求高（一次失败可能导致流水线中断），软约束不够。Few-shot 的优势是"零依赖"（任何模型都能用，不依赖 Function Calling API 或约束解码框架），适合"原型验证"或"模型不支持 FC/约束解码"的场景。工程优先级：原型阶段用 Few-shot 快速验证，生产化时升级到 Function Calling 或约束解码保证可靠性。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么衡量 JSON 输出方案的可靠性，证明 Function Calling 比 Few-shot 好？**
+
+定义 JSON 成功率指标：在测试集（覆盖各种 query 类型）上跑，统计"输出能被正确解析且符合 Schema"的比例。Few-shot 基线如 92%，Function Calling 如 99.5%，约束解码如 99.9%（语法 100% 但语义可能有少量错）。细分失败类型：格式错（非法 JSON）、Schema 不符（字段类型错/缺字段）、语义错（字段值不合理），看各方案的失败分布。做 A/B 测试：线上对照组（Few-shot）vs 实验组（Function Calling），看下游系统的"JSON 解析失败率"和"重试率"是否降。关键是验证"可靠性提升对业务的影响"——如解析失败导致工单流失，成功率从 92% 到 99.5% 直接减少 7.5% 的流失。
+
+**Q：JSON 输出方案怎么沉淀成团队的标配？**
+
+封装成"结构化输出 SDK"：统一接口 `generate_structured(prompt, schema, mode)`，mode 可选 function_calling/constrained_decoding/json_mode/few_shot，根据模型能力自动选最优模式。内置 Schema 模板库（常见业务结构的 Schema 定义）、后处理修复器（非法 JSON 修复、字段补全、类型转换）、重试机制（失败自动重试 + 降级到更可靠的模式）。沉淀"各模型的 JSON 能力对照表"（如 GPT-4 FC 可靠、Llama-3 用约束解码）、"Schema 设计规范"（字段命名、枚举值、可选/必填的最佳实践）。把"结构化输出"作为 LLM 调用的默认能力，开发者只管定义 Schema，可靠性由 SDK 保证。
+

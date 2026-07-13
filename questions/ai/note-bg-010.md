@@ -387,3 +387,49 @@ Thought: 根据我的知识，2026年的iPhone是iPhone 16（忽略了observatio
 - 触发技巧：Zero-shot用“step by step”启动CoT，Few-shot用样例引导启动ReAct
 - 核心优势：借外部行动打破知识盲区，通过交互补齐最新信息避免幻觉
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：CoT 已经能让模型"先思考再回答"，为什么还要搞 ReAct 加 Action？纯靠脑子想（CoT）不够吗？**
+
+不够，因为 CoT 只能在模型"已有知识"内推理。遇到三类问题 CoT 必然失败：1）时效性问题（"今天股价"）——模型知识有截止日期；2）私有数据（"客户 X 的订单状态"）——模型没见过；3）精确计算（大数乘法）——模型 next-token 机制做不准。ReAct 通过 Action（调搜索引擎、数据库、计算器）把外部世界引入推理链，让模型的"推理能力"和"外部知识"结合。本质是 CoT 假设"模型已知所有信息"，ReAct 承认信息不全、用工具补齐。
+
+### 第二层：证据与定位
+
+**Q：你怎么判断一个问题用 ReAct 比用 CoT 更合适？有没有判断标准？**
+
+三个判断维度：1）是否需要外部信息——问题涉及实时数据、私有数据、超出训练知识的事实，用 ReAct；纯逻辑推理（数学证明、代码逻辑）用 CoT 即可；2）模型 CoT 的幻觉率——对同一类问题测 CoT 的幻觉率（用 LLM-as-Judge + 人工抽检），幻觉率 >20% 说明知识不足，上 ReAct；3）工具调用的收益/成本比——一次工具调用延迟 200-500ms、有 API 成本，如果问题本身简单（如"1+1"），ReAct 的 Action 反而拖慢且没必要。经验规则：开放域事实问题用 ReAct，封闭域推理问题用 CoT，简单问题直接答。
+
+### 第三层：根因深挖
+
+**Q：ReAct 实际运行时，模型常见的失败模式有哪些？你怎么定位？**
+
+三种典型失败：1）过度调用工具——简单问题也疯狂调工具，根因是 SFT/RL 阶段没教"何时不调用"，模型过拟合到"必须调用"；定位方法是统计 tool_call 率，简单问题的调用率应 <10%，超了就是过度调用。2）忽略 observation——调了工具但不用结果，回到自己的幻觉答案；根因是训练时 observation 和最终答案的关联不强，模型没学到"基于 observation 推理"；定位方法是对比"有 observation"和"无 observation"时的答案，如果一致说明忽略了。3）解析错误——文本格式的 Action 解析失败（如 Action: 后跟了多余文字）；根因是 prompt 模板不严，现代实现改用 Function Call 原生 API 解决。
+
+**Q：模型"忽略 observation"是 ReAct 的典型失败，为什么不强制把 observation 拼进 context 就能解决，还要专门训练？**
+
+拼进 context 是必要的（物理上有 observation），但不充分——模型在生成下一轮 Thought 时，attention 可能没聚焦到 observation 上，尤其 observation 很长（如搜索结果几千 token）时，attention 被稀释（lost in the middle）。强制解决方法有两个层次：1）prompt 层——在 observation 后加"请基于以上搜索结果回答"，强化 attention；2）训练层——Agentic RL 时给"基于 observation 推理"的轨迹高 reward、给"忽略 observation 幻觉"的轨迹负 reward，让模型内化"必须看 observation"的策略。后者是治本，前者是治标。实测 RL 训练后的模型 observation 引用率能从 40% 提到 85%。
+
+### 第四层：方案权衡
+
+**Q：ReAct 用文本格式（Thought/Action/Observation）还是 Function Call 原生 API？两种实现怎么选？**
+
+优先 Function Call。文本格式 ReAct 是 2022 年的设计（当时没有原生 tool API），有三个问题：1）解析脆弱——Action: Search[xxx] 的正则解析容易失败（模型可能输出 Search xxx 或 Search("xxx")）；2）格式漂移——长对话后模型可能漏掉 Observation 标记；3）多工具调度复杂——文本格式表达"并行调用两个工具"很别扭。Function Call 原生 API（OpenAI tools、Anthropic tool_use）由模型直接输出结构化 JSON，框架级解析保证 100% 正确，还支持并行调用。所以现代 Agent 框架（LangChain、Claude tools）都用 Function Call，文本 ReAct 只在用不支持 tool use 的开源模型时才作为退路。
+
+**Q：既然 Function Call 这么好，为什么还要学 ReAct 的 Thought-Action-Observation 循环？直接让模型调工具不就行了？**
+
+ReAct 的核心价值不在格式，而在"显式推理（Thought）引导行动"的范式。即使 Function Call 原生 API，让模型"先想清楚为什么调这个工具、传什么参数"，比直接调工具的准确率高得多——Thought 起到了 CoT 的推理引导作用。实测：带 Thought 推理的 Function Call，tool_call_success_rate 比直接调高 15-25%，因为 Thought 帮模型澄清意图、选对工具、构造正确参数。所以 ReAct 的"推理+行动"循环是思想层面的贡献，Function Call 是工程实现层面的优化，两者不冲突——现代最佳实践是"Function Call 接口 + ReAct 的 Thought 推理引导"。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明 ReAct 在你的业务场景里确实比 CoT 好，而不是"多调了工具但答案没变好"？**
+
+AB 测试。固定 500 个业务问题，分别跑 CoT（纯推理）和 ReAct（推理+工具），三个维度对比：1）准确率——专家标注答案正确性，ReAct 应比 CoT 高（尤其是事实类问题）；2）幻觉率——ReAct 应显著低于 CoT（工具补充了准确信息）；3）成本/延迟——ReAct 会更高（工具调用开销），要算 ROI：准确率提升带来的业务价值 vs 多出的延迟和 API 成本。如果 ReAct 准确率 +10%、幻觉率 -15%，且业务价值覆盖成本，就证明 ReAct 优于 CoT。如果 ReAct 在某些子类（如纯逻辑题）反而更差，说明这些场景该用 CoT，做场景路由。
+
+**Q：ReAct 的 prompt 设计和工具选择经验怎么沉淀成团队 Agent 框架的默认能力？**
+
+封装成框架组件：1）Thought 引导模板——内置"在调用工具前先输出 Thought 说明理由"的 prompt 模板，开发者配工具列表即可；2）工具选择路由器——维护"问题类型 → 推荐工具"映射（如时间问题→时钟工具、事实问题→搜索、计算→计算器），自动提示模型优先选哪个；3）过度调用防护——简单问题检测器（基于问题长度/类型分类），对简单问题限制 tool_call 次数上限；4）ReAct 效果评测集——内置 CoT vs ReAct 的对照评测脚本，新 Agent 上线前必跑。这套能力写入团队 Agent SOP，让 ReAct 从"调 prompt 的艺术"变成"可复用的工程组件"。

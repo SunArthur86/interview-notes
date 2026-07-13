@@ -369,3 +369,49 @@ ZeRO-3: 切分优化器状态 + 梯度 + 参数（省Nx，即FSDP）
 - TP变慢原因：因层内频繁AllReduce通信开销暴增，故切卡过多反降计算效率
 - PP气泡问题：因层间串行执行需前后等待，导致GPU产生大量空闲流水线气泡
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：你训一个 70B 模型，单卡 A100 80G 放不下，为什么首先想到 TP（Tensor Parallel）而不是 PP（Pipeline Parallel）或 DP（Data Parallel）？**
+
+先排除 DP——DP 要求每卡放完整模型副本，70B 模型 fp16 要 140GB，单卡 80G 放不下，DP 直接不可行。再看 TP vs PP：TP 把每一层的权重矩阵切到多卡，单卡只需放 1/N 的参数，70B 切到 8 卡每卡约 17.5GB 参数，激活值也能放下。TP 的优势是层内 AllReduce 通信在高带宽 NVLink（单机内 600GB/s）下能被计算掩盖，延迟低。PP 虽然也能切参数，但层间串行产生流水线气泡（bubble），且首尾 stage 空闲。所以单机 8 卡内优先 TP，跨机才考虑加 PP。
+
+### 第二层：证据与定位
+
+**Q：你说 TP 开太大（如 TP=16）反而变慢，怎么从指标上发现这个问题？**
+
+看两个指标。1）通信占比——用 Nsight Systems 抓 profile，看 AllReduce 通信时间占 step 总时间的比例。TP=2 时通信占比通常 <15%（被计算掩盖），TP=8 升到 30%，TP=16（跨机）可能到 60%+。2）计算效率——TFLOPS 实测值除以峰值（A100 fp16 约 312 TFLOPS），TP=2 时 MFU（Model FLOPs Utilization）能到 50%，TP=16 可能降到 20%。当通信占比超过 40%、MFU 跌破 30%，就说明 TP 切太多，通信开销已经无法被计算掩盖，要降 TP 引入 PP。
+
+### 第三层：根因深挖
+
+**Q：TP 的通信是 AllReduce（层内同步），为什么会成为瓶颈？通信量到底有多大？**
+
+TP 在每一层的前向和反向各有一次 AllReduce。通信量 = batch_size × sequence_length × hidden_dim × 4 bytes（fp32）。以 70B 模型为例，hidden_dim=8192，batch=8，seq=4096，单次 AllReduce 通信量 = 8×4096×8192×4 ≈ 1GB。TP=N 时 AllReduce 要做 ring-allreduce，通信轮次和 N 相关，跨机时带宽从 NVLink 的 600GB/s 骤降到 IB 网络的 50-100GB/s，单次 AllReduce 从 1.6ms 升到 20ms+。每层 2 次 AllReduce，70B 有 80 层，一步训练 160 次 AllReduce，跨机 TP 的通信总时间能到 3 秒，比计算时间还长。
+
+**Q：既然 TP 通信这么贵，为什么不全部用 PP（层间只 P2P 通信，通信量小）？**
+
+PP 有两个 TP 没有的硬伤。1）流水线气泡——PP 是层间串行，前向时第一个 stage 算完第二 stage 才开始，反向时反过来，首尾 stage 大量空闲。bubble ratio = (stages-1)/micro_batches，micro_batches 不够大时气泡占比能到 30-50%。2）负载不均——不同 stage 的计算量可能不同（如 embedding 层和 transformer 层），导致最慢的 stage 拖累全局。TP 没有气泡问题（层内并行同步）。所以实务是 TP+PP 组合——单机内 TP（NVLink 掩盖通信），跨机 PP（减少跨机通信频率），这就是千亿模型的 3D 并行。
+
+### 第四层：方案权衡
+
+**Q：TP、PP、DP 怎么组合？给一个 70B 模型训 8 机 64 卡（每机 8×A100）的配置。**
+
+经验公式：TP=单机卡数=8（NVLink 内），PP=模型层数/单卡能放的层数，DP=总卡数/(TP×PP)。70B 模型 80 层，单卡 80G 放不下完整层，TP=8 后单卡约 17.5GB 参数+激活，每卡能放约 10-20 层，PP=4-8。取 PP=4，则 DP=64/(8×4)=2。最终配置：TP=8（机内）× PP=4（跨机，每 stage 20 层）× DP=2（数据并行）。再配合 1F1B 调度减少气泡、ZeRO-1 切优化器状态。这个配置 MFU 能到 45%+。如果是 7B 小模型，单机 8 卡 TP=8 就够，PP=1，DP=机数。
+
+**Q：为什么不直接用 FSDP（ZeRO-3）切参数，而要上 TP+PP 这么复杂？FSDP 不用改模型代码，多省事。**
+
+FSDP 适合 ≤100B 的模型，但有两个 TP 没有的问题。1）通信量更大——FSDP 每层前向要 all-gather 完整参数（通信参数量大小），反向要 reduce-scatter 梯度，而 TP 通信的是激活值（远小于参数）。70B 参数 fp16 是 140GB，每层 all-gather 通信量巨大。2）TP 的通信（激活值 AllReduce）量小且在高带宽 NVLink 内，FSDP 的大通信量在跨机时瓶颈明显。实测 70B 规模，TP+PP 的 MFU 比 FSDP 高 15-20%。所以追求效率的大模型选 TP+PP（需改模型代码用 ColumnParallelLinear），FSDP 适合快速原型或 ≤30B 的中小模型。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明你的 TP/PP/DP 配置是最优的，而不是"能跑但浪费"？**
+
+做配置搜索：固定模型和数据，跑几组配置（TP=8/PP=4/DP=2、TP=4/PP=8/DP=2、TP=8/PP=2/DP=4 等），每组跑相同步数，对比：1）MFU——越高越好，目标 >45%；2）单步时间——越短越好；3）显存占用——不 OOM 的前提下。最优配置是"MFU 最高且单步最快"的那个。还要验证气泡比例——用 profile 工具看 PP 的 stage 空闲时间占比，目标 <15%（通过增加 micro_batches 优化）。最终配置定型前，跑一个 1000 步的稳定性测试，确认 loss 曲线正常、无 OOM、无通信超时。
+
+**Q：分布式策略选型经验怎么沉淀成团队 SOP，避免每个新模型都重新搜配置？**
+
+整理成"模型规模 → 并行配置"对照表：7B→TP=8/PP=1（单机）；70B→TP=8/PP=4/DP=2（多机）；175B→TP=8/PP=8/DP=4+ZeRO-1。配上每种的 MFU 基线、气泡比例、通信参数。再把配置搜索脚本（自动遍历 TP/PP/DP 组合、跑 100 步、输出 MFU）集成到训练框架，新模型输入参数规模自动推荐配置。最后建一个分布式训练 troubleshooting 手册：OOM 怎么调（降 batch/加 ZeRO/加 PP）、通信超时怎么查（NCCL debug、拓扑）、MFU 低怎么诊断（profile 看 compute/comm 占比），新人照着 SOP 走能少走 80% 弯路。

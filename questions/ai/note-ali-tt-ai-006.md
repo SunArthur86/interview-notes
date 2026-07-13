@@ -255,3 +255,49 @@ heap.hprof (堆转储文件)
 3. **提到Shallow Size vs Retained Size的区别**：这是MAT分析的核心概念
 4. **提到AI场景的特殊性**：AI应用中模型对象（权重、KV Cache）可能占用大量直接内存，需要特别关注Native Memory
 5. **提到JFR(Java Flight Recorder)**：JDK 11+内置的低开销性能采集工具，适合长期运行的生产环境
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：线上 JVM 内存涨了你用 Arthas 而不是直接 jmap dump，动机是什么？Arthas 比传统工具强在哪？**
+
+Arthas 不停机、可交互、开销可控。jmap dump 会 STW（全堆转储时暂停应用几秒到几十秒），对生产服务是事故；且 dump 出来的 hprof 是静态快照，不能看对象引用链的变化。Arthas 的 `dashboard`、`heapdump`、`profiler` 命令可以实时看 JVM 状态、按需 dump、抓 CPU/内存火焰图，且 Arthas 是字节码增强，开销 <5%，适合线上持续诊断。动机是"线上不停机诊断"，这是 jmap/jstack 等传统工具做不到的。
+
+### 第二层：证据与定位
+
+**Q：JVM 老年代占用从 40% 涨到 85% 不下来，你怎么用 Arthas 定位是哪个对象在涨？**
+
+三步定位：一是 `dashboard` 看老年代占用趋势和 GC 频率（Full GC 是否在跑但清不掉）；二是 `heapdump` dump 堆，用 MAT 分析 Dominator Tree，找占内存最大的对象类（如发现 `byte[]` 或某业务对象占 3GB）；三是 Arthas 的 `vmtool --action getInstances --className XXX` 直接查某类的实例数量和引用链，看是谁在持有这些对象不释放。常见根因：缓存无上限、大 List 未清理、ThreadLocal 泄漏。
+
+### 第三层：根因深挖
+
+**Q：MAT 显示 `HashMap$Node` 占了 4GB，但这只是个泛型容器，怎么定位里面装的是哪个业务对象？**
+
+用 MAT 的 "List Objects" → "with incoming references"，从 HashMap$Node 反查它的 key/value 类型，再往上追溯是谁持有这个 HashMap。或者用 OQL（Object Query Language）查询：`SELECT * FROM com.xxx.BusinessObject` 看该业务对象有多少实例。如果业务对象实例数和 HashMap$Node 数量对应，确认就是这个业务对象被缓存在 HashMap 里。进一步看 HashMap 的持有者（可能是某个 static 字段或单例），定位到代码里的具体缓存变量。
+
+**Q：那为什么不直接在代码里给所有缓存加上限（如 Guava Cache 的 maximumSize），省得排查？**
+
+加上限是治本但排查仍有价值。一是历史代码里可能有不规范的缓存（裸 HashMap、static List），加上限要逐个改造，排查能快速定位最严重的先修；二是内存泄漏不只在缓存——ThreadLocal 泄漏、大 byte[]（如未释放的序列化结果）、类加载器泄漏（动态生成的 Class）都不是"加缓存上限"能解决的；三是排查能确认根因（是缓存还是别的），避免"加了上限但内存还涨"的误诊。排查和治本不矛盾，排查定位 + 上限预防是组合拳。
+
+### 第四层：方案权衡
+
+**Q：AI 应用里你提到模型对象（权重/KV Cache）占 Native Memory，这块 Arthas 能看吗？不能的话怎么办？**
+
+Arthas 主要看 JVM 堆内对象，Native Memory（DirectByteBuffer、JNI 分配的模型权重）在堆外，Arthas 看不全。AI 应用的模型推理（如 ONNX Runtime、TensorRT）的权重和 KV Cache 常分配在 Direct Memory 或 GPU 显存，不进 JVM 堆。定位这块要用 `jcmd <pid> VM.native_memory`（JDK 11+，需启动时加 `-XX:NativeMemoryTracking=summary`）看 Native 内存分布；GPU 显存用 `nvidia-smi` 看进程占用；DirectByteBuffer 用 `arthas vmtool` 查 DirectByteBuffer 实例。AI 场景的内存排查要跨 JVM 堆和 Native/GPU，比传统 Java 应用复杂。
+
+**Q：为什么不直接把模型推理放 Python 服务（原生支持 GPU/显存管理），而要在 JVM 里趟 Native Memory 的坑？**
+
+看技术栈和架构。如果整个系统是 Java 微服务生态（Spring Cloud、内部 RPC 框架），引入 Python 推理服务要跨语言调用（gRPC/HTTP），增加延迟和运维复杂度。JVM 里跑推理（如通过 JNI 调 ONNX Runtime Java API）能复用现有基础设施。但如果是纯 AI 团队，Python 服务更自然（PyTorch/Transformers 生态）。选型是工程权衡——JVM 生态成熟度 vs Python 的 AI 原生支持。现在趋势是推理用 Python（或 C++ serving 如 Triton），Java 做业务编排，通过 gRPC 解耦。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明内存优化真的有效，而不是碰巧那几天流量低没涨？**
+
+上线前后各采 1 周基线：老年代占用 P99、Full GC 频率、堆内存峰值。做流量归一化——把老年代占用除以 QPS（MB/QPS），消除流量波动。如果上线后 MB/QPS 显著下降且 Full GC 频率降低，证明是优化效果。更严格的是压测验证：用相同流量打上线前后两版，对比内存占用曲线，控制变量。
+
+**Q：JVM 内存排查的经验怎么沉淀成团队 SOP？**
+
+固化成"内存问题排查 runbook"：第一步 dashboard 看趋势 → 第二步 heapdump + MAT 找大对象 → 第三步 Arthas vmtool 查引用链 → 第四步定位代码修复。配套 JVM 监控面板（Prometheus + Grafana，老年代占用、GC 频率、Native Memory），设告警（老年代 >80% 持续 5 分钟触发）。沉淀"常见内存泄漏模式库"（缓存无上限/ThreadLocal/类加载器/大 byte[]），新人遇到内存问题按 runbook 走，不依赖个人经验。
