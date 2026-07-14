@@ -690,5 +690,89 @@
       "如果只要求最终一致性，是否可以不用两阶段提交？",
       "半同步复制(semi-sync)和两阶段提交是什么关系？"
     ]
+  },
+  {
+    "id": "note-xhs-db-015",
+    "category": "database",
+    "subcategory": "事务/MVCC",
+    "difficulty": "L4",
+    "tags": [
+      "拼多多",
+      "Java服务端",
+      "MySQL",
+      "事务隔离",
+      "MVCC",
+      "ReadView",
+      "面经"
+    ],
+    "question": "【拼多多 Java服务端】MySQL事务隔离等级有了解吗？是如何实现的？",
+    "answer": "## 一、费曼类比\n\n```\n三个并发问题 = 三种尴尬场景:\n\n脏读 (Dirty Read):\n  事务A: \"UPDATE balance=200\" (还没提交!)\n  事务B: 读到balance=200 ← 看到了还没确认的数据!\n  事务A: \"ROLLBACK\" (撤销了)\n  事务B: 基于200做的决策全错了!\n\n不可重复读 (Non-Repeatable Read):\n  事务B: 第一次读 balance=100\n  事务A: \"UPDATE balance=200; COMMIT;\"\n  事务B: 第二次读 balance=200 ← 同一事务内两次读结果不一样!\n\n幻读 (Phantom Read):\n  事务B: SELECT COUNT(*) → 10条\n  事务A: INSERT 一条新记录; COMMIT;\n  事务B: SELECT COUNT(*) → 11条 ← 多了一条\"幽灵\"记录!\n```\n\n## 二、第一性原理分析\n\n```\n一致性 ←─────────────────────→ 并发性\n  │                               │\n  │  串行化(最强)                   │  读未提交(最弱)\n  │  所有事务排队执行               │  什么都能看到\n  │  性能最差                      │  性能最好\n  │                               │\n  └─────── 4个隔离级别 ────────────┘\n            RU → RC → RR → S\n            ↑               ↑\n         并发高            一致强\n         一致弱            并发低\n```\n\n## 三、详细答案\n\n### 3.1 四种隔离级别\n\n| 隔离级别 | 脏读 | 不可重复读 | 幻读 | 性能 |\n|---------|------|----------|------|------|\n| **读未提交** (Read Uncommitted) | 可能 | 可能 | 可能 | 最高 |\n| **读已提交** (Read Committed, RC) | 避免 | 可能 | 可能 | 高 |\n| **可重复读** (Repeatable Read, RR) | 避免 | 避免 | InnoDB避免 | 中 |\n| **串行化** (Serializable) | 避免 | 避免 | 避免 | 最低 |\n\n> MySQL InnoDB默认隔离级别是 **RR**（Oracle/PostgreSQL默认RC）\n\n### 3.2 MVCC核心机制\n\n```\nMVCC = Multi-Version Concurrency Control（多版本并发控制）\n\n核心三件套:\n  1. 隐藏列: 每行有 trx_id(最后修改事务ID) + roll_pointer(指向Undo Log)\n  2. Undo Log版本链: 每次修改的旧版本通过roll_pointer串成链表\n  3. ReadView: 决定当前事务能看到哪个版本\n\n┌─────────────────────────────────────────────────────────┐\n│                    数据行 (当前版本)                      │\n│  id=1 | name='Alice' | trx_id=300 | roll_pointer ──────│─┐\n└─────────────────────────────────────────────────────────┘ │\n                                                            ↓\n┌───────────────────────────────────────────────────┐\n│              Undo Log 版本链                        │\n│                                                   │\n│  旧版本2: name='Bob'  | trx_id=200 | roll_ptr ───│─┐\n└───────────────────────────────────────────────────┘ │\n                                                      ↓\n┌───────────────────────────────────────────────────┐\n│  旧版本1: name='Tom'  | trx_id=100 | roll_ptr=null│\n└───────────────────────────────────────────────────┘\n```\n\n### 3.3 ReadView 可见性判断\n\n```java\n// ReadView 结构:\nclass ReadView {\n    long creator_trx_id;        // 创建ReadView的事务ID\n    long[] m_ids;               // 创建时活跃(未提交)事务ID列表\n    long min_trx_id;            // m_ids中最小值\n    long max_trx_id;            // 下一个将分配的事务ID(最大值+1)\n}\n\n// 可见性判断算法:\nboolean isVisible(trx_id) {\n    if (trx_id == creator_trx_id)  return true;  // 自己改的，可见\n    if (trx_id < min_trx_id)       return true;  // 在ReadView前已提交\n    if (trx_id >= max_trx_id)      return false; // 在ReadView后才开始\n    if (m_ids.contains(trx_id))    return false; // 在活跃列表中(未提交)\n    return true;                                // 不在活跃列表(已提交)\n}\n```\n\n### 3.4 RC vs RR 的本质区别\n\n```\nRC (读已提交):\n  事务B开始 ──→ SELECT ──→ SELECT ──→ SELECT\n                  │           │           │\n               新ReadView  新ReadView  新ReadView\n                  ↓           ↓           ↓\n              看到A提交前的  看到A提交后  看到A提交后\n              旧版本        新版本      新版本\n              \n  → 同一事务内两次读可能不同 → 不可重复读!\n\nRR (可重复读):\n  事务B开始 ──→ SELECT ──→ SELECT ──→ SELECT\n                  │           │           │\n               新ReadView  复用ReadView 复用ReadView\n                  ↓           ↓           ↓\n              看到A提交前的  看到A提交前  看到A提交前\n              旧版本        旧版本      旧版本\n              \n  → 同一事务内多次读结果一致 → 可重复读!\n```\n\n### 3.5 当前读与Next-Key Lock\n\n```\n快照读 (普通SELECT):\n  → 走MVCC，读ReadView对应的版本，不加锁\n\n当前读 (SELECT...FOR UPDATE / UPDATE / DELETE / INSERT):\n  → 读最新已提交版本，加锁\n\nRR级别防止幻读:\n  ┌─────────────────────────────────────┐\n  │  表数据: id=5, 10, 15, 20           │\n  │                                     │\n  │  事务A: SELECT * FROM t WHERE       │\n  │         id BETWEEN 8 AND 18         │\n  │         FOR UPDATE;                 │\n  │                                     │\n  │  加锁范围 (Next-Key Lock):           │\n  │  (5, 10]  (10, 15]  (15, 20]        │\n  │  ← Gap Lock →←Record Lock→          │\n  │                                     │\n  │  事务B: INSERT id=12;               │\n  │  → 阻塞! (落在Gap Lock范围内)        │\n  │                                     │\n  │  → 防止了幻读!                       │\n  └─────────────────────────────────────┘\n\nNext-Key Lock = Gap Lock(间隙锁) + Record Lock(行锁)\n  - Record Lock: 锁定索引记录本身\n  - Gap Lock: 锁定索引记录之间的间隙\n  - Next-Key Lock: 锁定记录+前面的间隙\n```\n\n### 3.6 为什么MySQL默认RR而不是RC？\n\n```\n原因: 主从复制\n  MySQL早期binlog使用STATEMENT格式:\n  \n  主库:\n    事务A: BEGIN; UPDATE t SET x=1 WHERE x=0; COMMIT;\n    事务B: BEGIN; INSERT INTO t VALUES(0); COMMIT;\n    \n  从库binlog回放顺序不确定 → 结果可能不一致!\n  \n  RR级别 + STATEMENT binlog = 保证主从一致性\n  (因为RR下事务A的UPDATE会锁定间隙，B的INSERT被阻塞)\n  \n  现在: binlog=ROW格式 + RC级别 也可以保证一致性\n  但MySQL历史遗留默认值仍是RR\n```\n\n## 四、实际例子\n\n```sql\n-- 查看当前隔离级别\nSELECT @@transaction_isolation;  -- MySQL 5.7+: REPEATABLE-READ\n\n-- 修改隔离级别\nSET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;\n\n-- RR级别下演示MVCC\n-- Session A:\nBEGIN;\nSELECT * FROM account WHERE id=1;  -- balance=100 (ReadView创建)\n\n-- Session B:\nUPDATE account SET balance=200 WHERE id=1;\nCOMMIT;\n\n-- Session A 再次查询:\nSELECT * FROM account WHERE id=1;  -- 仍然balance=100 (复用ReadView)\n\n-- Session A 当前读:\nSELECT * FROM account WHERE id=1 FOR UPDATE;  -- balance=200 (最新版本)\n```\n\n## 五、扩展知识\n\n- **MVCC只在InnoDB引擎中实现**，MyISAM没有事务\n- **RR级别下MVCC的幻读漏洞**: 先快照读（不加锁），再INSERT一条（刚好和另一个事务INSERT的记录相同），会触发唯一键冲突，再SELECT能看到新记录 → 幻读\n- **Gap Lock在RC级别下不生效**（RC只有Record Lock）\n\n## 六、苏格拉底式面试提问\n\n1. **\"你说RR通过MVCC避免幻读，但INSERT时唯一键冲突怎么办？\"** — 引出RR下MVCC幻读的特殊漏洞（先快照读再INSERT场景）\n2. **\"ReadView的活跃事务列表是怎么维护的？\"** — 引出事务系统段(trx_sys)的全局活跃事务链表\n3. **\"Gap Lock在什么情况下会退化为Record Lock？\"** — 唯一索引等值查询命中记录时，不需要Gap Lock\n4. **\"如果隔离级别设为Serializable，MVCC还生效吗？\"** — Serializable下所有读都加共享锁，退化为当前读\n5. **\"MVCC的Undo Log会无限增长吗？什么时候清理？\"** — 引出purge线程、最小活跃ReadView\n\n## 七、面试加分点\n\n1. **能画出Undo Log版本链** — 展示对MVCC底层存储的理解\n2. **解释RC和RR的唯一区别** — ReadView创建时机（每次SELECT vs 首次SELECT）\n3. **知道Next-Key Lock组成** — Gap Lock + Record Lock，防止幻读\n4. **能说出MySQL默认RR的历史原因** — 主从复制+STATEMENT binlog\n5. **提到MVCC幻读漏洞** — 先快照读再INSERT触发唯一键冲突的场景",
+    "follow_up": [
+      "MVCC的Undo Log版本链是怎么组织的？",
+      "RR级别下快照读和当前读有什么区别？",
+      "Gap Lock和Next-Key Lock的区别？",
+      "为什么MySQL默认RR而不是RC？",
+      "MVCC如何解决幻读？还有没有漏洞？"
+    ],
+    "feynman": {
+      "essence": "MySQL用4种隔离级别平衡并发与一致性。RR级别通过MVCC(多版本并发控制)实现快照读避免幻读，通过Next-Key Lock实现当前读避免幻读",
+      "analogy": "MVCC就像'拍照'——每个事务开始时拍一张数据快照(ReadView)，之后读自己的照片，互不干扰。有人改了数据，你看到的还是老照片，不会受影响",
+      "key_points": [
+        "4种隔离级别：读未提交(RU)、读已提交(RC)、可重复读(RR)、串行化(S)",
+        "MVCC = Undo Log版本链 + ReadView可见性判断",
+        {
+          "RC级别": "每次SELECT生成新ReadView → 不可重复读"
+        },
+        {
+          "RR级别": "第一次SELECT生成ReadView，之后复用 → 可重复读"
+        },
+        "当前读用Next-Key Lock(Record Lock + Gap Lock)防止幻读"
+      ]
+    },
+    "first_principle": {
+      "essence": "并发事务相互影响产生3类问题(脏读/不可重复读/幻读)，隔离级别是'一致性vs并发性'的权衡",
+      "derivation": "完全串行=最强一致但无并发 → 放松约束提升并发 → 但产生脏读/不可重复读/幻读 → MVCC用版本链让读不阻塞写、写不阻塞读 → ReadView决定看到哪个版本",
+      "conclusion": "MVCC = 空间换并发，通过Undo Log版本链+ReadView实现非阻塞一致性读"
+    }
+  },
+  {
+    "id": "note-xhs-db-016",
+    "category": "database",
+    "subcategory": "索引/B+树",
+    "difficulty": "L3",
+    "tags": [
+      "拼多多",
+      "Java服务端",
+      "MySQL",
+      "B+树",
+      "索引",
+      "InnoDB",
+      "面经"
+    ],
+    "question": "【拼多多 Java服务端】MySQL索引底层用的什么数据结构？和其他数据结构相比有什么优势？",
+    "answer": "## 一、费曼类比\n\n```\nB+树 vs 其他结构的图书馆类比:\n\nB+树 = 多层目录卡片系统:\n┌─────────────────────────────────────┐\n│ 1F: 大类目录 (计算机|文学|历史...)    │  ← 非叶节点(只存方向)\n│   ↓                                 │\n│ 2F: 小类目录 (AI|数据库|网络...)      │  ← 非叶节点\n│   ↓                                 │\n│ 3F: 书架 (按序排列，书架间有走道)     │  ← 叶子节点(存实际数据)\n│   ←──── 双向链表连接 ────→          │\n└─────────────────────────────────────┘\n找书: 从1F→2F→3F，3次\"IO\"就能找到任何书\n范围: 找到第一本后，沿走道走到相邻书架即可\n```\n\n## 二、第一性原理分析\n\n**核心约束：磁盘IO是瓶颈**\n\n```\n磁盘读取以\"页\"为单位(InnoDB默认16KB/页):\n  - 随机IO: ~10ms (SSD ~0.1ms)\n  - 顺序IO: ~1ms (SSD ~0.01ms)\n  - 内存访问: ~100ns\n\n目标: 最小化IO次数\n\nB+树如何实现:\n  每个节点 = 一个数据页(16KB)\n  非叶子节点只存: 键值(假设8B) + 子节点指针(6B) = 14B/条\n  一个页可存: 16384 / 14 ≈ 1170个键\n\n  3层B+树容量:\n    根节点:    1170个键\n    第二层:    1170 × 1170 = 1,368,900个键  \n    第三层(叶子): 1,368,900 × 每页约16行 ≈ 2000万行!\n    \n  → 2000万行数据只需3次IO!\n```\n\n## 三、详细答案\n\n### 3.1 B+树结构\n\n```\n                    ┌───────────────────────┐\n                    │  根节点(非叶子)         │  ← IO #1\n                    │  [10|20|30|40|50]      │\n                    └───┬───┬───┬───┬───┬───┘\n            ┌──────────┘   │   │   │   └──────────┐\n            ↓              ↓   │   ↓              ↓\n    ┌──────────────┐ ┌────────┐│┌────────┐ ┌──────────────┐\n    │ [1|5|8]      │ │[11|15]│││[21|25] │ │[31|35|38]    │ ← IO #2\n    │ (非叶子)      │ │       │││        │ │              │\n    └──┬──┬──┬─────┘ └─┬──┬──┘│└─┬──┬───┘ └──┬──┬──┬─────┘\n       ↓  ↓  ↓         ↓  ↓   ↓   ↓  ↓        ↓  ↓  ↓\n     叶子 叶子 叶子   叶子 叶子 叶子 叶子 叶子  叶子 叶子 叶子\n     [1] [5] [8]    [11] [15] [20] [25] [30] [31] [35] [40] ← IO #3\n     数据 数据 数据  数据 数据 数据 数据 数据 数据 数据 数据\n     \n     ←──┘←──┘←──┘←──┘←──┘←──┘←──┘←──┘←──┘←──┘←──┘\n          叶子节点双向链表（←→ 顺序遍历）\n```\n\n### 3.2 B+树 vs B树 vs 其他数据结构\n\n| 数据结构 | 查找复杂度 | 范围查询 | 磁盘IO | 树高(百万数据) | 适合数据库? |\n|---------|-----------|---------|--------|-------------|------------|\n| **B+树** | O(log N) | 极快(链表遍历) | 3-4次 | 3层 | **最优** |\n| **B树** | O(log N) | 慢(需中序遍历) | 3-4次 | 3-4层 | 可以但范围查询差 |\n| **红黑树** | O(log N) | 慢 | **20+次** | ~20层 | 差(树太高) |\n| **Hash** | O(1) | **不支持** | 1次 | N/A | 仅等值查询 |\n| **跳表** | O(log N) | 快 | 未知 | ~20层 | Redis用 |\n\n### 3.3 B+树 vs B树 核心区别\n\n```\nB树: 数据分布在所有节点\n         ┌───────────────────┐\n         │ [10 DATA|20 DATA] │  ← 非叶节点也存数据\n         └───┬───────────┬───┘\n             ↓           ↓\n     [5 DATA]          [15 DATA]\n     \n     问题: 非叶节点存数据 → 每页存键少 → 树更高 → IO更多\n           范围查询: 需要中序遍历整棵树 → 大量随机IO\n\nB+树: 数据只在叶子节点\n         ┌───────────────────┐\n         │   [10 | 20]        │  ← 非叶节点只存键+指针\n         └───┬───────────┬───┘\n             ↓           ↓\n     [5 DATA]←→[10 DATA]←→[15 DATA]←→[20 DATA]  ← 叶子链表\n     \n     优势: 非叶节点存键多 → 树矮 → IO少\n           范围查询: 顺着链表走 → 顺序IO\n```\n\n### 3.4 聚簇索引 vs 二级索引\n\n```\n聚簇索引 (Clustered Index):\n  → 数据行按主键B+树组织，叶子节点 = 完整数据行\n  → 一张表只有一个聚簇索引\n  → InnoDB的\"表\"本质上就是聚簇索引\n\n  ┌─────────────────────────────────────────┐\n  │      聚簇索引 B+树                        │\n  │                                         │\n  │  非叶节点: [主键值 + 页指针]              │\n  │                                         │\n  │  叶子节点: [主键 | 列1 | 列2 | ... | 列N] │ ← 完整数据行\n  └─────────────────────────────────────────┘\n\n二级索引 (Secondary Index):\n  → 叶子节点存: 索引列值 + 主键值(不是数据行!)\n  → 查到主键后需要\"回表\"到聚簇索引找完整数据\n\n  ┌─────────────────────────────────────────┐\n  │      二级索引 B+树 (如idx_name)           │\n  │                                         │\n  │  非叶节点: [name值 + 页指针]              │\n  │                                         │\n  │  叶子节点: [name值 | 主键ID]             │ ← 只有索引列+主键\n  │           ↓                              │\n  │      回表到聚簇索引 → 找到完整数据行       │\n  └─────────────────────────────────────────┘\n\n覆盖索引 (Covering Index):\n  → SELECT的列都在索引中 → 不需要回表!\n  → 如: SELECT id, name FROM users WHERE name='Alice'\n  → idx_name的叶子节点[name|id]已经包含所需列\n```\n\n### 3.5 为什么不用Hash索引？\n\n```\nHash索引:\n  优点: 等值查询O(1)，极快\n  缺点:\n    ✗ 不支持范围查询 (WHERE age > 18)\n    ✗ 不支持排序 (ORDER BY)\n    ✗ 不支持模糊匹配 (LIKE 'abc%')\n    ✗ 不支持最左匹配 (联合索引)\n\n  → Memory引擎用Hash索引\n  → InnoDB不支持Hash索引(但有自适应Hash索引AHI)\n```\n\n## 四、实际例子\n\n```sql\n-- 创建索引\nCREATE INDEX idx_name_age ON users(name, age);  -- 联合索引\n\n-- 索引选择分析:\nEXPLAIN SELECT * FROM users WHERE name = 'Alice' AND age > 20;\n-- type=range, key=idx_name_age (走联合索引)\n\nEXPLAIN SELECT * FROM users WHERE age = 20;\n-- type=ALL (索引失效! 违反最左匹配)\n\n-- 覆盖索引(避免回表)\nEXPLAIN SELECT id, name FROM users WHERE name = 'Alice';\n-- Extra: Using index (覆盖索引, 无需回表)\n```\n\n## 五、索引失效场景\n\n| 场景 | 例子 | 原因 |\n|------|------|------|\n| 函数操作 | `WHERE YEAR(create_time) = 2024` | 索引列被函数包裹 |\n| 隐式类型转换 | `WHERE phone = 13800138000` (phone是varchar) | 类型不匹配 |\n| 最左匹配违反 | 联合索引(a,b,c)，查询只有b | 跳过了a |\n| LIKE左模糊 | `WHERE name LIKE '%abc'` | 前缀不确定 |\n| OR条件 | `WHERE a=1 OR b=2` (b无索引) | 需要全表扫描b |\n| != / NOT IN | `WHERE status != 1` | 优化器认为扫描行数太多 |\n\n## 六、苏格拉底式面试提问\n\n1. **\"为什么InnoDB要求有主键，不设会怎样？\"** — 会选择唯一非空索引，没有则自动生成隐藏的ROW_ID\n2. **\"为什么推荐自增主键而不是UUID？\"** — 自增主键顺序插入不会导致页分裂，UUID随机插入导致大量页分裂和碎片\n3. **\"联合索引(a,b,c)，WHERE b=1 AND c=2能走索引吗？\"** — 不能，违反最左匹配，但WHERE a=1 AND c=2可以部分走索引(只用a)\n4. **\"B+树高度为什么通常只有3-4层？\"** — 高扇出(每页存上千个键)使树高极低\n5. **\"如果一个表有10亿行，B+树会有几层？\"** — 4层(第4层叶子节点: 1170^3 × 16 ≈ 260亿，4次IO足够)\n\n## 七、面试加分点\n\n1. **算出3层B+树存2000万行** — 展示对存储容量的定量理解\n2. **画出聚簇索引vs二级索引** — 明确回表概念\n3. **提到覆盖索引优化** — 真实项目中减少回表的常见手段\n4. **知道Hash索引的局限** — 不支持范围/排序/模糊匹配\n5. **提到自增主键的优势** — 避免页分裂、提高写入性能",
+    "follow_up": [
+      "为什么B+树比B树更适合做数据库索引？",
+      "聚簇索引和非聚簇索引的区别？",
+      "什么是回表？如何避免？",
+      "联合索引的最左匹配原则是什么？",
+      "索引失效的常见场景有哪些？"
+    ],
+    "feynman": {
+      "essence": "MySQL InnoDB索引底层用B+树。非叶子节点只存索引(不存数据)，所有数据在叶子节点，叶子节点用双向链表连接，支持范围查询和排序",
+      "analogy": "B+树就像图书馆的目录卡片系统——非叶子节点是分类目录（只告诉你去哪一层找），叶子节点是实际的书架（按顺序排列），书架之间有通道相连（双向链表），你可以快速走到相邻书架",
+      "key_points": [
+        "B+树非叶子节点只存键值+指针，不存数据 → 一个节点能存更多键 → 树更矮",
+        "叶子节点存全部数据，用双向链表连接 → 范围查询高效",
+        "InnoDB聚簇索引：数据和主键索引存在一起（叶子节点就是数据行）",
+        "二级索引：叶子节点存主键值（需要回表查询）",
+        "为什么不用B树/红黑树/Hash？范围查询差(B树)、树太高(红黑树)、不支持范围(Hash)"
+      ]
+    },
+    "first_principle": {
+      "essence": "磁盘IO是性能瓶颈，索引结构设计的目标是'最小化磁盘IO次数'。B+树通过高扇出(每个节点存大量键)使树高通常只有3-4层",
+      "derivation": "磁盘按页(16KB)读取 → 一个页存更多键 → 树更矮 → IO次数更少 → B+树非叶子不存数据 → 扇出更大 → 3层可存约2000万行数据(3次IO)",
+      "conclusion": "B+树 = 高扇出+矮树高+叶子链表 = 最少磁盘IO + 高效范围查询"
+    }
   }
 ]

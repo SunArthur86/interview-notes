@@ -1603,5 +1603,125 @@
       "G1的Full GC触发条件是什么？（分配失败、Evacuation Failure）",
       "如何调优G1的停顿时间目标？"
     ]
+  },
+  {
+    "id": "note-xhs-java-014",
+    "category": "java",
+    "subcategory": "并发/线程池",
+    "difficulty": "L3",
+    "tags": [
+      "拼多多",
+      "Java服务端",
+      "线程池",
+      "ThreadPoolExecutor",
+      "并发",
+      "面经"
+    ],
+    "question": "【拼多多 Java服务端】Java线程池有哪些参数？提交任务时的处理流程是什么？",
+    "answer": "## 一、费曼类比\n\n```\n线程池 = 餐厅运营模型:\n\n┌────────────────────────────────────────────────────┐\n│                   餐厅（线程池）                     │\n│                                                    │\n│  常驻厨师 ──→ corePoolSize (3个固定厨师)             │\n│  临时厨师 ──→ maxPoolSize - corePoolSize (高峰期加人) │\n│  候餐区   ──→ workQueue (排队等位的客人)             │\n│  临时工时长──→ keepAliveTime (闲了多久就辞退)         │\n│  满客处理 ──→ handler (四种策略应对爆满)              │\n│                                                    │\n│  客人来了:                                          │\n│  1. 有空闲厨师？→ 直接做                             │\n│  2. 厨师都在忙？→ 去候餐区排队                        │\n│  3. 候餐区满了？→ 招临时厨师                         │\n│  4. 厨师到上限了？→ 执行满客策略                      │\n└────────────────────────────────────────────────────┘\n```\n\n## 二、第一性原理分析\n\n**为什么要池化？**\n\n```\n无线程池:                          有线程池:\n任务1 → new Thread → 执行 → 销毁    任务1 → 从池中取线程 → 执行 → 归还\n任务2 → new Thread → 执行 → 销毁    任务2 → 从池中取线程 → 执行 → 归还\n任务3 → new Thread → 执行 → 销毁    \n                                   线程复用，省去创建/销毁开销（~1ms/次）\n缺点: 创建开销大、无法控制数量        优点: 复用 + 可控 + 可监控\n```\n\n## 三、详细答案\n\n### 3.1 七个核心参数\n\n```java\npublic ThreadPoolExecutor(\n    int corePoolSize,         // 核心线程数（常驻）\n    int maximumPoolSize,      // 最大线程数（含核心）\n    long keepAliveTime,       // 非核心线程空闲存活时间\n    TimeUnit unit,            // 存活时间单位\n    BlockingQueue<Runnable> workQueue,  // 任务队列\n    ThreadFactory threadFactory,        // 线程工厂（命名、优先级等）\n    RejectedExecutionHandler handler    // 拒绝策略\n)\n```\n\n### 3.2 任务处理流程（核心考点）\n\n```\n                    提交任务 execute(task)\n                           │\n                           ↓\n                 ┌─────────────────┐\n                 │ 当前线程数 <     │──YES──→ 创建核心线程执行任务\n                 │ corePoolSize?   │\n                 └────────┬────────┘\n                         NO\n                          ↓\n                 ┌─────────────────┐\n                 │ workQueue未满?  │──YES──→ 任务入队列等待\n                 └────────┬────────┘\n                         NO\n                          ↓\n                 ┌─────────────────┐\n                 │ 当前线程数 <     │──YES──→ 创建非核心线程执行任务\n                 │ maximumPoolSize?│\n                 └────────┬────────┘\n                         NO\n                          ↓\n                 ┌─────────────────┐\n                 │ 执行拒绝策略      │\n                 │ (RejectedHandler)│\n                 └─────────────────┘\n```\n\n**口诀：核心满→入队列→队列满→开到max→都满→拒绝**\n\n### 3.3 四种拒绝策略\n\n| 策略 | 行为 | 适用场景 |\n|------|------|---------|\n| **AbortPolicy** (默认) | 抛出RejectedExecutionException | 要求任务必须执行，异常可感知 |\n| **CallerRunsPolicy** | 由提交任务的线程自己执行 | 不丢任务、自动降速（反压） |\n| **DiscardPolicy** | 静默丢弃新任务 | 允许丢失（如日志收集） |\n| **DiscardOldestPolicy** | 丢弃队列最旧的任务，重新提交 | 只关心最新数据（如实时监控） |\n\n### 3.4 常见阻塞队列选择\n\n| 队列类型 | 特点 | 配套线程池 |\n|---------|------|-----------|\n| **LinkedBlockingQueue** | 无界（默认Integer.MAX_VALUE） | FixedThreadPool、SingleThreadPool |\n| **ArrayBlockingQueue** | 有界 | 自定义线程池（推荐） |\n| **SynchronousQueue** | 不存储，直接交换 | CachedThreadPool |\n| **PriorityBlockingQueue** | 优先级排序 | 有优先级的任务 |\n\n### 3.5 为什么阿里禁止Executors？\n\n```java\n// ❌ 危险：LinkedBlockingQueue无界 → OOM风险\nExecutorService pool1 = Executors.newFixedThreadPool(10);\n// 内部: new LinkedBlockingQueue<Runnable>() → 容量Integer.MAX_VALUE\n\n// ❌ 危险：maximumPoolSize=Integer.MAX_VALUE → 创建大量线程\nExecutorService pool2 = Executors.newCachedThreadPool();\n\n// ✅ 正确：手动创建，有界队列+明确参数\nExecutorService pool = new ThreadPoolExecutor(\n    10,                              // corePoolSize\n    20,                              // maximumPoolSize\n    60L, TimeUnit.SECONDS,           // keepAliveTime\n    new ArrayBlockingQueue<>(1000),  // 有界队列！\n    new ThreadFactoryBuilder().setNameFormat(\"biz-pool-%d\").build(),\n    new ThreadPoolExecutor.CallerRunsPolicy()\n);\n```\n\n## 四、线程数设置经验\n\n```\nCPU密集型（计算、压缩、加密）:\n  线程数 = CPU核数 + 1\n  (+1是因为偶尔的页面故障等暂停，多一个线程填补)\n\nIO密集型（网络请求、数据库、文件）:\n  线程数 = CPU核数 × (1 + IO等待时间/CPU时间)\n  经验值: CPU核数 × 2 ~ CPU核数 × 10\n\n混合型:\n  线程数 = CPU核数 × (1 + IO占比/(1-IO占比))\n```\n\n## 五、实际例子\n\n```java\n// AI助手项目的推理线程池\nThreadPoolExecutor inferencePool = new ThreadPoolExecutor(\n    8,                                // 8个常驻推理线程\n    32,                               // 最多32个并发推理\n    60L, TimeUnit.SECONDS,\n    new ArrayBlockingQueue<>(200),    // 200个排队请求\n    new ThreadFactoryBuilder()\n        .setNameFormat(\"inference-%d\")\n        .setUncaughtExceptionHandler((t, e) -> log.error(\"推理异常\", e))\n        .build(),\n    new ThreadPoolExecutor.CallerRunsPolicy()  // 队列满时调用方线程执行（反压）\n);\n```\n\n## 六、扩展知识\n\n- **核心线程也能被回收**: `allowCoreThreadTimeOut(true)` 让核心线程也受keepAliveTime约束\n- **prestartAllCoreThreads()**: 预热所有核心线程，避免冷启动延迟\n- **execute vs submit**: execute无返回值、异常直接抛出；submit返回Future、异常封装在Future中\n\n## 七、苏格拉底式面试提问\n\n1. **\"你说核心线程满后任务入队列，但为什么不是直接创建新线程？这样不是更快吗？\"** — 引出设计哲学：控制资源消耗，队列是廉价缓冲，线程是昂贵资源\n2. **\"CallerRunsPolicy让调用者线程执行任务，这不会阻塞调用方吗？\"** — 引出反压(backpressure)机制，自动降速保护系统\n3. **\"如果线程池中一个线程抛了未捕获异常，线程池会怎样？\"** — execute方式线程终止并创建新线程；submit方式异常封装在Future中\n4. **\"如何监控线程池运行状态？\"** — getActiveCount/getQueueSize/getCompletedTaskCount + 自定义拒绝策略日志\n5. **\"线程池和ForkJoinPool有什么本质区别？\"** — 引出工作窃取(Work Stealing)算法、分治任务模型\n\n## 八、面试加分点\n\n1. **能完整说出7个参数** — 不是背名字，而是解释每个参数的作用\n2. **画出任务处理流程图** — 核心→队列→max→拒绝，清晰准确\n3. **知道Executors的OOM风险** — 阿里规约的核心原因\n4. **能区分CPU密集型和IO密集型的线程数设置** — 展示实际调优经验\n5. **推荐CallerRunsPolicy** — 说明反压机制，体现系统设计思维",
+    "follow_up": [
+      "线程池是如何区分核心线程和非核心线程的？",
+      "为什么阿里禁止用Executors创建线程池？",
+      "如何合理设置线程池大小？（CPU密集型 vs IO密集型）",
+      "线程池的execute()和submit()有什么区别？",
+      "线程池异常处理机制是什么？任务抛异常后线程会怎样？"
+    ],
+    "feynman": {
+      "essence": "线程池 = 预创建的线程集合 + 任务队列 + 拒绝策略。7个核心参数控制线程创建、排队和拒绝行为",
+      "analogy": "线程池就像一家餐厅——corePoolSize是常驻厨师，maxPoolSize是高峰期最多雇佣的厨师，workQueue是候餐区，rejectHandler是客人太多时的处理方式（拒绝/叫外卖/等位）",
+      "key_points": [
+        "7个参数：corePoolSize、maxPoolSize、keepAliveTime、unit、workQueue、threadFactory、handler",
+        "任务处理流程：核心线程→队列→非核心线程→拒绝策略",
+        "4种拒绝策略：AbortPolicy(抛异常)、CallerRunsPolicy(调用者执行)、DiscardPolicy(丢弃)、DiscardOldestPolicy(丢弃最旧)",
+        "常见队列：LinkedBlockingQueue(无界)、ArrayBlockingQueue(有界)、SynchronousQueue(直接交换)",
+        "阿里规约禁止Executors.newFixedThreadPool()，要用new ThreadPoolExecutor()"
+      ]
+    },
+    "first_principle": {
+      "essence": "线程创建/销毁有开销(约1ms)，池化复用减少开销。但有界资源需要策略控制何时扩容、何时排队、何时拒绝",
+      "derivation": "任务来了 → 先用常驻线程(core) → 不够用就排队(queue) → 队列满了就临时扩容(max) → 都满了就拒绝(reject)。这是'先复用→再缓冲→后扩容→最后保护'的渐进式策略",
+      "conclusion": "线程池设计 = 核心线程(常态) + 队列(缓冲) + 最大线程(峰值) + 拒绝策略(保护)"
+    }
+  },
+  {
+    "id": "note-xhs-java-015",
+    "category": "java",
+    "subcategory": "并发/ThreadLocal",
+    "difficulty": "L3",
+    "tags": [
+      "拼多多",
+      "Java服务端",
+      "ThreadLocal",
+      "ThreadLocalMap",
+      "内存泄漏",
+      "并发",
+      "面经"
+    ],
+    "question": "【拼多多 Java服务端】ThreadLocal有了解吗？",
+    "answer": "## 一、费曼类比\n\n```\n共享变量 + synchronized:              ThreadLocal:\n                                     \n  ┌─────────────────────┐           线程A          线程B         线程C\n  │   共享变量 counter   │           ┌──────┐      ┌──────┐      ┌──────┐\n  │                     │           │TLMap │      │TLMap │      │TLMap │\n  │  线程A ─┐           │           │      │      │      │      │      │\n  │  线程B ─┼─ 获取锁 ──│           │conn=A│      │conn=B│      │conn=C│\n  │  线程C ─┘ 排队      │           │user=X│      │user=Y│      │user=Z│\n  │                     │           └──────┘      └──────┘      └──────┘\n  └─────────────────────┘           各自独立，无需加锁\n  每次只有一个线程能访问              \n```\n\n## 二、第一性原理分析\n\n**并发变量访问的两条路：**\n\n```\n路径1: 共享 + 同步 (synchronized/Lock)\n  → 多线程访问同一变量，通过锁保证安全\n  → 问题：锁竞争开销、死锁风险\n\n路径2: 隔离 + 无锁 (ThreadLocal)\n  → 每个线程持有自己的副本，互不可见\n  → 优势：无竞争、无等待\n  → 代价：内存占用增加（每线程一份）\n```\n\n## 三、详细答案\n\n### 3.1 ThreadLocal内部结构\n\n```\n┌──────────────────────────────────────────────────────┐\n│                    Thread 对象                        │\n│                                                      │\n│  ThreadLocal.ThreadLocalMap threadLocals             │\n│  ThreadLocal.ThreadLocalMap inheritableThreadLocals  │\n│                                                      │\n│  ┌────────────────────────────────────────────────┐  │\n│  │            ThreadLocalMap                       │  │\n│  │                                                 │  │\n│  │  Entry[] table:                                 │  │\n│  │  ┌──────────────┬──────────────────┐           │  │\n│  │  │     Key      │      Value       │           │  │\n│  │  │ (弱引用)      │ (强引用)          │           │  │\n│  │  ├──────────────┼──────────────────┤           │  │\n│  │  │ ThreadLocal1 │  \"连接对象conn\"   │           │  │\n│  │  ├──────────────┼──────────────────┤           │  │\n│  │  │ ThreadLocal2 │  \"用户信息user\"   │           │  │\n│  │  ├──────────────┼──────────────────┤           │  │\n│  │  │ ThreadLocal3 │  \"SimpleDateFmt\"  │           │  │\n│  │  └──────────────┴──────────────────┘           │  │\n│  │                                                 │  │\n│  │  ⚠️ Key = WeakReference<ThreadLocal>            │  │\n│  │  ⚠️ Value = 强引用（直接指向对象）                │  │\n│  └────────────────────────────────────────────────┘  │\n└──────────────────────────────────────────────────────┘\n```\n\n### 3.2 核心源码流程\n\n```java\n// ThreadLocal.set()\npublic void set(T value) {\n    Thread t = Thread.currentThread();      // 获取当前线程\n    ThreadLocalMap map = getMap(t);          // 获取线程的ThreadLocalMap\n    if (map != null) {\n        map.set(this, value);               // this=ThreadLocal实例作为Key\n    } else {\n        createMap(t, value);                // 首次访问时创建Map\n    }\n}\n\n// ThreadLocal.get()\npublic T get() {\n    Thread t = Thread.currentThread();\n    ThreadLocalMap map = getMap(t);\n    if (map != null) {\n        Entry e = map.getEntry(this);       // 用this(ThreadLocal)作为Key查找\n        if (e != null) return (T) e.value;\n    }\n    return setInitialValue();\n}\n```\n\n### 3.3 内存泄漏分析\n\n```\n引用链:\n  Thread (强) → ThreadLocalMap (强) → Entry\n                                       ├→ Key: WeakRef → ThreadLocal对象\n                                       └→ Value: 强引用 → 实际数据对象\n\n场景: ThreadLocal对象外部无强引用 → GC回收Key → Entry的Key=null\n      但Value仍被Entry强引用 → Value无法回收 → 内存泄漏!\n\n  ┌────────────────────────────────────────────────┐\n  │ Thread (线程池中永不销毁)                        │\n  │   → ThreadLocalMap                              │\n  │     → Entry[Key=null, Value=大对象] ← 泄漏!     │\n  └────────────────────────────────────────────────┘\n\n解决: 用完必须调用 threadLocal.remove()！\n```\n\n### 3.4 经典应用场景\n\n```java\n// 场景1: 数据库连接管理（每个线程一个连接）\nprivate static ThreadLocal<Connection> connHolder = new ThreadLocal<>();\n\npublic Connection getConnection() {\n    Connection conn = connHolder.get();\n    if (conn == null) {\n        conn = DriverManager.getConnection(url);\n        connHolder.set(conn);\n    }\n    return conn;\n}\n\n// 场景2: 用户上下文传递（避免方法参数层层传递）\npublic class UserContext {\n    private static ThreadLocal<User> userHolder = new ThreadLocal<>();\n    \n    public static void set(User user) { userHolder.set(user); }\n    public static User get() { return userHolder.get(); }\n    public static void clear() { userHolder.remove(); }  // 必须清理!\n}\n\n// 场景3: 线程安全的日期格式化（SimpleDateFormat非线程安全）\nprivate static ThreadLocal<SimpleDateFormat> dateFormat = \n    ThreadLocal.withInitial(() -> new SimpleDateFormat(\"yyyy-MM-dd\"));\n```\n\n## 四、ThreadLocal vs Synchronized\n\n| 维度 | Synchronized | ThreadLocal |\n|------|-------------|-------------|\n| 思路 | 共享变量+加锁同步 | 每线程独立副本 |\n| 并发性能 | 锁竞争开销 | 无竞争（空间换时间） |\n| 内存占用 | 一份共享变量 | N份（每线程一份） |\n| 数据一致性 | 强一致 | 各线程数据隔离 |\n| 适用场景 | 需要共享状态的同步 | 需要线程隔离的上下文 |\n\n## 五、扩展知识\n\n- **InheritableThreadLocal**: 子线程可以继承父线程的ThreadLocal值（构造方法中复制）\n- **TransmittableThreadLocal (TTL)**: 阿里开源，解决线程池中ThreadLocal值传递问题\n- **ThreadLocalMap使用开放寻址法**（非链表法）解决哈希冲突\n\n## 六、苏格拉底式面试提问\n\n1. **\"如果线程池中的线程被复用了，上一个任务设置的ThreadLocal会怎样？\"** — 引出必须手动remove()，否则数据残留和内存泄漏\n2. **\"为什么Key用弱引用而Value不用？\"** — 引出设计权衡：Key回收避免Entry永久持有ThreadLocal引用；Value强引用保证数据可用\n3. **\"子线程能拿到父线程的ThreadLocal值吗？\"** — 引出InheritableThreadLocal，但线程池场景需要TTL\n4. **\"ThreadLocalMap的哈希冲突怎么解决的？\"** — 开放寻址法（线性探测），不是HashMap的链表法\n5. **\"你说ThreadLocal无锁，那它内部ThreadLocalMap的set操作不需要加锁吗？\"** — 不需要，因为每个线程访问自己的Map，不存在竞争\n\n## 七、面试加分点\n\n1. **画出引用链图** — Thread→Map→Entry(WeakRef Key, StrongRef Value)，展示底层理解\n2. **强调remove()的重要性** — 特别在线程池场景，这是生产事故常见原因\n3. **知道内存泄漏原因** — Key被GC但Value无法回收\n4. **对比Synchronized** — 展示对两种并发控制思路的理解\n5. **提到TTL** — 线程池场景的ThreadLocal传递，展示实际项目经验",
+    "follow_up": [
+      "ThreadLocal和Synchronized有什么区别？",
+      "ThreadLocalMap为什么用弱引用作为Key？",
+      "InheritableThreadLocal是什么？和ThreadLocal有什么区别？",
+      "线程池中使用ThreadLocal有什么风险？",
+      "TransmittableThreadLocal是什么？"
+    ],
+    "feynman": {
+      "essence": "ThreadLocal为每个线程提供独立的变量副本，实现线程隔离。数据存在每个线程自己的ThreadLocalMap中，不存在共享竞争",
+      "analogy": "ThreadLocal就像酒店房间里的保险箱——每个客人（线程）有自己的保险箱（ThreadLocalMap），存放自己的物品（变量副本），互不干扰。你不需要锁，因为根本没有共享",
+      "key_points": [
+        "每个Thread对象内部有一个ThreadLocalMap，存储该线程的所有ThreadLocal变量",
+        "ThreadLocalMap的Key是ThreadLocal对象的弱引用，Value是强引用",
+        "核心方法：set()/get()/remove()",
+        "经典应用：数据库连接管理、用户上下文传递、日期格式化",
+        "内存泄漏风险：Value是强引用，线程不结束时Value无法回收"
+      ]
+    },
+    "first_principle": {
+      "essence": "解决并发问题的两种思路：(1)加锁让线程排队访问共享变量 (2)每个线程各有一份副本，不需要共享。ThreadLocal选择后者",
+      "derivation": "多线程共享变量需要同步→同步有性能开销→如果每个线程各持一份副本就不需要同步→把存储放在Thread对象上→ThreadLocal作为Key标识哪个变量",
+      "conclusion": "ThreadLocal = 空间换安全，每个线程独立存储，从根源消除竞争"
+    }
+  },
+  {
+    "id": "note-xhs-java-016",
+    "category": "java",
+    "subcategory": "JVM/内存模型",
+    "difficulty": "L3",
+    "tags": [
+      "拼多多",
+      "Java服务端",
+      "JVM",
+      "内存区域",
+      "堆",
+      "栈",
+      "方法区",
+      "面经"
+    ],
+    "question": "【拼多多 Java服务端】JVM内存区域如何划分的？",
+    "answer": "## 一、费曼类比\n\n```\nJVM = 一栋写字楼:\n\n┌──────────────────────────────────────────────────────┐\n│                   JVM 内存布局                        │\n│                                                      │\n│  ┌─── 线程共享区 ────────────────────────────────┐   │\n│  │                                                │   │\n│  │   堆 (Heap) = 公共仓库                          │   │\n│  │   ┌──────────────┬────────────────────────┐   │   │\n│  │   │   新生代      │      老年代             │   │   │\n│  │   │ Eden|S0|S1   │    长期存活的对象        │   │   │\n│  │   │ (8 : 1 : 1)  │                        │   │   │\n│  │   └──────────────┴────────────────────────┘   │   │\n│  │                                                │   │\n│  │   方法区/元空间 (Metaspace) = 公共档案室         │   │\n│  │   类信息、常量池、静态变量                        │   │\n│  └────────────────────────────────────────────────┘   │\n│                                                      │\n│  ┌─── 线程私有区 (每个线程一份) ──────────────────┐   │\n│  │                                                │   │\n│  │   程序计数器 (PC) = 便签纸，记执行到哪行          │   │\n│  │   虚拟机栈 (VM Stack) = 办公桌，每层一个栈帧     │   │\n│  │   本地方法栈 (Native Stack) = 给native方法用     │   │\n│  └────────────────────────────────────────────────┘   │\n└──────────────────────────────────────────────────────┘\n```\n\n## 二、第一性原理分析\n\n**为什么分这么多区域？因为数据特性不同：**\n\n```\n数据类型             生命周期          共享性      →    放在哪里\n─────────────────────────────────────────────────────────────\n方法局部变量          方法调用期间       线程私有    →    虚拟机栈\n对象实例             GC决定             线程共享    →    堆\n类元信息             几乎永久           线程共享    →    方法区/元空间\n执行位置             实时变化           线程私有    →    程序计数器\n```\n\n## 三、详细答案\n\n### 3.1 JVM内存全景图\n\n```\n┌─────────────────────────────────────────────────────────────┐\n│                      JVM 内存                               │\n│                                                             │\n│  ┌───────────────────────────────────────────────────────┐  │\n│  │                  线程共享区域                           │  │\n│  │                                                       │  │\n│  │  ┌─────────────────────────────────────────────────┐ │  │\n│  │  │                 堆 (Heap)                        │ │  │\n│  │  │                                                   │ │  │\n│  │  │  ┌─────────────────────────┬─────────────────┐  │ │  │\n│  │  │  │      新生代 (Young)      │   老年代 (Old)   │  │ │  │\n│  │  │  │  ┌─────┬────┬────┐      │                  │  │ │  │\n│  │  │  │  │Eden │ S0 │ S1 │      │   长期存活对象    │  │ │  │\n│  │  │  │  │     │    │    │      │   大对象直接分配  │  │ │  │\n│  │  │  │  │ 8   │ 1  │ 1  │      │                  │  │ │  │\n│  │  │  │  └─────┴────┴────┘      │                  │  │ │  │\n│  │  │  │     Minor GC             │    Major GC      │  │ │  │\n│  │  │  └─────────────────────────┴─────────────────┘  │ │  │\n│  │  │                                                   │ │  │\n│  │  └─────────────────────────────────────────────────┘ │  │\n│  │                                                       │  │\n│  │  ┌─────────────────────────────────────────────────┐ │  │\n│  │  │        方法区 / 元空间 (Metaspace)                │ │  │\n│  │  │  类元信息(Klass) | 运行时常量池 | 静态变量        │ │  │\n│  │  │  JDK<8: 永久代(PermGen, 在堆中)                   │ │  │\n│  │  │  JDK8+: 元空间(Metaspace, 使用本地内存)            │ │  │\n│  │  └─────────────────────────────────────────────────┘ │  │\n│  └───────────────────────────────────────────────────────┘  │\n│                                                             │\n│  ┌───────────────────────────────────────────────────────┐  │\n│  │              线程私有区域 (每个线程一份)                 │  │\n│  │                                                       │  │\n│  │  ┌─────────────┐  ┌──────────────────────────────┐   │  │\n│  │  │程序计数器 PC │  │       虚拟机栈 (VM Stack)      │   │  │\n│  │  │当前执行行号  │  │                              │   │  │\n│  │  │(唯一不OOM)  │  │  ┌────────────────────────┐  │   │  │\n│  │  │              │  │  │ 栈帧 (方法调用)         │  │   │  │\n│  │  └─────────────┘  │  │ ├ 局部变量表            │  │   │  │\n│  │                    │  │ ├ 操作数栈              │  │   │  │\n│  │  ┌─────────────┐  │  │ ├ 动态链接              │  │   │  │\n│  │  │本地方法栈    │  │  │ └ 方法返回地址          │  │   │  │\n│  │  │(native方法)  │  │  └────────────────────────┘  │   │  │\n│  │  └─────────────┘  └──────────────────────────────┘   │  │\n│  └───────────────────────────────────────────────────────┘  │\n└─────────────────────────────────────────────────────────────┘\n```\n\n### 3.2 各区域详解\n\n| 区域 | 线程 | 存储内容 | 异常类型 | 大小控制 |\n|------|------|---------|---------|---------|\n| 程序计数器 | 私有 | 当前线程执行的字节码行号 | **不会OOM** | 固定 |\n| 虚拟机栈 | 私有 | 栈帧(局部变量表、操作数栈等) | StackOverflowError / OOM | -Xss |\n| 本地方法栈 | 私有 | native方法的栈帧 | StackOverflowError / OOM | -Xss |\n| 堆 | 共享 | 对象实例、数组 | OutOfMemoryError: Java heap space | -Xms/-Xmx |\n| 方法区/元空间 | 共享 | 类信息、常量池、静态变量 | OOM: Metaspace | -XX:MaxMetaspaceSize |\n\n### 3.3 栈帧结构\n\n```\n┌─────────────────────────────────────────┐\n│              栈帧 (Stack Frame)           │\n│                                         │\n│  ┌─────────────────────────────────┐    │\n│  │ 局部变量表 (Local Variable Table)│    │\n│  │  slot[0]: this                  │    │\n│  │  slot[1]: 参数1                 │    │\n│  │  slot[2]: 局部变量1             │    │\n│  └─────────────────────────────────┘    │\n│                                         │\n│  ┌─────────────────────────────────┐    │\n│  │ 操作数栈 (Operand Stack)        │    │\n│  │  执行字节码指令的工作区           │    │\n│  │  如: iadd 弹出两个int→push结果   │    │\n│  └─────────────────────────────────┘    │\n│                                         │\n│  ┌─────────────────────────────────┐    │\n│  │ 动态链接 (Dynamic Linking)      │    │\n│  │  指向运行时常量池的方法引用       │    │\n│  └─────────────────────────────────┘    │\n│                                         │\n│  ┌─────────────────────────────────┐    │\n│  │ 方法返回地址 (Return Address)   │    │\n│  │  方法结束后PC应该跳到的位置       │    │\n│  └─────────────────────────────────┘    │\n└─────────────────────────────────────────┘\n```\n\n### 3.4 JDK8 永久代→元空间\n\n```\nJDK <8 (永久代 PermGen):\n  - 位于JVM堆内存中，有固定上限(-XX:MaxPermSize)\n  - 容易OOM: java.lang.OutOfMemoryError: PermGen space\n  - 字符串常量池在永久代中\n  - GC效率低，Full GC才能清理\n\nJDK 8+ (元空间 Metaspace):\n  - 使用本地内存(Native Memory)，不受JVM堆大小限制\n  - 默认无上限(可设-XX:MaxMetaspaceSize)\n  - 字符串常量池移到堆中\n  - 更难OOM，但仍需监控\n\n为什么要换？\n  1. 永久代大小难调优，容易OOM\n  2. 元空间用本地内存，大小随需增长\n  3. 合并JRockit和HotSpot的代码\n```\n\n## 四、对象在堆中的流转\n\n```\nnew Object()\n     │\n     ↓\n┌──────────┐     │ ┌──────────┐\n│   Eden   │ ──→ │ │ Survivor │\n│  (出生)   │     │ │  From/To │\n└──────────┘     │ └────┬─────┘\n  Minor GC ──────┘      │\n  (Eden满触发)          │ 存活\n                        ↓\n                 ┌──────────────┐\n                 │   老年代      │\n                 │ (Old Gen)    │\n                 └──────────────┘\n                   ↑ 年龄≥15 或 大对象\n                   \n对象晋升老年代条件:\n  1. 年龄达到 -XX:MaxTenuringThreshold (默认15)\n  2. 大对象直接进入(-XX:PretenureSizeThreshold)\n  3. 动态年龄判断(Survivor中相同年龄对象>Survivor空间50%)\n  4. 空间分配担保(Survivor不够时)\n```\n\n## 五、OOM排查\n\n| OOM信息 | 区域 | 原因 | 排查 |\n|---------|------|------|------|\n| Java heap space | 堆 | 对象太多/内存泄漏 | jmap dump → MAT分析 |\n| Metaspace | 元空间 | 类加载过多(动态生成类) | -XX:MaxMetaspaceSize + 类加载日志 |\n| unable to create new native thread | 堆外 | 线程数太多 | 减少线程数/调整Xss |\n| Direct buffer memory | 直接内存 | NIO Buffer泄漏 | 检查ByteBuffer分配 |\n\n## 六、苏格拉底式面试提问\n\n1. **\"你说程序计数器不会OOM，为什么？\"** — 引出PC只存一个行号，大小固定，且JVM规范明确保证\n2. **\"如果栈深度超过限制了，是StackOverflowError还是OOM？\"** — 递归过深是StackOverflowError；无法扩展栈空间才是OOM\n3. **\"元空间用本地内存，是不是就不会OOM了？\"** — 仍然会OOM（本地内存也有上限），只是阈值更高\n4. **\"字符串常量池到底在哪？\"** — JDK6在永久代，JDK7+在堆中（不是元空间）\n5. **\"如何用命令查看JVM各区域使用情况？\"** — jmap -heap, jstat -gc, JConsole/Arthas\n\n## 七、面试加分点\n\n1. **画出完整内存图** — 包含共享区和私有区的嵌套关系\n2. **知道JDK8元空间变化** — 永久代→元空间、字符串常量池迁移\n3. **能说出每个区域的OOM类型** — 展示实际排障经验\n4. **结合GC流程讲对象流转** — Eden→Survivor→Old的晋升机制\n5. **提到栈帧内部结构** — 局部变量表、操作数栈，展示字节码层面理解",
+    "follow_up": [
+      "JDK8为什么要用元空间替代永久代？",
+      "为什么栈是线程私有的而堆是共享的？",
+      "一个对象从创建到回收经历了什么过程？",
+      "栈帧里面有哪些结构？",
+      "如何排查OOM是哪个区域的问题？"
+    ],
+    "feynman": {
+      "essence": "JVM内存分为线程共享区（堆、方法区）和线程私有区（虚拟机栈、本地方法栈、程序计数器），不同区域存放不同类型的数据",
+      "analogy": "JVM就像一栋写字楼——堆是公共仓库（所有人共享，存放对象），方法区是公共档案室（类信息共享），每个线程有独立办公室（栈=办公桌放方法调用，PC寄存器=便签纸记执行到哪了）",
+      "key_points": [
+        "线程私有：程序计数器(PC)、虚拟机栈(VM Stack)、本地方法栈(Native Method Stack)",
+        "线程共享：堆(Heap)、方法区(Method Area/元空间)",
+        "堆分新生代(Eden+S0+S1)和老年代",
+        "方法区JDK8前叫永久代(PermGen)，JDK8+叫元空间(Metaspace，使用本地内存)",
+        "OOM类型不同区域不同表现"
+      ]
+    },
+    "first_principle": {
+      "essence": "不同数据的生命周期不同——方法调用的栈帧用完即弃，对象可能长期存活，类信息几乎永久存在。按生命周期和共享性分区管理",
+      "derivation": "方法调用频繁且短暂 → 每个线程独立栈，快速分配回收; 对象生命周期不确定 → 共享堆，由GC管理; 类信息稳定 → 方法区/元空间; 本地方法调用 → 本地方法栈",
+      "conclusion": "JVM内存分区 = 按数据生命周期和共享性分类管理，不同区域用不同策略回收"
+    }
   }
 ]
