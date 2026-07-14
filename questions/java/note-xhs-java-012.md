@@ -30,10 +30,10 @@ follow_up:
 - 如果jmap命令执行也失败了（内存不足），怎么办？（用gcore生成core dump再转换）
 - 生产环境上线前你还配置过哪些JVM参数？
 memory_points:
-- JVM参数: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/dumps/
-- 手动触发: jmap -dump:format=b,file=heap.hprof <pid>
-- JDK11+: jcmd <pid> GC.heap_dump /path/heap.hprof
-- OOM前的预防性Dump: 脚本监控heap使用率 > 85%时自动触发
+- "JVM参数: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/dumps/"
+- "手动触发: jmap -dump:format=b,file=heap.hprof <pid>"
+- "JDK11+: jcmd <pid> GC.heap_dump /path/heap.hprof"
+- "OOM前的预防性Dump: 脚本监控heap使用率 > 85%时自动触发"
 ---
 
 # 【拼多多 Java服务端】OOM时JVM没自动生成Dump文件怎么办？

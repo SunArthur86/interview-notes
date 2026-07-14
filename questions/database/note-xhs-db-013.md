@@ -16,9 +16,9 @@ feynman:
   essence: "三种日志分别解决三个问题：redo log保证崩溃恢复（持久性），undo log保证回滚和MVCC（原子性+隔离性），binlog保证主从复制和数据归档"
   analogy: "三种日志就像三种不同的记录员：redo log是'黑匣子'——记录已经做了什么，飞机坠毁了也能恢复；undo log是'后悔药'——记录怎么撤销，事务失败时回退；binlog是'广播员'——把操作告诉所有从库"
   key_points:
-  - redo log: InnoDB引擎层，物理日志，记录'页X偏移Y改了什么'，保证崩溃恢复
-  - undo log: InnoDB引擎层，逻辑日志，记录'反向操作'，保证回滚+MVCC
-  - binlog: Server层，逻辑日志，记录'SQL语句/行变更'，保证主从复制
+  - "redo log: InnoDB引擎层，物理日志，记录'页X偏移Y改了什么'，保证崩溃恢复"
+  - "undo log: InnoDB引擎层，逻辑日志，记录'反向操作'，保证回滚+MVCC"
+  - "binlog: Server层，逻辑日志，记录'SQL语句/行变更'，保证主从复制"
   - redo log是循环写，binlog是追加写
   - 三者通过两阶段提交保证一致性（见note-xhs-db-014）
 first_principle:

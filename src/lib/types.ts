@@ -21,6 +21,7 @@ export interface Question {
   follow_up: string[];
   feynman?: Feynman;
   first_principle?: FirstPrinciple;
+  createdAt?: string;
 }
 
 export type Rating = 'know' | 'fuzzy' | 'dont';

@@ -17,8 +17,8 @@ feynman:
   essence: "两阶段提交是MySQL保证redo log和binlog一致性的协议：先写redo log(prepare)→再写binlog→最后提交redo log(commit)。崩溃恢复时根据两个日志的状态决定提交或回滚"
   analogy: "两阶段提交就像签合同：第一步双方各签一份草稿（prepare），第二步互换确认无误后盖章生效（commit）。如果中途一方反悔（崩溃），根据草稿状态决定是作废还是继续"
   key_points:
-  - Phase 1: 写redo log(prepare状态)
-  - Phase 2: 写binlog → 写redo log(commit状态)
+  - "Phase 1: 写redo log(prepare状态)"
+  - "Phase 2: 写binlog → 写redo log(commit状态)"
   - 崩溃恢复规则：有binlog+prepare → 提交；无binlog+prepare → 回滚
   - 核心矛盾：redo log(InnoDB)和binlog(Server)属于不同层，需要协议保证一致
   - 如果不2PC：redo写完binlog没写→主库有数据从库没有→主从不一致
