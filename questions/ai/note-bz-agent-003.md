@@ -179,3 +179,49 @@ def execute_with_recovery(action):
 - 闭环控制：每次行动后的Observation会作为新的观察输入，直到达成目标或触发步数兜底
 - 能力分工：决策环节靠规划，观察环节靠记忆读写，行动环节靠工具调用
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：你用 OODA 闭环（观察-定向-决策-行动）描述 Agent 工作原理，这和 ReAct 的 Thought-Action-Observation 有什么本质区别？是不是换了个名字？**
+
+不完全是换名字。OODA 是更上位的"认知论"框架（源自军事决策），ReAct 是 OODA 在 LLM Agent 的"工程实现"。对应关系：Observe≈接收 Observation、Orient≈Thought（理解+推理）、Decide≈决定 Action（调什么工具）、Act≈执行工具。区别在于 OODA 强调"Orient"（定向/态势理解）是核心——在决策前要先理解当前状态和信息，这对应 Agent 的"上下文理解和意图识别"环节，ReAct 把它简化进了 Thought。实务中 OODA 更适合设计 Agent 的状态机（每个状态对应一个 OODA 阶段），ReAct 更适合写 prompt（Thought-Action-Observation 三段式）。两者互补，不冲突。
+
+### 第二层：证据与定位
+
+**Q：OODA 闭环里"行动后的观察结果"如何反馈到下一轮决策？这个反馈机制具体怎么实现？**
+
+靠 context 拼接。每轮 Action 的执行结果（Observation）被格式化为文本，拼接到 Agent 的 context 窗口里，下一轮 LLM forward 时 attention 到这些 Observation，作为决策依据。实现上是：`context = system_prompt + history (Thought_1, Action_1, Observation_1, ..., Thought_n, Action_n, Observation_n) + current_input`，每轮把新的 Thought/Action/Observation append 进去。LLM 在生成下一轮 Thought 时，通过 attention 机制"看到"之前的 Observation。如果 Observation 很长（如搜索结果几千 token），要做摘要或截断，否则 context 会爆炸。这个"行动→观察→context→决策"的反馈环就是 OODA 闭环的工程实现。
+
+### 第三层：根因深挖
+
+**Q：OODA 闭环听起来很顺，但 Agent 经常在"Orient"（理解态势）这步出错——误解用户意图或误读工具结果。根因是什么？**
+
+两个根因。1）LLM 的理解能力局限——复杂意图（如隐含约束、多目标）LLM 推理不准，表现是"理解偏了"；2）context 信号被稀释——长 context 里关键信息（用户意图、工具结果）的 attention 权重被大量噪声稀释（lost in the middle），LLM 没"看到"关键信息，表现是"信息在那但没用到"。区分方法：把 context 里的关键信息（如用户明确要求）标红或加 marker，看 LLM 是否引用；如果加了 marker 后理解正确了，是 attention 稀释问题（要精简 context 或移到末尾）；如果加了 marker 还是理解错，是 LLM 推理能力问题（要换更强模型或 SFT 提升理解）。
+
+**Q：既然 Orient（理解）是出错重灾区，为什么不专门训练一个"意图理解模型"做这步，而不是让通用 LLM 兼任？**
+
+专模型做意图理解确实更准（在特定领域 fine-tune 后准确率能到 95%+），但牺牲了灵活性。Agent 的核心价值是"通用性"——一个 Agent 能处理多种任务，靠 LLM 的零样本理解能力。如果每个任务都训专模型，就退化成了传统 pipeline（每个环节一个专模型），失去 Agent 的泛化优势。实务折中：1）通用意图理解用 LLM（覆盖长尾任务）；2）高频核心意图用专模型/规则做预识别（如"这是查订单还是退货"用分类器先判，再路由到对应 Agent）；3）LLM 兜底处理专模型没覆盖的。这样核心意图准、长尾任务灵活，兼顾准确性和泛化。
+
+### 第四层：方案权衡
+
+**Q：OODA 闭环是单 Agent 的模型，多 Agent 协作时这个闭环还成立吗？怎么扩展？**
+
+成立但要做分布式扩展。单 Agent 的 OODA 是一个闭环；多 Agent 时，每个 Agent 内部仍是 OODA 闭环，Agent 之间的通信构成更高层的闭环。具体：1）Agent A 的 Act（输出结果）→ 通过消息传递 → 成为 Agent B 的 Observe 输入；2）需要协调时，引入"Supervisor Agent"做全局 OODA——Observe 所有子 Agent 的状态、Orient 整体进度、Decide 任务分配、Act 下发指令。所以多 Agent 是"OODA 闭环的嵌套"——子 Agent 各自 OODA，Supervisor 做元 OODA。LangGraph 的图结构天然支持这种嵌套（每个子图是一个 Agent 的 OODA，主图编排多个子图）。
+
+**Q：为什么不把 OODA 的四个阶段做成四个独立微服务（Observe 服务/Orient 服务/...），微服务化不是更解耦吗？**
+
+OODA 的四阶段在单 Agent 内是紧密耦合的——Orient 的推理结果直接决定 Decided 的 Action，中间要共享 context 和中间状态。拆成微服务会引入：1）序列化开销——每阶段间要传 context（可能几万 token），网络传输成本高；2）延迟累积——四阶段四次网络往返，单轮延迟从 500ms 涨到 2s+；3）状态一致性——四阶段共享的 context 要跨服务同步，复杂。所以单 Agent 内的 OODA 应该在一个进程内（函数调用共享内存），不做微服务化。微服务化适合多 Agent 层面（每个 Agent 是独立服务，通过消息总线通信），不是单 Agent 内的 OODA 阶段拆分。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明你的 Agent 确实实现了"OODA 闭环"，而不是"看似循环实则线性执行"？**
+
+看是否有"基于反馈的状态调整"。线性执行是：步骤 1→2→3 不管结果都往下走。OODA 闭环是：Act 后的 Observation 影响下一轮 Decide——如果 Observation 显示"工具调用失败"，Agent 应该换方案（而非继续原计划）；如果 Observation 显示"信息不够"，Agent 应该追加检索。验证方法：构造需要"基于中间结果调整策略"的任务（如"查 A，如果 A>100 则查 B，否则查 C"），看 Agent 是否真的根据 A 的结果分支。如果 Agent 不管 A 的结果都执行固定流程，就是"伪闭环"。再查 trace 日志，确认每轮的 Thought 引用了上一轮的 Observation（而非无视 Observation 自顾自推理）。
+
+**Q：OODA 闭环的工作原理怎么沉淀成 Agent 框架的默认执行引擎，而不是每个 Agent 重写循环？**
+
+封装成 ExecutionEngine 组件：1）状态机——定义 OODA 四状态（OBSERVING/ORIENTING/DECIDING/ACTING），引擎驱动状态流转；2）循环控制——内置终止条件（final_answer/max_turns/死循环检测），开发者不用手写 while；3）context 管理——自动拼接每轮的 Thought/Action/Observation，配 token 上限和压缩策略；4）trace 日志——自动记录每轮 OODA 四阶段的内容，输出到 LangSmith/dashboard 供调试。开发者只需定义"每个状态下 LLM 的 prompt 模板 + 工具列表"，引擎自动跑闭环。这套写入团队 Agent 框架 SOP，新 Agent 继承 ExecutionEngine，专注于业务逻辑（prompt+工具），不重写循环控制。

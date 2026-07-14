@@ -30,10 +30,10 @@ follow_up:
 - 幂等去重表越来越大怎么清理？
 - 消息处理失败后重试，怎么区分"重复投递"和"首次失败重试"？
 memory_points:
-- 核心方案: idempotent_key去重表 + 同一DB事务(去重检查+业务执行)
-- 并发控制: SELECT FOR UPDATE悲观锁 / version乐观锁
-- 状态机方案: 状态流转(PENDING→PROCESSING→SUCCESS)天然幂等
-- 注意: 去重记录在事务提交后保留(TTL清理)，不能在事务内删除
+- "核心方案: idempotent_key去重表 + 同一DB事务(去重检查+业务执行)"
+- "并发控制: SELECT FOR UPDATE悲观锁 / version乐观锁"
+- "状态机方案: 状态流转(PENDING→PROCESSING→SUCCESS)天然幂等"
+- "注意: 去重记录在事务提交后保留(TTL清理)，不能在事务内删除"
 ---
 
 # 设计MQ幂等消费函数

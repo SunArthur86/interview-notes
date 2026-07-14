@@ -314,3 +314,45 @@ agent.run("帮我订一张明天北京到上海的机票，靠窗")
 - MCP：基于JSON-RPC的开放标准协议，实现跨平台工具发现与生态接入
 - Skills：封装多Tool加Prompt加流程逻辑，抽象层级最高直接复用完整业务
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Function Call、MCP、Skills 这三者是替代关系还是互补？为什么不能只用 Function Call？**
+
+是抽象层级的递进，不是替代。Function Call 是"单次调用"——定义一个函数 schema，LLM 输出 JSON 调用它；MCP 是"标准协议"——把工具的发现、调用、权限统一成 client-server 架构，让一个 Agent 能接入任意 MCP server；Skills 是"能力封装"——把一组相关的工具 + prompt + 知识打包成可复用的能力单元。只用 Function Call 的问题是：工具多了之后 schema 爆炸（context 装不下）、工具复用要重新定义、权限管理散落。MCP 解决互操作，Skills 解决复用。
+
+### 第二层：证据与定位
+
+**Q：你的 Agent 接入了 20 个 Function Call，LLM 经常选错工具，怎么定位是 Function Call 能力本身不够还是工具太多？**
+
+用两个实验：1) 把工具数降到 5 个，看准确率是否回升——如果回升说明是"工具数太多导致注意力分散"（经验上 > 10 个工具准确率明显下降）；2) 保持 20 个工具但用 RAG 召回 top-5 相关工具再喂给 LLM，看准确率——如果回升说明是工具检索的问题，不是 LLM 能力问题。具体指标看 tool_call_success_rate 和 first_attempt_success_rate。
+
+### 第三层：根因深挖
+
+**Q：工具多了 LLM 选错，根因到底是 context 装不下还是 LLM 注意力机制的问题？**
+
+两者都有但后者是主因。20 个工具的 schema 大概 2000-3000 token，远没到 context 上限，所以不是"装不下"。真正的问题是 LLM 在长 schema 列表里的注意力稀释——类似 lost in the middle 现象，中间位置的工具被选中的概率显著低于首尾。验证方法：把同一个工具放在 schema 列表的第 1 位 vs 第 10 位，对比被选中的概率，差异通常 > 15%。
+
+**Q：既然是注意力问题，为什么不直接用更长的 context 模型（128K）来解决？**
+
+长 context 解决的是"装得下"，不是"看得清"。128K context 里放 20 个工具 schema 一样会有注意力稀释。解决注意力问题的正确方向是"减少喂给 LLM 的工具数"——用 RAG 按 query 召回 top-K 工具，或用 MCP 的工具发现机制动态挂载。把 context 从 8K 扩到 128K 是治标，把工具数从 20 降到 5 是治本。
+
+### 第四层：方案权衡
+
+**Q：MCP 提供了标准协议，但引入 MCP server 会增加一层网络调用和进程间通信，延迟和复杂度都上升，怎么权衡？**
+
+权衡点是"工具的复用性和生态" vs "单次调用延迟"。MCP server 跑在独立进程，单次调用比进程内 Function Call 多 5-20ms，但换来的是：1) 同一个 MCP server 被多个 Agent 复用（不用每个 Agent 重新实现）；2) 工具可以独立升级、独立部署；3) 权限收敛到 MCP server 一层。如果工具是高频调用且只服务一个 Agent，用进程内 Function Call；如果工具要跨 Agent 共享、需要独立权限管控，用 MCP。
+
+**Q：为什么不把所有工具都做成 Skills，让 Skills 自己管理 prompt 和工具，减少主 Agent 的负担？**
+
+Skills 的封装粒度太粗会有问题。一个 Skill 内部如果封装了"查订单 + 算退款 + 发通知"三个动作，主 Agent 调用 Skill 时无法单独控制其中一步，灵活性丢失。Skills 适合"完整能力"（如"处理一次完整退款流程"），Function Call 适合"原子操作"（如"查订单状态"）。两者应该共存——原子操作用 Function Call，复合能力用 Skills，不要强行统一。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明引入 MCP 后整体可用性提升了，而不是引入了新故障点？**
+
+对比引入 MCP 前后的两个指标：1) tool_call_success_rate（应该持平或略升，因为 MCP server 可以做更细致的参数校验）；2) 平均故障恢复时间 MTTR（应该下降，因为 MCP server 独立部署可以单独重启）。同时监控 MCP server 的 P99 延迟和错误率，设阈值告警。沉淀为工具治理规范：原子工具用 Function Call、共享能力用 MCP、复合流程用 Skills，三层各有职责边界。

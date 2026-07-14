@@ -176,3 +176,49 @@ while (true) {
 ```
 
 > **记忆要点**：BIO 的痛在"线程等"，NIO 的巧在"Selector 问"，AIO 的好（理论）在"OS 喊"。Netty 选 NIO 是因为 Linux 下 epoll 已经够好。
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：BIO/NIO/AIO 你说本质是"阻塞模型 vs 多路复用 vs 异步回调"，但 AIO（异步 IO）听起来最先进，为什么没普及？**
+
+AIO 在不同平台实现差异大：Linux 的 AIO（libaio、io_uring）和 Java NIO.2 的 AsynchronousChannel 不完全契合，Linux 的 epoll 本质是"多路复用"（NIO），不是真异步。Java AIO 在 Linux 上底层仍用 epoll 模拟，性能优势不明显，且 API 复杂（CompletionHandler 回调嵌套深、调试难）。Windows 的 IOCP 是真异步，但服务器多用 Linux。所以 AIO 在 Linux 上的"先进性"没兑现，Netty 曾支持 AIO 但后来移除（社区认为收益不抵复杂度）。NIO（epoll 多路复用 + Reactor 模型）在 Linux 上已经足够高效（Netty/Dubbo/Redis 都基于它），AIO 没有压倒性优势。所以"没普及"不是 AIO 不好，是 Linux 生态下 NIO 够用且更简单。
+
+### 第二层：证据与定位
+
+**Q：BIO 是"一个连接一个线程"，NIO 是"一个线程管理多连接"，你怎么用代码演示两者的连接数能力差异？**
+
+BIO 演示：写个 ServerSocket accept 循环，每个新连接 new Thread 处理。开 1 万客户端连接，Server 端会有 1 万线程（`jstack` 或 `jvisualvm` 看），内存占用数 GB，再开更多连接会 OOM（线程上限）。NIO 演示：用 Selector 注册 1 万个 SocketChannel，单线程 select 处理事件。1 万连接只有 1 个线程（或几个 EventLoop），内存几十 MB，可扩展到 10 万+ 连接。差异根因：BIO 的线程在 `socket.read()` 上阻塞（等数据），一个连接占一个线程；NIO 的 Selector.select() 监听所有 channel 的就绪事件，一个线程服务多个 channel，read 只在有数据时调用（不阻塞）。这就是"多路复用"的价值——少量线程管大量连接。
+
+### 第三层：根因深挖
+
+**Q：NIO 的 Selector 你说是"多路复用"，底层用什么系统调用？epoll 相比 select/poll 的优势是什么？**
+
+Linux 下 Selector 底层是 epoll（其他平台有 kqueue/IOCP）。epoll 相比 select/poll 的优势：一、O(1) 事件通知——select/poll 每次返回都要遍历所有注册的 fd（O(N)），epoll 直接返回就绪 fd 列表（O(1)）；二、无 fd 数量限制——select 默认 1024 个 fd（FD_SETSIZE），poll 无限但仍是 O(N) 遍历，epoll 用红黑树管理 fd 无上限；三、内存拷贝少——select/poll 每次调用要把 fd 集合从用户态拷贝到内核态，epoll 用共享内存（epoll_wait 只返回就绪 fd，不重传全部）。所以 epoll 在"高连接数 + 低活跃度"（如 IM，1 万连接但只有少数有数据）场景远胜 select/poll。Java NIO 的 Selector 在 Linux 自动用 epoll（无需显式选择）。
+
+**Q：那为什么不直接用 epoll 系统调用，而非要 Java NIO 的 Selector 封装？**
+
+Java NIO 的价值是"跨平台 + 面向对象封装"。跨平台：Linux 是 epoll、macOS 是 kqueue、Windows 是 IOCP，Java NIO 的 Selector 统一了 API（`Selector.open()`、`select()`），JVM 自动用平台的最佳实现。直接调 epoll（通过 JNI）就绑死 Linux，失去跨平台。封装：Selector 把 fd 管理、事件注册、就绪返回包装成面向对象 API（SelectionKey、Channel），比 C 的 epoll_create/epoll_ctl/epoll_wait 易用。但封装也有代价——性能损耗（JIT、GC、对象分配）、灵活性差（无法用 epoll 的某些高级特性如 edge-triggered，Java NIO 默认 level-triggered）。所以高性能场景（如 DPDK、零拷贝）会绕过 Java NIO 直接 JNI，但通用网络编程用 NIO/Netty 够用。
+
+### 第四层：方案权衡
+
+**Q：NIO 你说"非阻塞"，但 read/write 仍可能返回 0（无数据），这跟"阻塞等到有数据"相比有什么实际差异？**
+
+NIO 的"非阻塞"指"channel 配置 non-blocking 后，read/write 不阻塞线程"——read 无数据返回 0（或更少字节），write 缓冲区满返回写入字节数（可能小于预期）。线程不阻塞，可以"继续干别的"（如处理其他 channel）。BIO 的 read 会阻塞线程直到有数据（线程挂起）。实际差异：一、线程利用率——BIO 一个线程只能等一个连接（阻塞），NIO 一个线程可轮询多个连接（非阻塞）；二、编程模型——BIO 是"顺序流式读"（while read line），NIO 是"事件驱动"（selector 告诉你哪个 channel 就绪再读）；三、半包粘包——BIO 的流是"读一次是一次"，NIO 的 channel 是"读到的字节数不定"，要自己处理"一条消息分多次读"或"多条消息一次读"。所以 NIO 不是"更快的 BIO"，是"完全不同的编程模型"，复杂度也高。
+
+**Q：为什么不所有 IO 都用 NIO，BIO 不是更简单吗？**
+
+BIO 简单但连接数受限——每个连接一个线程，千级连接就吃力。NIO 复杂但能扛万级连接。选型看连接数：一、低连接数（百级以内）+ 业务简单——BIO 够用且代码清晰（如内部管理工具、RPC 的少量调用）；二、高连接数（万级）+ 高吞吐——必须 NIO（如 IM、推送、网关）；三、超低延迟（如游戏）——可能用 AIO 或更底层（netty native epoll transport 绕过 Java NIO）。实际工程：99% 用 Netty（封装了 NIO），1% 用 BIO（极简场景）。Spring Boot 的 Tomcat 默认 NIO（Tomcat 8+），不是 BIO——说明即使是 Web 服务器也普遍用 NIO。所以"都用 NIO"是工程主流，BIO 主要在教学和极简工具里。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证 BIO 和 NIO 在高连接数下的性能差异？**
+
+压测对比：写 BIO Server（thread per connection）和 NIO Server（Selector 单线程），用同一客户端程序开 N 个连接（N=100、1000、10000、100000）。监控：一、内存——BIO 的线程栈占用（`jmap` 或 RSS），N=10000 时 BIO 应数 GB，NIO 几十 MB；二、CPU——BIO 的线程切换开销（`top -H` 看线程数），NIO 单线程无切换；三、连接建立时间——BIO 每连接 new Thread 的开销，NIO 注册 channel 几乎瞬时；四、吞吐——相同负载下 NIO 吞吐应远高于 BIO（N 大时）。验证 epoll：`strace -e epoll_wait, epoll_ctl -p <pid>` 看 Java NIO 实际调用的系统调用，应看到 epoll_create1/epoll_ctl/epoll_wait。这些验证直观展示 IO 模型的性能差异。
+
+**Q：这道题做完，你沉淀出了什么可复用的 IO 模型选型经验？**
+
+三场景选型：一、低连接 + 简单业务——BIO（代码清晰，如内部工具）；二、高连接 + 通用网络服务——NIO（用 Netty 封装，如 IM/RPC/网关）；三、极致性能 + 平台特定——AIO 或 native transport（绕过 Java NIO，如高频交易）。核心原则："连接数决定 IO 模型，BIO 适合百级，NIO 适合万级以上；不直接用 NIO API（太复杂），用 Netty 等框架封装；EventLoop 不阻塞是 NIO 的核心约束。" 这套经验也适用于其他语言（Go 的 net 包本质是 NIO + goroutine，Rust 的 tokio 类似 Netty），底层都是"多路复用 + 事件驱动"。

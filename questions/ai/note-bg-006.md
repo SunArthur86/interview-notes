@@ -393,3 +393,49 @@ def agentic_rl_training(model, tools, tasks, reward_model):
 - Loss Mask设计：因工具结果由系统产生，非模型能力，故必须置为False不参与反传
 - 架构特点：通过上下文拼接把多轮交互展平，形成有监督的连续生成序列
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Agentic RL 训练 Agent 时，为什么工具返回的 observation token 必须 mask 掉不参与 loss，让模型一起学不行吗？**
+
+Agent loop 里模型生成的 token 是"动作"（如决定调用什么工具、传什么参数），工具返回的 observation 是"环境状态"（如搜索结果、代码执行输出）。如果让 observation 参与 loss，模型会被优化去"预测/记忆工具返回的内容"，而不是学习"什么时候调用什么工具"——这是两个完全不同的学习目标。更糟的是 observation 通常很长（搜索结果几千 token），它们的 loss 会淹没模型生成动作的 loss，导致模型不学调用策略而学背诵工具输出。所以必须 mask observation，只对模型自己生成的 token 算 loss。
+
+### 第二层：证据与定位
+
+**Q：你怎么验证训练时 mask 真的生效了，observation token 没有参与梯度更新？**
+
+两个层面验证：1）代码层——在 loss 计算前打印 labels 的 mask 分布，确认 observation 区间的 label 是 -100（PyTorch 的 ignore_index）；2）梯度层——做一个反向实验，分别跑"有 mask"和"无 mask"两版，对比相同步数下模型在 tool_call_success_rate 上的表现。如果无 mask 版本的 tool_call 成功率明显低（如 40% vs 75%）且模型倾向输出长篇工具结果复述，就证明 mask 是必要的。还可以看 loss 曲线——无 mask 版本 loss 会偏低（observation 容易预测），mask 版本 loss 反映真实动作学习难度。
+
+### 第三层：根因深挖
+
+**Q：假设 Agent 训练后 tool_call_success_rate 很低（只有 30%），你怎么定位是 mask 没做对，还是模型本身没学会调用策略？**
+
+分层排查。第一步：确认 mask——检查训练数据的 token 序列，确认 observation 区间 label=-100，工具调用的参数 token label 是真实值（参与 loss）。第二步：确认 reward 信号——看 reward 分布，如果 reward 全 0 或全相同，模型根本没有学习信号，问题在 reward 设计不在 mask。第三步：看模型生成——采样模型在 eval prompt 上的输出，如果模型会输出 `<tool_call>` 标记和合理参数但工具执行失败，是参数学习不够；如果模型根本不输出工具调用标记，是 mask 问题导致模型没学到"何时调用"的信号。
+
+**Q：为什么不把工具调用的参数 token 和推理 token（Thought）都用同一个权重参与 loss，而是要分别赋权？**
+
+Thought（推理过程）和 Action（工具调用参数）的学习难度和重要性不同。Thought 是自由文本，错误成本相对低；Action 的参数必须严格符合工具 schema（如 JSON 格式、参数类型），错误一个字段工具就调用失败。如果用等权 loss，模型会在 Thought 上"偷分"（生成长篇推理降低 loss）而忽视 Action 准确性。正确做法是 Action token 的 loss 权重 > Thought（如 2:1），或者在 Action 区间用 label smoothing 容忍格式噪声。DeepSeek R1 的做法是对 Action 区间单独计算 token-level accuracy 监控，确保格式正确率 >95%。
+
+### 第四层：方案权衡
+
+**Q：observation 被 mask，但有些 observation 里包含关键信息（如搜索到的正确答案），模型下一轮要基于它推理，这种"跨轮信息"模型怎么学到？**
+
+靠下一轮生成时 observation 作为 context 输入，模型在前向时 attention 到这些 token，影响后续生成。loss 只是不对 observation 反传，但 observation 在前向计算中是可见的（attention 权重会用到）。所以模型学到的是"如何在 context 里有 observation 的情况下生成下一步"——这是 in-context learning，不是参数记忆。验证方法：测同一模型在"observation 在 context"和"observation 被 mask 掉"两种输入下的 tool_call 成功率，前者应显著高，证明模型确实在用 observation 做条件推理。
+
+**Q：为什么不直接把工具返回结果也当训练数据让模型学，像 SFT 那样让模型模仿工具输出，不就学到工具知识了吗？**
+
+这会让模型混淆"动作"和"状态"的边界。如果模型学会"输出工具结果"，它在推理时会自己编造工具返回（幻觉），而不是真正去调用工具——因为它被训成"预测 observation"了。这违反 Agent 的核心设计：工具调用是模型主动发起的 action，结果是环境给的 feedback，两者角色不能混。SFT 阶段教模型"如何生成工具调用参数"是对的（这些是动作），但教模型"生成工具结果"是错的。所以 mask 不是为了省 loss，是为了维护正确的因果关系——模型只对自己的动作负责。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明 Agentic RL 训练后模型真的学会了"何时调用工具"的策略，而不是过拟合到训练集的工具调用模板？**
+
+泛化测试：1）新工具测试——给模型一个训练时没见过的工具（新 schema、新描述），看它能否根据 description 正确调用，能调用说明学到了通用调用策略而非背模板；2）反例测试——给一个不需要工具的简单问题（如"1+1=?"），看模型是否克制不调用工具直接回答，如果疯狂调用工具就是过拟合到"必须调用"；3）工具选择测试——给多个工具，看模型能否选对最合适的（如查天气选 weather_api 而非 search）。三个测试都通过才证明学到了真正的策略，过拟合的模型会在新工具/反例上崩溃。
+
+**Q：Agent loop 的 mask 设计和 reward 设计怎么沉淀成团队框架的默认能力，避免每个项目重新踩坑？**
+
+封装成训练框架的标准组件：1）mask 自动生成——数据预处理时根据 `<tool_call>...</tool_call>` 和 `<observation>...</observation>` 标记自动生成 mask，开发者不用手写；2）Action/Thought loss 权重可配置——默认 Action:Thought=2:1，提供 knob 调整；3）reward 模板——内置常见 reward（tool_call_success_rate、final_answer_accuracy、format_validity）的组合模板，按场景选；4）泛化测试集——框架自带新工具/反例/工具选择测试用例，训练完自动跑一遍出报告。这套能力写入 Agent RL 训练 SOP，新项目一键复用。

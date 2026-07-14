@@ -294,3 +294,49 @@ class TaskCenter {
 - Task核心追踪：必须包含状态机、进度(0-100)、关联ID列表以及贯穿全局的traceId。
 - 独立解耦设计：输入引用抽象为独立对象以便管理上下文，授权对象确保文件系统安全。
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：为什么要把任务中心拆成五大对象（Task/InputRef/Artifact/Permission/Notification），而不是用一个大的 Task 对象把所有信息嵌套进去？**
+
+因为"大对象"会导致三个工程灾难：(1) 职责膨胀——Task 对象里嵌套产物内容、权限信息、通知列表，一个对象几十个字段，任何修改都可能影响不相关的功能；(2) 序列化爆炸——Task 对象里嵌套了 5 个 Artifact 的完整 HTML 内容，每次持久化 Task 都要序列化几 MB 数据，性能极差；(3) 查询低效——想知道"这个用户授权过哪些文件"，如果权限嵌在 Task 里，要遍历所有 Task 再提取权限字段；如果 Permission 是独立对象，直接查 Permission 表即可。五大对象的本质是"单一职责原则"在 AI 任务建模中的应用：Task 管状态机和追踪（traceId）、InputRef 管上下文引用、Artifact 管产物内容和版本、Permission 管授权范围和有效期、Notification 管通知分发和交互。它们通过 ID 引用关联（Task.inputRefIds 指向 InputRef 列表），形成对象图而非嵌套对象，每个对象可独立演进、独立查询、独立持久化。
+
+### 第二层：证据与定位
+
+**Q：你怎么定位"任务状态混乱"是对象模型设计问题，而不是状态管理代码的 bug？**
+
+用"对象不变式验证"定位。五大对象各自有不变式（如 Task.status 只能按 queued→running→review→done 流转，不能跳过 running 直接到 done；Artifact.version 必须递增；Permission.status=granted 时 expiresAt 必须 >now）。如果状态混乱是因为不变式被破坏（如出现 status=done 但 progress=50 的 Task），说明是对象模型缺乏约束——状态机没有在对象层做校验，允许了非法状态转换；如果不变式都成立但用户仍看到混乱（如任务列表顺序不对、产物归属错乱），说明是 UI 层的查询/排序逻辑 bug，与对象模型无关。具体定位方法：写一个对象不变式检查器（运行时遍历所有对象验证不变式），在开发模式下持续运行。如果检查器频繁报警，根因是对象模型设计；如果不报警但 UI 仍乱，根因是 UI 逻辑。
+
+### 第三层：根因深挖
+
+**Q：为什么 InputRef 要独立成对象，而不是直接在 Task 里存一个文件路径数组（inputFiles: string[]）？**
+
+因为"输入"不只是"文件路径"，它是一个有自己生命周期的实体。InputRef 独立成对象的三个理由：(1) 输入需要提取状态管理——一个网页 URL 作为输入，需要经过"抓取→正文提取→摘要→Token 计算"的异步流程，状态从 pending→extracted→stale 流转，这个生命周期独立于 Task（Task 可能在 InputRef 还在提取时就已创建）；(2) 输入需要跨任务复用——同一个竞品分析报告 PDF 可能被 3 个不同任务引用，如果每个 Task 各存一份路径，无法做"素材去重"和"提取结果缓存"；InputRef 独立后，多个 Task 引用同一个 InputRef.id，提取只做一次；(3) 输入需要"过期检测"——文件可能被用户删除或修改，InputRef 独立后可以定期检查 stale 状态（对比文件 hash），通知所有引用它的 Task"你的输入素材已过期"。如果只是路径数组，这些能力都无法实现——路径不携带状态、不可复用、不可检测。
+
+**Q：那如果团队觉得五个对象太多，想把 Permission 和 Notification 合并进 Task（只保留 Task/InputRef/Artifact 三个），为什么不简化？**
+
+因为"合并 Permission 和 Notification 进 Task"会丧失两个核心能力。Permission 独立的价值：(1) 权限可以跨任务复用——用户授权了"读取 /Users/you/projects 目录"，这个授权对后续所有任务都有效，不需要每个 Task 各申请一次；如果权限嵌在 Task 里，每个新任务都要重新授权，体验灾难；(2) 权限需要独立撤销——用户在设置页"撤销某项授权"时，如果权限嵌在 Task 里，要遍历所有 Task 找到嵌套的权限记录逐个撤销；Permission 独立后，撤销操作只需改一条 Permission 记录的状态。Notification 独立的价值：(1) 通知需要独立查询——用户查看"所有未读通知"时，如果通知嵌在 Task 里，要遍历所有 Task 提取通知字段再过滤未读；Notification 独立后直接查 Notification 表；(2) 通知有独立生命周期——一条通知从创建到已读到点击，状态流转独立于 Task（Task 可能已完成但通知还没读）。所以五个对象不是"过度设计"，而是各自有不可合并的生命周期和查询需求。
+
+### 第四层：方案权衡
+
+**Q：对象之间的关联你用 ID 引用（Task.artifactIds: string[]）还是嵌套对象（Task.artifacts: Artifact[]），怎么选？**
+
+选 ID 引用，不选嵌套。根因是"序列化/反序列化成本"和"数据一致性"。嵌套的问题：(1) 序列化爆炸——Task 对象嵌套了 Artifact 列表，每个 Artifact 的 content 可能是几 MB 的 HTML，序列化一个 Task 就是几十 MB，持久化和跨窗口传输都极慢；(2) 数据重复——同一个 Artifact 出现在 Task.artifacts 和 ArtifactStore 中两份，更新时要同步两处，容易不一致；(3) 查询僵化——想查"所有 status=draft 的 Artifact"，如果嵌套在 Task 里，要遍历所有 Task 再展开 artifacts 字段过滤；ID 引用时直接查 ArtifactStore。ID 引用的代价是"查询时需要 join"（拿到 Task 后要再查 ArtifactStore 获取详情），但这在本地存储（IndexedDB/SQLite）中是 O(1) 的主键查询，成本极低。所以"ID 引用 + 独立 Store"是大对象图的标准实践（关系型数据库的设计理念），嵌套只适用于"子对象完全属于父对象且不会被独立查询"的场景（如 Task.error 嵌套在 Task 里）。
+
+**Q：那如果团队觉得 ID 引用导致查询链太长（查 Task→查 InputRef→查提取结果，三次查询），为什么不把高频关联的 InputRef 直接嵌套进 Task？**
+
+因为"查询链长"是 Store 层应该优化的性能问题，不是"破坏对象独立性"的理由。优化方法：(1) 批量预加载——TaskStore.getTaskWithDetails(taskId) 一次性 join 查询 Task + 关联的 InputRef + Artifact，返回一个聚合视图（DTO），前端只调一次接口；(2) 缓存层——对高频访问的 InputRef（如最近 7 天的提取结果）做内存缓存，第二次查询直接命中缓存无需 IO；(3) 响应式订阅——前端首次加载 Task 后订阅关联对象的变化（InputRef 提取完成时推送更新），避免轮询。这三种优化都保留了对象的独立性（InputRef 仍在独立的 Store 里），只是在查询层做了聚合。嵌套 InputRef 进 Task 的代价是丧失了"InputRef 跨任务复用""独立过期检测""独立提取状态管理"等能力——这些能力的丧失远比"多一次查询"的成本高。所以根因是"查询性能要用查询层的手段优化（预加载/缓存/订阅），而非用数据层的反范式（嵌套）来交换"。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证"五大对象模型"比"单一大对象"更优，怎么证明拆分是值得的？**
+
+用工程效率指标验证：(1) 新功能开发成本——新增一个"通知批量已读"功能，在五大对象模型下只需操作 NotificationStore（一个对象），改动约 20 行代码；在单一大对象下要遍历所有 Task、提取嵌套的通知字段、逐个修改再写回，改动约 100 行且容易出 bug。统计团队一个月内的平均功能开发成本，如果拆分后降低 30% 以上，证明有效。(2) 状态事故率——状态不一致导致的 bug 数，拆分后因对象边界清晰、各自有独立 Store 做校验，事故率应显著下降。(3) 单元测试覆盖率——五大对象各自可独立测试（TaskStore 的测试不依赖 ArtifactStore），拆分后单元测试覆盖率应达到 80% 以上；单一大对象因为耦合严重，覆盖率通常不到 40%。如果这三个指标都显著改善，就证明五大对象的拆分成本（多写几个 Store）远小于其工程收益。
+
+**Q：怎么让团队在扩展对象模型（如新增第六个对象 Schedule，或给 Task 新增字段）时，自觉遵循五大对象的设计原则，而不是随意给 Task 加字段或新建孤立对象？**
+
+把对象模型做成"类型系统 + 代码生成"的强制约束。第一，五大对象的 TypeScript 接口定义在中央 schema 文件里（如 types/domain.ts），所有对象必须继承自 BaseDomainObject（包含 id/createdAt/updatedAt/traceId），新增字段必须走 schema review；第二，每个对象有对应的 Store（TaskStore/InputRefStore/...），UI 层只能通过 Store 的 API 访问对象，不允许直接构造对象字面量——这通过 ESLint 规则禁止 `new Task()`，强制走 `taskStore.create()`；第三，新增对象必须提交"对象设计 RFC"——说明这个对象的职责边界、与现有五大对象的关联关系、不可合并进现有对象的理由，RFC 通过后才能加 schema；第四，给 Task 加字段时自动触发"职责审查"——如果新字段（如 permissions: Permission[]）与现有对象（PermissionStore）职责重叠，CI 报警提示"这个字段应该用 permissionIds: string[] 引用 Permission 对象"。这样对象模型就从"个人随意改"变成了"受约束的演进"。
+

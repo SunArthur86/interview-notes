@@ -237,3 +237,45 @@ for d_k in d_k_values:
 - 除以根号$d_k$刚好使点积方差缩放回1，而除以$d_k$会导致区分度不足退化为均值。
 - 口诀：根号缩放保方差，大维不惧梯度降。
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Self-Attention 里这个 $\sqrt{d_k}$ 你能不背公式，讲清楚它到底在防什么、不防会怎样吗？**
+
+它防的是大 $d_k$ 下点积值发散导致 Softmax 进入饱和区。$d_k=512$ 时点积标准差约 22.6，Softmax 输出会有一项接近 1、其余接近 0，梯度 $\frac{\partial}{\partial s_i}\text{Softmax}$ 里的 $p_i(1-p_i)$ 在 $p_i\to 1$ 时趋于 0，反向传播几乎没信号，训练停滞。动机不是"让数值好看"，是让梯度能回传。
+
+### 第二层：证据与定位
+
+**Q：你怎么在实验里观察到"Softmax 饱和导致梯度消失"，而不是人云亦云？**
+
+两个可观测信号：一是 dump 出训练前几百步的 attention logits，看其标准差是否随 $d_k$ 线性增长、是否远超 1；二是记录每层 attention 权重矩阵的最大值，若长期贴近 1.0 且对应 token 位置几乎不变，说明 attention 退化成 hard attention。再做对照实验：去掉 $\sqrt{d_k}$ 训练相同步数，观察 loss 曲线是否早期就 plateau、梯度范数是否趋近 0。
+
+### 第三层：根因深挖
+
+**Q：你说除以 $\sqrt{d_k}$ 是因为点积方差 $\text{Var}(QK^\top)=d_k$。这个推导依赖什么假设？假设不成立会怎样？**
+
+依赖 Q、K 各分量独立、均值 0、方差 1 的 i.i.d. 假设。训练初期权重接近随机初始化时成立，但训练中后期 $W_Q$、$W_K$ 学到的分布方差远不是 1，某些 head 的 key 会塌缩到低秩子空间。这时固定 $\sqrt{d_k}$ 缩放就不再最优——这也是为什么有些工作（如 Reformer、NUQA）改用可学习缩放因子或按 head 自适应缩放。
+
+**Q：那为什么不干脆除以 $d_k$（线性缩放）或 $d_k^{1.5}$，$\sqrt{d_k}$ 凭什么是最优？**
+
+数学上是刚好把方差压回 1：$\text{Var}(S/\sqrt{d_k})=\text{Var}(S)/d_k=d_k/d_k=1$。除以 $d_k$ 会把方差压到 $1/d_k$，logits 全挤在 0 附近，Softmax 输出接近均匀分布，attention 退化为 mean pooling，丧失选择性。$\sqrt{d_k}$ 是"既消除维度膨胀、又保留区分度"的唯一点，从方差归一化目标反推出来的，不是调参调出来的。
+
+### 第四层：方案权衡
+
+**Q：除以 $\sqrt{d_k}$ 之后仍有数值问题（FP16 下点积溢出），你怎么处理？**
+
+用 FP32 做 Softmax 计算（即 `torch.nn.functional.scaled_dot_product_attention` 的内部实现），或直接上 Flash Attention——它把 $QK^\top$ 分块在 SRAM 里算，避免在 HBM 里实例化大矩阵，同时内部做了数值稳定的 online Softmax。如果用线性 attention 或把 Softmax 换成 ReLU 核（如 Performer），可以彻底绕开这个问题，但表达力会下降，权衡是精度换稳定与速度。
+
+**Q：为什么不直接用加性 attention（$\text{score}(q,k)=v^\top \tanh(Wq+Uk)$）规避点积方差问题？**
+
+加性 attention（Bahdanau 原始版）确实没有方差随维度爆炸的问题，但它无法写成矩阵乘法，无法用 GPU 的 tensor core 加速，复杂度常数大。点积 attention 配 $\sqrt{d_k}$ + Flash Attention 在 GPU 上快一个数量级，这才是 Transformer 能 scale 到百亿参数的工程前提。理论优雅要让位于可大规模并行。
+
+### 第五层：验证与沉淀
+
+**Q：如果有人质疑你"$\sqrt{d_k}$ 只是经验技巧"，你怎么用实验反驳？**
+
+设计三组对照实验，固定模型与数据：A 组不缩放、B 组除以 $\sqrt{d_k}$、C 组除以可学习标量（初始化为 $\sqrt{d_k}$）。对比三组的收敛步数到目标 loss、attention 熵分布、各 head 的有效 rank。预期 B 和 C 接近且显著优于 A，证明缩放是数学必需而非玄学；C 略优于 B 说明可学习缩放在长训练里有边际收益。结果沉淀成内部实验报告，附 attention logits 直方图作为可视化证据。
+

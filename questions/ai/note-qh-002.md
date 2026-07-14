@@ -167,3 +167,45 @@ A: 之后。Continuous batching先组装batch（决定哪些请求在当前itera
 - 两者顺序：先Continuous Batching组batch，后Cascade Attention在组内检测并复用前缀。
 - VLM显存挑战：因为单张图产生上千视觉Token，所以极度依赖PagedAttention按需分配防OOM。
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Continuous Batching 为什么能在 token 级别动态拼 batch，而不是等请求凑齐？**
+
+因为 LLM 推理的 decode 阶段是"逐 token 生成"，每个 token 都是一次 forward。Continuous Batching 在每次 forward 前检查：哪些请求生成了新 token、哪些请求已经完成可以踢出、有没有新请求可以插入。这样 batch 的组成是逐 token 变化的，不需要等。本质是把"请求粒度的 batch"细化成"token 粒度的 batch"，用 GPU 的并行能力处理多个请求的不同步进度。
+
+### 第二层：证据与定位
+
+**Q：开了 Continuous Batching 后 P99 延迟反而升高了，怎么定位？**
+
+看两个指标：1) batch size 的分布——如果 P99 时刻 batch size 特别大（如 > 64），说明太多请求挤在一起，每个请求的 per-token 计算变慢；2) prefill 和 decode 的混批情况——如果长 prompt 的 prefill 和短请求的 decode 混在一个 batch，prefill 会阻塞 decode 导致短请求延迟升高。解法：prefill 和 decode 分离调度（chunked prefill），限制单 batch 最大 token 数。
+
+### 第三层：根因深挖
+
+**Q：Cascade Attention 复用共享前缀的 KV Cache，但前缀什么时候才算"共享"？根因判断标准是什么？**
+
+判断标准是"多个请求的 system prompt + few-shot + 工具 schema 完全相同"。这些前缀在多个请求间是字节级一致的，只算一次 KV Cache 就能给所有请求复用。根因是"前缀相同"这个属性，不是"前缀相似"。如果前缀只是语义相似但 token 序列不同，Cascade Attention 无法复用（KV Cache 是 token 序列的函数，序列变了 Cache 就失效）。所以 Cascade Attention 的收益高度依赖"前缀是否真的一致"。
+
+**Q：那如果用户 prompt 各不相同，Cascade Attention 不就没用了？为什么不直接每个请求独立算 KV Cache？**
+
+要看前缀结构。即使 user query 不同，system prompt（如"你是一个客服 Agent"）+ tool schema（一堆工具定义）通常是相同的，这部分前缀可能占 2000+ token。100 个并发请求共享这 2000 token 的 KV Cache，节省 2000 * 100 = 20 万 token 的 prefill 计算，收益巨大。独立算的话每个请求都要重新 prefill 这 2000 token，是纯浪费。所以 Cascade Attention 的价值在"前缀相同的部分"，哪怕 user query 各异。
+
+### 第四层：方案权衡
+
+**Q：Cascade Attention 要识别共享前缀，引入了前缀匹配和 Cache 管理的开销，什么时候不值得用？**
+
+当请求的前缀完全随机、没有共同部分时不值得。比如每个请求的 system prompt 都不同（动态生成），或者前缀很短（< 100 token），Cascade Attention 的匹配开销 > 复用收益。经验阈值：共享前缀 > 500 token 且并发请求 > 10 个时，Cascade Attention 明显正向。短前缀 + 低并发场景，直接独立计算更简单。
+
+**Q：为什么不直接把 system prompt 的 KV Cache 常驻内存，所有请求都用，而要搞 Cascade Attention 的动态匹配？**
+
+system prompt 常驻是 Cascade Attention 的一个简化版，适用于"前缀完全固定且只有一层"的场景。但实际场景更复杂：不同 Agent 实例有不同的 system prompt（客服 Agent vs 推荐 Agent），不同租户有不同的工具 schema，用户还可能带不同的 few-shot 示例。前缀是"分层的"（system → tools → few-shot → history → query），需要树形结构管理 KV Cache，按请求的实际前缀路径匹配。常驻内存只解决最简单的场景，Cascade Attention 解决通用的树形共享。
+
+### 第五层：验证与沉淀
+
+**Q：怎么衡量 Cascade Attention 的实际收益？**
+
+对比开/关 Cascade Attention 的两个指标：1) prefill 阶段的 GPU FLOPS 利用率——开启后应该下降（计算量减少）；2) 单请求的 TTFT（Time To First Token）——开启后应该下降 30-50%（共享前缀不重算）。同时监控 Cache 命中率（prefix_cache_hit_rate）和内存占用（KV Cache 总内存），确保没有因为 Cache 管理开销吃掉收益。沉淀为推理引擎调优手册：前缀长度阈值、Cache 淘汰策略（LRU）、共享检测算法的选型。

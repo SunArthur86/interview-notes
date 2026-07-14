@@ -153,3 +153,49 @@ public class MyHandler extends ChannelInboundHandlerAdapter {
 3. **精准控制**：有些事件只想让"后续的几个 Handler"处理，不想全链通知
 
 > **面试记忆口诀**：**"Channel/Pipeline 是全链广播，ChannelHandlerContext 是定点投递"**。前者沿整条 Pipeline 传播，后者只从当前 Handler 的下一个开始——这是 Netty 让你能精细控制事件流的关键设计。
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：ChannelHandlerContext 你说是"Handler 在 Pipeline 中的上下文"，但 Handler 自己不就是 Pipeline 的一员吗，为什么还要 Context 包装？**
+
+Context 的核心作用是"提供 Handler 与 Pipeline 交互的能力"。Handler 是业务逻辑（如 channelRead 里处理消息），它需要：一、触发下一个 Handler（fireChannelRead 传消息、write 发出站数据）；二、访问 Channel 和 EventLoop（ctx.channel()、ctx.executor()）；三、管理生命周期（ctx.close()、ctx.deregister()）；四、读写 Attribute（ctx.alloc()、ctx.attr(key)）。这些操作都通过 Context 完成，而非 Handler 直接做。Context 持有"前驱/后继 Handler 的引用"（双向链表），所以 ctx.fireChannelRead 能找到下一个 Handler。所以 Context 是"Handler 与 Pipeline 的胶水层"，Handler 专注业务、Context 管交互。这种分离让 Handler 可复用（不依赖特定 Pipeline），不同 Pipeline 复用同一 Handler。
+
+### 第二层：证据与定位
+
+**Q：ctx.fireChannelRead(msg) 和直接调 nextHandler.channelRead(msg) 有什么区别？为什么用 ctx？**
+
+ctx.fireChannelRead 内部找当前 ctx 的下一个 Inbound Handler，调用它的 channelRead。这是"责任链传递"的标准方式。如果直接调 nextHandler.channelRead（绕过 ctx），要自己维护"下一个 Handler 是谁"的引用，且丢失 Netty 的内部状态（如 ctx 的执行标记、事件触发统计）。另外，ctx 在 Netty 内部是双向链表节点，fireChannelRead 是 O(1) 找下一个（直接 next 指针），高效。直接调 nextHandler 要遍历查找，慢且易错。所以 ctx 是"责任链传递的唯一正确方式"，不要绕过。验证：在 handler 里打日志看 ctx.fireChannelRead 后下一个 handler 是否触发，顺序是否正确。
+
+### 第三层：根因深挖
+
+**Q：ctx.write 和 channel.write 你说"起点不同"，但两者最终都到 socket，差异在哪？**
+
+起点不同导致"经过的 Handler 不同"。channel.write 从 Pipeline 的 tail（最后一个 Outbound handler 的下一个）开始，向前经过所有 Outbound handler（编码、日志、SSL 等）到 head（socket）。ctx.write 从当前 ctx 的前一个 Outbound handler 开始，跳过当前 ctx 之前的 Outbound handler。差异：如 Pipeline 是 [Decoder, Business, Encoder, Logger]，Business 里调 ctx.writeAndFlush，从 Business 的前一个 Outbound handler（Encoder）开始，经过 Encoder、Logger 到 socket。如果用 channel.writeAndFlush，从 tail（Logger 之后）开始，也经过 Encoder、Logger。差异在"如果 Business 之前有 Outbound handler（如 SSL），ctx.write 跳过它，channel.write 经过它"。所以 ctx.write 是"从当前点出发"，channel.write 是"从尾出发"。场景：Business 要发原始字节（不经过 SSL 加密）用 ctx.write，要发完整处理（经过所有 Outbound）用 channel.write。
+
+**Q：那为什么不所有 write 都从 head（最早），统一行为？**
+
+因为不同场景需要不同起点。如 SSL Handler 在最前（head 端），加密所有出站数据。如果 Business 用 ctx.write 且 SSL 在 Business 之前（Pipeline 的 head 端），ctx.write 跳过 SSL，数据不加密——这是某些场景的需求（如内部数据不加密）。如果统一从 head，所有 write 都加密，无法选择性绕过。所以"起点可选"提供了灵活性——大部分场景用 channel.write（完整处理）、特殊场景用 ctx.write（精确控制）。这是 Netty 的设计——不强制统一行为，让开发者按需选。代价是理解成本（要清楚 Pipeline 结构），但收益是灵活。
+
+### 第四层：方案权衡
+
+**Q：ctx.executor() 返回绑定的 EventLoop，但 ctx 本身是"静态"的（绑定 Channel），EventLoop 怎么从 ctx 拿？**
+
+ctx 持有 Channel 引用，Channel 持有 EventLoop 引用（注册时绑定），所以 ctx.executor() 通过 channel.eventLoop() 间接拿。这是"对象图导航"——ctx → channel → eventLoop。ctx.executor() 的用途：在非 EventLoop 线程执行某操作时，提交到 EventLoop——如业务线程要把结果写回 Channel，`ctx.executor().execute(() -> ctx.writeAndFlush(result))`，确保 write 在 EventLoop 线程执行（线程安全）。直接 ctx.writeAndFlush 也行（Netty 内部会判断，如果不在 EventLoop 线程，自动提交到 EventLoop 队列），但显式 ctx.executor().execute 更明确意图。所以 ctx.executor() 是"把任务调度到 EventLoop"的入口，用于跨线程协作。
+
+**Q：为什么不直接 channel.eventLoop()，而非要 ctx.executor()？**
+
+两者等价（ctx.executor() 内部就是 channel.eventLoop()）。提供 ctx.executor() 是为了"API 一致性"——Handler 里所有操作都通过 ctx（fire*、write、executor、alloc），不直接碰 channel，让 Handler 代码风格统一。所以 ctx.executor() 是 API 设计的便利，不是功能差异。Handler 里推荐用 ctx.* 系列（与 Pipeline 集成深、风格一致），channel.* 用于"非 Handler 代码"（如业务层拿 channel 引用调用）。这是"风格选择"，不是性能或功能差异。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么验证 ctx 在 Pipeline 中的位置和事件传递正确？**
+
+两类验证：一、位置——在 handler 的 channelRead 里打印 `ctx.name()` 和 `ctx.pipeline().names()`，看自己在 Pipeline 中的位置；二、传递——在 Decoder 的 channelRead 末尾调 `ctx.fireChannelRead(decoded)`，在 Business 的 channelRead 打日志，触发读事件，应看到 Decoder 先触发、Business 后触发（顺序正确）。如果 Business 没触发，是 Decoder 漏了 fireChannelRead（消息吞掉）。验证 ctx.write 起点：Business 用 ctx.write，在 Business 之前的 Outbound handler 打日志，应不触发（跳过）；用 channel.write 应触发（经过）。线上监控：各 Handler 的 fire* 调用次数（应匹配，不匹配说明某 handler 吞消息）、ctx.write 的字节数（监控出站数据量）。
+
+**Q：这道题做完，你沉淀出了什么可复用的 ChannelHandlerContext 使用经验？**
+
+四条经验：一、ctx 是 Handler 的"交互接口"——所有 Pipeline 交互（fire*、write、executor、alloc）都通过 ctx，不直接操作 channel；二、ctx vs channel.write——ctx.write 从当前点出发（跳过之前的 Outbound），channel.write 从 tail 出发（经过全部），按需选；三、fire* 不忘——Decoder 解码后要 ctx.fireChannelRead 传给下一个，漏了消息丢失；四、executor 跨线程——非 EventLoop 线程操作用 ctx.executor().execute 提交到 EventLoop，保证线程安全。核心："ctx 是 Handler 与 Pipeline 的胶水，正确使用 ctx 保证事件传递和线程安全。"

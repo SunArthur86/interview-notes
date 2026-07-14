@@ -180,3 +180,45 @@ class DecoderLayer(nn.Module):
 - Decoder特有Mask：因为有Masked Self-Attn遮挡未来词，所以只能按序自回归生成。
 - Decoder特征融合：通过Cross-Attention（Q来自Decoder，K与V来自Encoder）获取源句信息。
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Transformer 抛弃 RNN 用纯 Attention，动机是"并行"还是"长距离依赖"？哪个是决定性的？**
+
+两者都是动机，但"并行训练"是决定性的。RNN 的长距离依赖问题已经被 LSTM 的门控机制部分缓解，真正限制 RNN 的是无法并行训练——序列长度 N 时 RNN 要做 N 步串行计算，GPU 利用率极低。Transformer 的 Self-Attention 是 N² 的矩阵运算，可以完全并行，训练效率提升 10-100 倍。没有并行训练，就没有"用更多数据训更大模型"的可能性，也就没有 LLM 的scaling law。并行是 scaling 的前提，决定性。
+
+### 第二层：证据与定位
+
+**Q：你的 Transformer 模型训练 loss 在某一步突然 spike，怎么定位是数据问题还是梯度爆炸？**
+
+看三组指标：1) 数据——该 step 的 batch 是否有异常样本（超长序列、特殊字符、OOD 内容）；2) 梯度——梯度范数（grad norm）是否在该 step 飙升（> 10x 正常值是梯度爆炸）；3) loss 曲线——spike 后是快速恢复还是持续高位。如果是梯度爆炸，加 gradient clipping（max_norm=1.0）通常能缓解；如果是数据，该 batch 的样本需要过滤。具体看该 step 的 input data 和 grad norm 时序图。
+
+### 第三层：根因深挖
+
+**Q：Transformer 的注意力矩阵是 N² 的，长序列时显存爆炸，根因是计算量还是存储？**
+
+主要是存储。N=8192 时注意力矩阵是 8192×8192×num_heads×batch_size×float16 字节，单层就要几 GB，多层累加到几十 GB。计算量虽然也是 N² 但 GPU 算力够，存储是瓶颈。根因是"显式 materialize 整个注意力矩阵"。解法：Flash Attention 不显式存储完整矩阵，用 tiling 在 SRAM 里分块计算，显存从 O(N²) 降到 O(N)，同时计算也更高效（减少 HBM 读写）。
+
+**Q：那为什么不直接限制序列长度（如 2048），而要搞 Flash Attention 和长上下文优化？**
+
+因为很多任务需要长上下文。RAG 要塞检索到的多个 chunk，代码理解要看整个仓库，Agent 要记多轮对话历史，2048 不够用。限制序列长度是"削足适履"——为了工程方便牺牲任务能力。Flash Attention、Ring Attention、稀疏注意力等技术是在"不牺牲序列长度的前提下优化存储和计算"，让模型能处理 32K、128K 甚至 1M token。长上下文是能力扩展，限制长度是能力天花板。
+
+### 第四层：方案权衡
+
+**Q：Encoder-Decoder、Decoder-Only、Encoder-Only 三种架构，为什么 LLM 主流用 Decoder-Only？**
+
+三个原因：1) 训练效率——Decoder-Only 用 causal mask 做下一个 token 预测，每个位置都能做监督（teacher forcing），训练信号最密集；Encoder-Decoder 只有 decoder 部分有生成损失，encoder 部分靠 masked LM 信号较弱；2) Scaling 友好——Decoder-Only 在 scaling up 时能力提升最稳定（GPT 系列验证）；3) 通用性——Decoder-Only 用同一套架构做理解和生成（GPT-4 既能 chat 也能推理），Encoder-Only（BERT）只适合理解任务。经验上 Decoder-Only 在同等参数量下能力更强。
+
+**Q：为什么不针对不同任务用不同架构（理解任务用 Encoder-Only，生成任务用 Decoder-Only），而要统一用 Decoder-Only？**
+
+统一架构的收益是"工程简化 + 模型复用"。维护多套架构意味着多套训练 pipeline、多套推理优化、多套部署。统一 Decoder-Only 后，所有任务用同一个模型，通过 prompt 适配不同任务。代价是某些理解任务（如分类）Decoder-Only 的效率低于 Encoder-Only（要逐 token 生成而不是一次 forward）。但随着模型能力提升，Decoder-Only 在理解任务上也能达到甚至超越 Encoder-Only，统一架构的收益超过了专业化架构的边际优势。
+
+### 第五层：验证与沉淀
+
+**Q：怎么验证 Transformer 实现的正确性，而不是"能跑就行"？**
+
+三层验证：1) 单元测试——Self-Attention 的输出形状、LayerNorm 的统计特性、位置编码的正交性，每个模块独立测；2) 梯度检查——对随机输入做数值梯度（有限差分）和反向传播梯度对比，误差 < 1e-5 确认反向传播正确；3) 收敛性验证——在小型数据集（如 tiny-shakespeare）上训练，loss 应该稳定下降到 < 1.5，生成样本应该有语法结构。三层都通过才能确认实现正确，能跑通不等于正确（可能梯度没流过某层但 loss 仍下降）。

@@ -415,3 +415,49 @@ class CodeReviewExecution:
 - MCP协议：Client与Server解耦，把M×N适配降维成M+N的标准化工具生态
 - Skill侧重：Agent内化的业务流，MCP侧重跨模型跨平台的外部工具通信规范
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：MCP、Skill、Function Call 这三个概念经常混在一起说，为什么必须区分？把它们都叫"工具调用"不行吗？**
+
+不行，因为它们解决的是工具调用不同层面的问题，混用会导致架构混乱。Function Call 是能力层——LLM 输出结构化函数调用（JSON）的能力，是所有工具调用的底层机制。MCP 是协议层——定义 LLM 如何发现、连接、调用外部工具/数据源的标准化协议（类似 USB-C），解决"M 个模型 × N 个工具"的适配问题（降维成 M+N）。Skill 是应用层——预定义的能力包（任务模板+工具+知识），是 Agent 内化的业务流。区分的意义：Function Call 是模型原生能力（选模型时看），MCP 是跨工具集成标准（做工具生态时用），Skill 是业务封装（做产品时设计）。
+
+### 第二层：证据与定位
+
+**Q：你说 MCP 解决了 M×N 适配问题，具体怎么衡量 MCP 降低了集成成本？**
+
+算适配工作量。没有 MCP 时：M 个模型（GPT、Claude、Gemini、开源模型）× N 个工具（GitHub、Slack、数据库...）= M×N 个适配器要写，每个适配器要处理不同模型的 tool API 格式差异。10 模型 × 20 工具 = 200 个适配器。有了 MCP：工具方实现 1 个 MCP Server（标准化协议），模型方实现 1 个 MCP Client，总共 M+N = 30 个实现，工具复用。衡量指标：新接入一个工具的开发人天——没有 MCP 时每个模型适配要 2-3 人天（200 个适配器 = 400-600 人天），有 MCP 后只实现 1 个 Server（2-3 人天），所有支持 MCP 的模型立即可用。
+
+### 第三层：根因深挖
+
+**Q：MCP 协议的核心设计是什么？它和直接用 OpenAI 的 Function Call API 有什么本质区别？**
+
+核心区别：Function Call 是"模型 API 级"的单次调用（请求里带 tools 定义，模型返回 tool_call），而 MCP 是"协议级"的持久连接——MCP Client 和 Server 之间建立一个长连接（基于 JSON-RPC over stdio/SSE），Client 可以动态发现 Server 提供的工具列表（list_tools）、调用工具（call_tool）、订阅资源更新。这意味着：1）工具集动态发现——不用硬编码 tools 定义，Agent 运行时自动获取可用工具；2）状态保持——Server 可以维持会话状态（如数据库连接）；3）标准化——任何 MCP 兼容的 Client（Claude Desktop、Cursor）都能用任何 MCP Server。Function Call 是无状态的一次性接口，MCP 是有状态的协议层。
+
+**Q：既然 MCP 这么强大，为什么不所有工具都做成 MCP Server，Function Call 直接淘汰？**
+
+因为 Function Call 和 MCP 不是替代关系，是不同层。Function Call 是模型的原生能力——模型"决定调用什么工具、传什么参数"的推理能力，任何工具调用机制（包括 MCP）最终都要靠模型的 Function Call 能力来触发。MCP 解决的是"工具如何被发现、连接、传输"的工程问题，不解决"模型能否正确决定调用"的能力问题。而且对于简单的单次工具调用（如调一次天气 API），直接用 Function Call 定义 tool schema 更简单，不必上 MCP Server 的复杂度。MCP 适合工具多、要动态发现、跨模型复用的场景，简单场景 Function Call 足矣。
+
+### 第四层：方案权衡
+
+**Q：你做一个企业 Agent，要集成 GitHub、数据库、Slack 三个工具，用 Function Call 直连还是用 MCP？怎么决策？**
+
+决策看三个维度：1）工具数量和动态性——只有 3 个固定工具，Function Call 直连（定义 3 个 tool schema）更简单；如果要支持用户动态添加工具（如插件市场），MCP 的动态发现更优。2）跨模型复用——如果 Agent 只用一个模型（如固定用 Claude），Function Call 够用；如果要让用户换模型（GPT/Claude/开源），MCP 一次实现多模型可用。3）状态需求——GitHub/数据库这种需要保持连接状态（分页、事务）的工具，MCP Server 的长连接更合适；Slack 这种无状态消息发送，Function Call 够用。实务：3 个固定工具 + 单模型 → Function Call；工具会增长 + 多模型 → MCP；混合场景 → 核心工具 Function Call，扩展工具走 MCP。
+
+**Q：Skill 和 MCP 又是什么关系？一个 Skill 内部用不用 MCP？**
+
+Skill 是应用层的"能力包"，内部可以调用 MCP Server 提供的工具，也可以不用。区别在于封装层次：MCP 是"提供原子工具"（如 read_file、search_repo），Skill 是"组合工具完成业务流"（如"代码审查"Skill = read_file + 分析 + search_repo + 写 review）。类比：MCP 是"提供螺丝刀、扳手等工具"，Skill 是"换轮胎这个任务包"（用到螺丝刀和扳手）。一个 Skill 的实现通常是：自然语言任务模板 + 内部调用多个 Function Call/MCP 工具 + 领域知识 prompt。所以 Skill 在 MCP 之上，是面向最终用户/业务场景的更高层封装，MCP 是 Skill 实现时的可选工具来源之一。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明引入 MCP 后，团队的工具集成效率真的提升了？**
+
+量化对比。记录"接入一个新工具"的指标：1）开发人天——MCP 前后对比，目标降低 60%+；2）跨模型复用率——MCP 前每个工具要为每个模型适配，MCP 后一个 Server 多模型可用，统计"工具 × 模型"组合里复用的比例；3）维护成本——工具 API 变更时，MCP 前要改 M×N 个适配器，MCP 后只改 1 个 Server。再做一次集成演练：让新人分别用 Function Call 直连和 MCP 接入同一个新工具，记录耗时和踩坑数。如果 MCP 路径人天减半、跨模型立即可用，就证明 MCP 的工程价值。还要监控 MCP 的运行时开销（协议解析、长连接维护）是否影响 Agent 延迟，通常 <50ms 可接受。
+
+**Q：Function Call / MCP / Skill 的技术选型经验怎么沉淀成团队 Agent 平台的默认架构？**
+
+定架构规范：1）工具层——所有外部工具（GitHub、DB、Slack）封装成 MCP Server，标准化协议、动态发现、跨模型复用；2）能力层——模型选型时确认原生 Function Call 能力（tool_call_success_rate >90%），这是基础；3）应用层——高频业务流（代码审查、数据分析、客服）封装成 Skill（任务模板+工具组合+领域 prompt），让非技术用户也能一键调用。配套：MCP Server 注册中心（管理可用工具）、Skill 市场（复用业务流）、Function Call 评测集（定期测模型的工具调用能力）。这套三层架构（工具 MCP / 能力 Function Call / 应用 Skill）写入团队 Agent 平台 SOP，新 Agent 按层组装，不再从零集成。

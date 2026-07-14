@@ -29,10 +29,10 @@ follow_up:
 - Dify和LangChain/LangGraph有什么区别？
 - 什么场景适合用Dify，什么不适合？
 memory_points:
-- 传统引擎: BPMN + 确定性 + 强事务 + Activiti/Camunda
-- Dify: 可视化AI编排 + LLM节点 + 动态决策 + 开源
-- 核心差异: 控制流由"预设规则"还是"LLM运行时决策"
-- 混合模式: 传统引擎的某些节点用Dify做智能决策
+- "传统引擎: BPMN + 确定性 + 强事务 + Activiti/Camunda"
+- "Dify: 可视化AI编排 + LLM节点 + 动态决策 + 开源"
+- "核心差异: 控制流由\"预设规则\"还是\"LLM运行时决策\""
+- "混合模式: 传统引擎的某些节点用Dify做智能决策"
 ---
 
 # 传统工作流引擎与Dify AI编排平台的区别

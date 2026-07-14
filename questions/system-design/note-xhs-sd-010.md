@@ -313,3 +313,59 @@ Trace: user_id=1001 request_id=abc123
 总耗时: 1512ms
 瓶颈定位: OpenAI API调用占99%
 ```
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：K8s 配置管理你为什么用 ConfigMap + Secret 分离，而不是全放 Secret（反正都能用）？**
+
+因为权限隔离和审计。ConfigMap 存非敏感配置（如日志级别、功能开关），所有开发可见可改。Secret 存敏感信息（数据库密码、API Key），只有运维和特定服务可见。如果全放 Secret，开发要看个日志级别都要申请 Secret 权限，效率低。而且 Secret 的访问受 RBAC 控制，读取有审计日志（谁在什么时候读了哪个 Secret），全放 Secret 会让审计日志爆炸（全是非敏感配置的读取记录）。决策依据：敏感度分级管理，ConfigMap 管普通配置（便利），Secret 管敏感配置（安全）。
+
+### 第二层：证据与定位
+
+**Q：服务启动报"连接 DB 失败"，你怎么定位是 Secret 配错了还是 DB 本身的问题？**
+
+查三个层面：
+1. Secret 注入——进 Pod 检查环境变量（`echo $DB_PASSWORD`）或挂载的文件，确认 Secret 的值是否正确（不是 base64 编码的原文，是解码后的密码）。
+2. 网络连通——从 Pod 内 `telnet db-host 3306` 或 `nc -zv db-host 3306`，确认网络可达（K8s NetworkPolicy 或安全组可能拦截）。
+3. DB 本身——用正确的密码从本地连接 DB，确认 DB 服务正常 + 密码有效。
+
+### 第三层：根因深挖
+
+**Q：Secret 的密码是对的（本地能连），网络也通，但 Pod 里连 DB 失败，根因是什么？**
+
+最可能是 Secret 的 base64 编解码问题。K8s 的 Secret 要求值是 base64 编码（`echo -n "password" | base64`），如果创建 Secret 时密码包含了特殊字符（如 `$`、`!`）且编码时被 shell 转义，实际存入的值与预期不同。另一种可能是 Secret 的 namespace 不对——Secret 必须与 Pod 在同一 namespace，跨 namespace 引用 Secret 会找不到。还有一种可能是 `envFrom` 或 `valueFrom` 的引用路径写错（`secretKeyRef` 的 name 或 key 不匹配）。要在 Pod 里打印实际拿到的值（注意脱敏）确认。
+
+**Q：为什么不直接把密码写死在镜像里（Dockerfile 里 ENV DB_PASSWORD=xxx），不就不用 Secret 了？**
+
+因为安全风险和灵活性。① 安全——镜像会被推到镜像仓库，任何能拉镜像的人都能看到密码（镜像分层，ENV 在元数据层可见）；② 灵活性——不同环境（dev/staging/prod）用不同密码，写死镜像要构建多个镜像，维护成本高；③ 轮换——密码泄露后要更换，写死镜像要重新构建 + 重新部署，Secret 只更新 Secret 对象即可（Pod 重启生效）。12-Factor App 原则要求"配置与代码分离"，Secret 是这一原则的 K8s 实现。写死镜像是反模式。
+
+### 第四层：方案权衡
+
+**Q：配置热更新你用 @RefreshScope（Spring Cloud）还是 Nacos/Apollo（配置中心），怎么选？**
+
+按配置变更频率和场景选：
+1. @RefreshScope——配合 Spring Cloud Config + Bus，ConfigMap 变更时触发 webhook → Bus 广播 → 各实例刷新 @RefreshScope Bean。适合"K8s 原生 + 变更频率低"。
+2. Nacos/Apollo——独立配置中心，客户端长轮询监听变更，实时推送。适合"变更频率高 + 需要灰度发布 + 多环境管理"。
+
+**Q：为什么不直接全用 K8s ConfigMap + @RefreshScope，而要引入 Nacos 增加复杂度？**
+
+因为 ConfigMap 的热更新有局限。① ConfigMap 变更后 Pod 不会自动感知（要靠 reloader 或手动重启），@RefreshScope 只刷新特定 Bean，全量配置变更不生效；② ConfigMap 没有灰度发布能力（改了 ConfigMap 所有 Pod 同时生效，无法"A/B 测试"）；③ ConfigMap 没有版本管理和回滚（改错了要手动改回来）。Nacos/Apollo 提供"灰度发布、版本回滚、多环境隔离、变更审计"，适合"配置频繁变更 + 需要精细化管控"的生产场景。简单场景用 ConfigMap 足够，复杂场景用配置中心。
+
+### 第五层：验证与沉淀
+
+**Q：可观测性三支柱（Metrics + Logging + Tracing）你怎么证明覆盖了所有关键场景？**
+
+用故障排查能力验证：
+1. Metrics 能发现问题——告警触发（如 P99 延迟 > 500ms），说明 Metrics 覆盖了关键指标。
+2. Logging 能定位原因——根据告警时间点查日志，找到具体错误（如 OOM、DB 超时），说明 Logging 记录了关键事件。
+3. Tracing 能定位位置——根据 trace ID 找到慢请求经过的链路（如 Gateway → Service A → Service B → DB），精确定位是 B → DB 慢，说明 Tracing 覆盖了全链路。
+如果某个环节排查不出来，说明对应支柱有盲区（如没有 RPC 调用的 trace span），要补全。
+
+**Q：K8s 配置与可观测性方案怎么沉淀？**
+
+1. 配置管理规范——"敏感信息用 Secret、普通配置用 ConfigMap、动态配置用 Nacos"的分层规范，团队统一执行。
+2. 可观测性模板——Prometheus 指标命名规范（如 `http_server_requests_seconds`）、日志结构化格式（JSON + traceId）、Trace 采样率策略，新服务接入即用。
+3. 故障排查 SOP——"告警 → 看指标定方向 → 看 trace 定位置 → 看日志定原因"的标准流程，新人值班按 SOP 执行。

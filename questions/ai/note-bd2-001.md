@@ -251,3 +251,49 @@ def robust_tool_execution(tool_call, max_retries=2):
 - 结构化输出：模型按JSON格式输出工具名和参数列表。
 - 循环反馈：工具执行结果作为Observation拼接到上下文，指导下一步生成。
 
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：Agent 调用工具你说是"LLM 判断意图 → 输出结构化指令 → Runtime 执行 → 结果回传"。为什么不直接让 LLM 生成代码（如 Python）执行，而要走 JSON 指令 + Runtime 这套？**
+
+安全性和可控性。让 LLM 直接生成代码执行（如 `exec()` 任意 Python）是"代码即权限"——LLM 能干任何事，包括删文件、发网络请求、读敏感数据，风险极高（prompt injection 可诱导生成恶意代码）。JSON 指令 + Runtime 是"工具白名单"——LLM 只能从预定义的工具列表里选（如 `search`、`calculate`），参数受 Schema 约束，Runtime 校验后再执行，LLM 无法越权。且 JSON 指令可审计（记录每次 tool_call）、可回滚（执行失败可重试/降级）、可限流（防止 LLM 死循环调用）。生产级 Agent 必须用白名单 + Runtime，不能让 LLM 直接执行代码。
+
+### 第二层：证据与定位
+
+**Q：线上 Agent 调用工具失败率从 2% 涨到 15%。你怎么定位是 LLM 选错工具、参数构造错、还是 Runtime 执行错？**
+
+看 tool_call 的日志分阶段统计。一是工具选择准确率（tool_selection_accuracy）——LLM 选的工具对不对（对比人工标注的"应该选哪个工具"），如果选错率涨，是 LLM 理解意图能力差或工具描述（System Prompt 里的 tool description）写得不清晰。二是参数正确率（argument_correctness）——选对工具后参数对不对（如 `search` 的 query 参数是否合理、`calculate` 的表达式是否合法），参数错率高是 Schema 设计问题（字段含义模糊）或 LLM 参数生成能力差。三是 Runtime 执行成功率（execution_success_rate）——参数对但执行失败（如 API 超时、权限不足、工具 bug），这是 Runtime/工具本身问题。三类错误的治法不同：选错改 prompt/加 few-shot，参数错改 Schema/加约束，执行错修工具/加重试。
+
+### 第三层：根因深挖
+
+**Q：Agent 进入死循环——反复调用同一个工具（如连调 10 次 `search`），根因是什么？**
+
+根因是"Observation 没有有效指导下一步"。ReAct 循环里，LLM 基于 Observation（工具返回结果）决定下一步。如果工具返回的结果 LLM"看不懂"或"无法判断是否已解决"，LLM 会重复调用同一工具（以为"再试一次可能有用"）。具体场景：一是工具返回空或模糊（如 `search` 返回"无结果"，LLM 不知道该换 query 还是放弃）；二是上下文太长，LLM 忘了之前调过（每次调用没被有效总结进上下文）；三是缺少终止条件（LLM 不知道何时该停止）。治本：一是工具返回要结构化且带"建议"（如"无结果，建议扩大搜索范围"）；二是设置 max_steps（如最多 5 步）硬终止；三是每步做"任务完成判断"（LLM 自检或独立判别器）。
+
+**Q：那为什么不直接给 LLM 无限步数（让它自己决定何时停），省得设 max_steps 可能误杀正常的长任务？**
+
+无限步数会失控。LLM 没有"成本意识"——它会为了微小的成功率提升而无限重试（每次调用都花 token 和 API 成本），一个死循环任务可能消耗几十美元和几分钟延迟，用户体验崩溃且成本爆炸。且 LLM 的"自信度"不可靠（前面说过确认偏误），它"觉得"再试一次能成功，实际不会。max_steps 是"硬安全阀"——即使 LLM 判断失误，也不会无限消耗。正常长任务（如 10 步的多工具协作）的 max_steps 设大（如 15-20），短任务设小（如 5）。关键是配合"任务完成判断"——每步检查是否已达成目标，达成则提前停止，不浪费剩余步数。max_steps 是"兜底"，不是"限制正常任务"。
+
+### 第四层：方案权衡
+
+**Q：工具描述（System Prompt 里的 tool description）你写得很详细（每个工具 5-10 行）。为什么不写简短点省 token？**
+
+详细描述提升工具选择准确率。LLM 选工具靠"理解工具描述 + 匹配当前意图"，描述越清晰（功能、适用场景、参数含义、返回格式、边界 case），LLM 选择越准。简短描述（如"搜索工具"）会让 LLM 在多个相似工具间困惑（如有 `search_web` 和 `search_kb` 两个搜索工具，简短描述分不清）。代价是 token 消耗——每个工具 10 行描述，10 个工具就 100 行（约 500 token），占上下文。但工具描述是"一次性成本"（每次对话只发一次），相比 tool_call 失败导致的重试成本（一次重试几十 token + 延迟），详细描述更划算。优化：用 Function Calling 的 tools 参数（结构化 Schema）代替自然语言描述，更省 token 且 LLM 理解更准。
+
+**Q：为什么不直接用 ReAct（纯文本的 Thought/Action/Observation），省得搞结构化 JSON 指令？**
+
+ReAct 纯文本灵活但不可靠。ReAct 让 LLM 输出 `Thought: ... Action: search(query="...")` 然后用正则解析 Action，问题是 LLM 可能输出格式跑偏（如 Action 写成自然语言、多了一个 Action、格式不符正则），解析失败率 5-10%。结构化 JSON（Function Calling）靠 API 强制 Schema，解析失败率 <1%。且 ReAct 的 Observation 拼接靠字符串操作（容易注入），JSON 指令的参数传递是结构化的（类型安全）。ReAct 适合"原型验证"（灵活、易调试），生产用 Function Calling（可靠、可审计）。当前主流框架（LangChain Agent、OpenAI Assistants）都转向 Function Calling，ReAct 是历史方案。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么衡量 Agent 工具调用链路的质量，证明优化有效？**
+
+定义指标：一是 tool_selection_accuracy（选对工具的比例），用 golden set（人工标注每个 query 该用哪个工具）评估；二是 argument_correctness（参数正确率），检查参数是否符合预期；三是 execution_success_rate（执行成功率），排除 LLM 错误后的工具本身可靠性；四是 E2E task_success_rate（端到端任务完成率），最终用户视角的成功率；五是平均步数（avg_steps），反映效率（步数过多可能是死循环或低效）。做消融实验：改 System Prompt（加 few-shot）前后对比 selection_accuracy；改 Schema（字段更清晰）前后对比 argument_correctness；加 max_steps 前后对比成本和 success_rate。
+
+**Q：Agent 工具调用链路怎么沉淀成团队标配？**
+
+封装成"Agent Runtime SDK"：统一工具注册接口（声明 name/description/parameters_schema/handler）、tool_call 执行引擎（参数校验 → 执行 → 结果序列化）、ReAct 循环管理（max_steps/终止判断/重试）、日志和 trace（记录每步 Thought/Action/Observation 用于调试和评估）。沉淀"工具描述编写规范"、"Schema 设计最佳实践"、"max_steps 配置经验值"（按任务复杂度）、"golden set 构建方法"。配套评估看板（selection_accuracy、argument_correctness、E2E success_rate、avg_cost），异常（success_rate 骤降/步数飙升）告警。
+

@@ -190,3 +190,49 @@ GRPO 的 token 级 IS 和 PPO 一致，区别在于：
 - 核心作用：修正off-policy偏差，因为采样用旧策略而训练更新新策略
 - 安全机制：配合PPO clip，限制ratio在[1-ε, 1+ε]防极端权重
 
+
+## 苏格拉底式面试追问
+
+> 这组追问模拟面试官层层逼问，每一问先回答"为什么"，再回答"怎么做"，最后回答"如何证明"。
+
+### 第一层：目标与动机
+
+**Q：GRPO 已经用组内 reward 归一化解决了 baseline 问题，为什么还要搞 token 级重要性采样？多此一举吗？**
+
+不多余。GRPO 的组内归一化解决的是"优势值 A 怎么算"的问题（免去 Critic），但没解决"off-policy 偏差"的问题。RL 训练时策略在更新：采样 rollout 用的是旧策略 π_old，但参数更新时的梯度是按新策略 π_new 算的，两者分布不同直接估梯度会有偏。重要性采样用权重 ratio=π_new/π_old 修正这个偏差，保证 E_old[ratio·f]=E_new[f] 的无偏性。token 级（逐 token 算 ratio）比序列级（整条序列一个 ratio）更精细——长序列里不同 token 的 π_new/π_old 偏差不同，序列级会平均化，token 级让每个 token 的贡献独立校正，梯度估计更准。
+
+### 第二层：证据与定位
+
+**Q：你怎么衡量 token 级重要性采样确实比序列级更准？有量化指标吗？**
+
+看两个信号。1）梯度估计方差——分别用 token 级和序列级 ratio 算梯度，跨多个 batch 看梯度方差。token 级的方差应更小（因为逐 token 校正，不像序列级把所有 token 的偏差耦合在一起）。2）长序列训练稳定性——在长输出任务（如代码生成，输出几百 token）上，序列级 ratio 容易出现极端值（个别 token 偏差大被平均后掩盖或放大），导致训练不稳定（KL 飙升）。token 级因为每个 token 独立 clip，极端 token 被单独裁剪（PPO clip 到 [1-ε,1+ε]），不会污染整条序列。实测：长序列任务用 token 级 ratio，KL 稳定性提升、最终 reward 更高 2-3 个点。
+
+### 第三层：根因深挖
+
+**Q：token 级 ratio 在长序列里为什么会比序列级更稳？数学上解释一下偏差怎么累积的。**
+
+序列级 ratio = Π(π_new(t)/π_old(t))，是所有 token ratio 的连乘。长序列（如 500 token）里即使每个 token 偏差很小（如平均 ratio=1.01），连乘后 1.01^500 ≈ 145，序列级 ratio 爆炸。这意味着序列级要么极小（所有 token 都偏小）要么极大（连乘放大），梯度信号失真。token 级 ratio 是逐 token 的 1.01，配合 PPO clip 到 [0.8, 1.2]，每个 token 的贡献被限制在合理范围，不会因连乘放大。数学上：序列级的方差 = O(Π var_t)，token 级的方差 = O(Σ var_t)，长序列下前者指数级增长，后者线性级。
+
+**Q：既然 token 级 ratio 更准，为什么不直接用，还要配合 PPO clip？重要性采样本身不是无偏的吗？**
+
+重要性采样无偏的前提是 ratio 的方差有界。但实际中 π_new 和 π_old 偏离大时（策略更新激进），ratio 会出现极端值（如 100 或 0.01），导致梯度估计虽然无偏但方差爆炸（单条样本主导梯度，训练震荡）。PPO clip 是"用一点偏差换方差可控"的工程妥协——把 ratio 裁剪到 [1-ε, 1+ε]（ε 通常 0.2），极端值被截断，方差大幅下降，代价是引入轻微偏差（裁剪后的期望不再严格等于新策略期望）。实务证明这个 trade-off 划算：clip 后训练稳定收敛，最终效果好于"无偏但震荡"的纯重要性采样。这就是 PPO 的 "Proximal"（近端）含义——限制策略更新别离太远。
+
+### 第四层：方案权衡
+
+**Q：token 级 ratio 要对每个 token 算 π_new/π_old，计算开销不小，这个开销值得吗？**
+
+值得，开销可控。每个 token 的 ratio 计算是一次 softmax 概率查表（π_new(t) 和 π_old(t) 都是模型 forward 时 logits 的 softmax 值），不额外 forward。rollout 时用 π_old 采样已经算了 π_old(t)，训练时用 π_new forward 也算了 π_new(t)，ratio 只是两者相除，O(1) per token。总开销相对 forward 的 O(n²) attention 可忽略（<1%）。收益是长序列训练稳定性和最终效果提升。所以 DeepSeekMath/R1 都用 token 级 ratio，开销不是瓶颈，实现复杂度才是（要正确处理 log-prob 的数值稳定性，用 log-sum-exp 避免 underflow）。
+
+**Q：为什么不直接 on-policy（采样后立即用新策略更新，不要重要性采样），不就没偏差了吗？**
+
+纯 on-policy 效率太低。每采样一个 batch 就要更新参数，更新后旧样本作废（因为 π_new≠π_old 了），每个样本只用一次。对 Agentic RL 这种 rollout 昂贵的场景（每个轨迹要跑几十轮工具调用），样本只用一次浪费极大。重要性采样的价值是"让旧样本在新策略下复用"——通过 ratio 修正，一个 batch 可以做多次梯度更新（PPO 的 multi-epoch，通常 4 epoch），样本利用率提升 4 倍。代价是引入 ratio 偏差（靠 clip 控制）。所以工程上是"近 on-policy"——sample 一批，用 token 级 ratio + clip 复用 4 次，兼顾效率和稳定性。
+
+### 第五层：验证与沉淀
+
+**Q：你怎么证明 token 级重要性采样的实现是对的，没有数值 bug（如 log-prob underflow）？**
+
+单元测试 + 数值监控。1）单元测试——构造已知 π_old/π_new 的简单 case（如均匀分布），手算期望 ratio，对比代码输出；构造极端 case（π_new/π_old=1000）测 clip 是否生效。2）数值监控——训练时统计 ratio 分布（mean、std、max、min），健康的 ratio 应集中在 [0.5, 2]，max 不应超过 clip 上限（1+ε），如果出现 nan/inf 就是数值 bug（通常是 log-prob underflow，要用 log-sum-exp 或 fp32 算 log-prob）。3）KL 监控——π_new 和 π_old 的 KL 应平稳在 0.01-0.1，如果飙升说明 ratio 失控。这三个检查通过，实现基本正确。
+
+**Q：GRPO/PPO 的 token 级重要性采样实现经验怎么沉淀成团队 RL 框架的标准模块？**
+
+封装成框架的 ImportanceSampling 模块：1）token-level ratio 计算——内置 log-prob 的数值稳定实现（log-sum-exp + fp32），开发者不用手写；2）clip 策略可配置——默认 PPO clip（[1-ε,1+ε]），可切换 GRPO 的组内归一化模式；3）ratio 监控——自动上报 ratio 分布（mean/std/max/clip 率）到 dashboard，clip 率（被裁剪的 token 比例）超 30% 告警（说明策略更新太激进）；4）数值安全——自动检测 nan/inf 并 fallback 到上一个稳定 checkpoint。这套写入团队 RL 框架，新算法（PPO/GRPO/DAPO）共享同一个 ratio 计算模块，避免每个算法重写踩数值坑。
