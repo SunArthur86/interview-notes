@@ -1130,5 +1130,184 @@
       "derivation": "单机性能有上限 → 水平扩展多实例 → 需要流量分配 → 分配策略决定效果 → 轮询简单但不考虑实例差异 → 加权轮询考虑性能差异 → 最少连接考虑实时负载 → 一致性哈希解决会话保持",
       "conclusion": "负载均衡 = 分配位置（服务端/客户端）× 分配策略（轮询/最少连接/哈希）× 健康检查"
     }
+  },
+  {
+    "id": "note-xhs-sd-015",
+    "category": "system-design",
+    "subcategory": "分布式",
+    "difficulty": "L3",
+    "tags": [
+      "最终一致性",
+      "CAP",
+      "BASE",
+      "电商",
+      "分布式事务",
+      "消息队列",
+      "拼多多"
+    ],
+    "question": "【拼多多一面】什么是最终一致性？在电商下单流程中如何体现？",
+    "answer": "## 最终一致性定义\n\n系统允许副本间短暂不一致，但保证在没有新写入的情况下最终收敛到同一状态。是CAP中AP方向的实践。\n\n## 电商下单中的体现\n\n**核心链路（强一致）**：创建订单 + 扣款 → 本地事务保证\n**非核心链路（最终一致）**：库存扣减、积分发放、物流通知 → MQ异步处理\n\n## 实现方案：本地事务 + 消息表\n\n```java\n@Transactional\npublic void createOrder() {\n    orderRepository.save(order);        // 创建订单\n    accountService.deduct(userId, amount); // 扣款\n    messageRepository.save(msg);        // 写消息表（同一事务）\n}\n// 后台定时扫描消息表 → 投递MQ → 消费者异步处理\n```\n\n## 三大保障\n1. MQ可靠投递（消息表+重试）\n2. 幂等消费（Redis去重/DB唯一索引）\n3. 定时补偿任务（扫描失败记录重试）",
+    "follow_up": [
+      "MQ在扣款成功后宕机了，库存没扣怎么补偿？",
+      "什么场景必须强一致？",
+      "RocketMQ事务消息原理？",
+      "幂等设计为什么重要？",
+      "库存扣减一直失败怎么处理？"
+    ],
+    "feynman": {
+      "essence": "最终一致性是系统允许短暂不一致但最终收敛。电商下单通过MQ异步解耦实现跨系统最终一致。",
+      "analogy": "就像快递物流——你下单后页面立刻显示'已下单'，但仓库扣库存、物流安排几分钟后才同步。最终所有系统一致。",
+      "key_points": [
+        "核心链路强一致（本地事务）",
+        "非核心链路最终一致（MQ异步）",
+        "BASE理论实践",
+        "三大保障：MQ+幂等+补偿",
+        "RocketMQ事务消息方案"
+      ]
+    },
+    "first_principle": {
+      "problem": "分布式系统中网络分区不可避免，如何保证可用性同时实现数据一致性？",
+      "axioms": [
+        "强一致性要求放弃可用性",
+        "大多数业务不需要强一致",
+        "用户核心诉求是下单成功不超卖"
+      ],
+      "rebuild": "放弃跨系统强一致→核心链路本地事务→非核心MQ异步→补偿机制→最终一致。"
+    }
+  },
+  {
+    "id": "note-xhs-sd-016",
+    "category": "system-design",
+    "subcategory": "高并发",
+    "difficulty": "L4",
+    "tags": [
+      "秒杀",
+      "Redis",
+      "Lua脚本",
+      "消息队列",
+      "库存扣减",
+      "异步下单",
+      "拼多多"
+    ],
+    "question": "【拼多多一面】大促时如何用Redis+消息队列做库存扣减与订单异步创建？",
+    "answer": "## 核心架构\n\nRedis Lua脚本原子扣减（防超卖）→ MQ异步创建订单（削峰）→ 补偿兜底\n\n## Redis Lua原子扣减\n\n```lua\nlocal stock = tonumber(redis.call('GET', KEYS[1]))\nif stock < tonumber(ARGV[1]) then return 0 end\nredis.call('DECRBY', KEYS[1], ARGV[1])\nreturn 1\n```\n\nCHECK+DEDUCT在同一Lua脚本中原子执行，保证不超卖。\n\n## 异步下单流程\n\n1. API网关限流\n2. Redis Lua原子扣减库存（1ms）\n3. 扣减成功 → 发MQ消息 → 立即返回\"排队中\"\n4. MQ消费者异步创建订单+扣余额\n5. 定时任务对账补偿\n\n## 关键设计\n- 幂等：requestId去重防重复扣减\n- 补偿：MQ发送失败回滚Redis库存\n- 热点分片：百万人抢购时库存拆分多key",
+    "follow_up": [
+      "Lua脚本扣减失败怎么办？",
+      "MQ消息积压，库存已扣但订单没创建怎么办？",
+      "热点商品Redis单key瓶颈怎么解决？",
+      "如何保证Redis和DB库存最终一致？",
+      "大促结束后怎么对账？"
+    ],
+    "feynman": {
+      "essence": "Redis+Lua保证库存原子扣减（防超卖），MQ异步创建订单削峰填谷，补偿机制保证最终一致性。",
+      "analogy": "像演唱会售票——检票口（Redis）瞬间判断有没有票，给号码牌（MQ），等候区等叫号正式出票（异步）。检票口不等出票所以吞吐量极高。",
+      "key_points": [
+        "Redis+Lua原子扣减防超卖",
+        "MQ异步削峰保护DB",
+        "三层防护：Redis预扣→MQ异步→DB乐观锁兜底",
+        "幂 requestId去重",
+        "降级：限流+熔断"
+      ]
+    },
+    "first_principle": {
+      "problem": "大促QPS百万级，DB单机几千QPS，如何不超卖地扛住洪峰？",
+      "axioms": [
+        "DB无法承受高并发写入",
+        "Redis单机10万+QPS",
+        "原子扣减是防超卖底线",
+        "削峰填谷是标准手段"
+      ],
+      "rebuild": "请求→Redis Lua原子扣减（毫秒级）→发MQ→消费者按DB节奏创建订单。Redis扛峰，MQ削峰，DB平稳消费。"
+    }
+  },
+  {
+    "id": "note-xhs-sd-017",
+    "category": "system-design",
+    "subcategory": "消息队列",
+    "difficulty": "L3",
+    "tags": [
+      "Kafka",
+      "消息不丢失",
+      "消息不重复",
+      "幂等",
+      "ISR",
+      "消息队列",
+      "拼多多"
+    ],
+    "question": "【拼多多二面 + XHS视频帖】Kafka如何保证消息不丢失、不重复消费？",
+    "answer": "## 不丢失（三环节）\n\n| 环节 | 配置 | 说明 |\n|------|------|------|\n| Producer | `acks=all` + `retries=MAX` | 等所有ISR副本确认 |\n| Broker | `min.insync.replicas≥2` + `replication.factor=3` | 多副本 + ISR机制 |\n| Consumer | 手动提交Offset | `enable.auto.commit=false` |\n\n## 不重复（两层面）\n\n**Producer端**：`enable.idempotence=true`（PID+SequenceNumber去重）\n**Consumer端**：业务幂等（唯一键去重/Redis setIfAbsent/DB唯一索引/状态机）\n\n## Exactly-Once\n\n幂等生产者 + Kafka事务（`beginTransaction`/`commitTransaction`）\n\n## 终极配置\n\n```\nacks=all\nreplication.factor=3\nmin.insync.replicas=2\nunclean.leader.election.enable=false\nenable.idempotence=true\n```",
+    "follow_up": [
+      "ISR机制是什么？ISR只剩1个怎么办？",
+      "幂等生产者靠什么字段去重？",
+      "Kafka事务能实现跨分区Exactly-Once吗？",
+      "Consumer处理慢导致rebalance时Offset没提交怎么办？",
+      "和RocketMQ在可靠性上有什么区别？"
+    ],
+    "feynman": {
+      "essence": "Kafka通过Producer(acks=all+重试)+Broker(ISR副本)+Consumer(手动提交Offset)保证不丢；通过幂等生产者+业务幂等保证不重复。",
+      "analogy": "不丢=快递要签收（寄出确认收到+复制多份+签收确认）；不重复=快递单号去重（即使重寄，收件人看单号一样就不重复拆）。",
+      "key_points": [
+        "不丢三环节：acks=all+ISR≥2+手动Offset",
+        "不重复：幂等生产者+业务幂等",
+        "Exactly-Once=幂等+事务",
+        "关键参数：acks=all,min.insync.replicas≥2",
+        "幂等靠PID+sequenceNumber"
+      ]
+    },
+    "first_principle": {
+      "problem": "消息从生产到消费经过三阶段，每阶段都可能丢/重复。如何端到端保证？",
+      "axioms": [
+        "网络不可靠",
+        "磁盘可能损坏",
+        "消费者可能崩溃",
+        "每环节都不能假设上一环节可靠"
+      ],
+      "rebuild": "每环节加确认和重试→Producer等ISR确认→Broker多副本→Consumer处理完再提交Offset→幂等防重。"
+    }
+  },
+  {
+    "id": "note-xhs-sd-018",
+    "category": "system-design",
+    "subcategory": "高并发",
+    "difficulty": "L4",
+    "tags": [
+      "系统设计",
+      "拼团",
+      "抢购",
+      "限流",
+      "防刷",
+      "库存一致性",
+      "拼多多"
+    ],
+    "question": "【拼多多二面】设计一个拼团活动抢购系统（防刷、限流、库存一致性）？",
+    "answer": "## 拼团库存模型\n\n可用库存 = 总库存 - 已锁定 - 已售出\n\n与秒杀不同：拼团是\"先锁定后确认/释放\"\n\n## 拼团状态机\n\n开团(锁定库存) → 待成团 → 成团(确认扣减) / 超时失败(释放库存)\n\n## 三大核心问题\n\n### 1. 防刷\n- 用户维度限流（每小时限开N团）\n- 设备指纹 + IP限流\n- 风控规则（行为分析）\n\n### 2. 限流\n- 网关层：令牌桶（全局QPS上限）\n- 应用层：Sentinel滑动窗口\n\n### 3. 库存一致性\n- Redis预扣（原子锁定库存）\n- 定时任务扫描超时拼团释放库存\n- 分布式锁防重复处理\n\n## 拼团 vs 秒杀\n\n| 维度 | 秒杀 | 拼团 |\n|------|------|------|\n| 库存模型 | 直接扣减 | 锁定→确认/释放 |\n| 时间因素 | 无 | 有（24h成团期限）|\n| 库存回滚 | 一般不需要 | 核心功能 |",
+    "follow_up": [
+      "定时任务释放库存慢导致库存长时间锁定怎么办？",
+      "团长取消怎么保证团员体验？",
+      "Redis和DB库存不一致怎么对账？",
+      "拼团和秒杀库存模型本质区别？",
+      "万人团（10000人）架构怎么调整？"
+    ],
+    "feynman": {
+      "essence": "拼团系统核心是库存状态机管理（锁定→确认/释放）+三维度防刷+双层限流。与秒杀区别是'先锁后确认'。",
+      "analogy": "拼团像组团旅游——先报名占名额（锁定），等够人数才出发（确认），人数不够退名额（释放）。",
+      "key_points": [
+        "库存模型：可用=总-锁定-售出",
+        "防刷三维度：用户+设备+IP",
+        "限流双层：网关+应用",
+        "定时任务释放超时库存",
+        "状态机：开团→待成团→成团/失败"
+      ]
+    },
+    "first_principle": {
+      "problem": "拼团是'先占位后确认'模式，库存不是买了就减。如何管理锁定→确认/释放的生命周期？",
+      "axioms": [
+        "库存=锁定→确认/释放",
+        "时间是关键变量（24h超时）",
+        "用户不能开多团/加多团",
+        "黄牛可能批量开团锁库存"
+      ],
+      "rebuild": "库存模型改为可用=总-已锁定-已售出→开团/加团原子扣减→成团写DB→失败/超时原子回滚→定时任务扫描超时释放。"
+    }
   }
 ]

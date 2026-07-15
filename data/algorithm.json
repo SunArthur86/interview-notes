@@ -447,5 +447,91 @@
       "derivation": "问题本质是'不相邻子序列的最大权和'。对于第i个元素，要么选（则不能选i-1），要么不选。最优子结构 = max(选i的收益, 不选i的收益)",
       "conclusion": "打家劫舍 = 逐位贪心 + 最优子结构，状态转移方程 dp[i] = max(dp[i-1], dp[i-2]+nums[i])"
     }
+  },
+  {
+    "id": "note-xhs-algo-011",
+    "category": "algorithm",
+    "subcategory": "链表",
+    "difficulty": "L1",
+    "tags": [
+      "链表",
+      "反转",
+      "双指针",
+      "递归",
+      "手撕代码",
+      "拼多多"
+    ],
+    "question": "【拼多多一面】手撕算法：反转单链表",
+    "answer": "## 迭代法（推荐）\n\n三指针 prev/curr/next：\n```java\npublic ListNode reverseList(ListNode head) {\n    ListNode prev = null, curr = head;\n    while (curr != null) {\n        ListNode next = curr.next;\n        curr.next = prev;\n        prev = curr;\n        curr = next;\n    }\n    return prev;\n}\n```\n\n口诀：存next、转指针、移prev、移curr\n\n## 递归法\n\n```java\npublic ListNode reverseList(ListNode head) {\n    if (head == null || head.next == null) return head;\n    ListNode newHead = reverseList(head.next);\n    head.next.next = head;\n    head.next = null;\n    return newHead;\n}\n```\n\n| 方法 | 时间 | 空间 |\n|------|------|------|\n| 迭代 | O(n) | O(1) |\n| 递归 | O(n) | O(n) |",
+    "follow_up": [
+      "递归和迭代哪种更好？",
+      "反转链表的一部分（区间m到n）怎么做？",
+      "K个一组反转链表怎么做？",
+      "如何判断回文链表？",
+      "链表有环，反转后会发生什么？"
+    ],
+    "feynman": {
+      "essence": "反转链表就是将每个节点的next指针从指向后一个改为指向前一个。迭代用三指针，递归用调用栈。",
+      "analogy": "就像一排人手拉手面朝前站——反转就是让每人转身，松开前面人的手去拉后面人的手。关键是临时记住下一个人的位置。",
+      "key_points": [
+        "迭代三指针prev/curr/next",
+        "递归：head.next.next=head",
+        "时空复杂度O(n)",
+        "边界：空链表、单节点",
+        "变体：区间反转、K组反转"
+      ]
+    },
+    "first_principle": {
+      "problem": "单向链表只存next指针，如何不使用额外空间反转？",
+      "axioms": [
+        "每个next指针需改方向",
+        "改之前必须存原next",
+        "遍历一次即可"
+      ],
+      "rebuild": "维护prev=null→遍历：存next→curr.next=prev→prev=curr→curr=next→循环到curr=null。"
+    }
+  },
+  {
+    "id": "note-xhs-algo-012",
+    "category": "algorithm",
+    "subcategory": "数组",
+    "difficulty": "L1",
+    "tags": [
+      "数组",
+      "双指针",
+      "合并",
+      "从后往前填充",
+      "手撕代码",
+      "拼多多"
+    ],
+    "question": "【拼多多二面】手撕算法：合并两个有序数组",
+    "answer": "## 从后往前双指针（最优解）\n\n```java\npublic void merge(int[] nums1, int m, int[] nums2, int n) {\n    int p1 = m - 1, p2 = n - 1, p = m + n - 1;\n    while (p1 >= 0 && p2 >= 0) {\n        if (nums1[p1] > nums2[p2]) {\n            nums1[p--] = nums1[p1--];\n        } else {\n            nums1[p--] = nums2[p2--];\n        }\n    }\n    while (p2 >= 0) {\n        nums1[p--] = nums2[p2--];\n    }\n    // nums1剩余不用动（已在正确位置）\n}\n```\n\n时间O(m+n)，空间O(1)\n\n**为什么从后往前？** nums1尾部有预留空间，从后往前填充不会覆盖未处理数据。\n\n**为什么不用处理nums1剩余？** nums1剩余的元素已在正确起始位置。",
+    "follow_up": [
+      "为什么要从后往前？从前往前不行吗？",
+      "nums1没有预留空间怎么合并？",
+      "合并K个有序数组怎么做？（小顶堆）",
+      "合并有序链表和有序数组有什么区别？",
+      "数组特别大（10GB）内存2GB怎么合并？（外部排序）"
+    ],
+    "feynman": {
+      "essence": "合并有序数组用双指针从后往前填充——利用nums1尾部预留空间，每次取较大元素放最后。",
+      "analogy": "像合并两排按身高排好的队伍——从最高的开始放最后面，直接放到空位上，不会挤到任何人。",
+      "key_points": [
+        "三指针p1=m-1,p2=n-1,p=m+n-1",
+        "每次取较大放p位置",
+        "nums2剩余需拷贝",
+        "nums1剩余不动",
+        "时空O(m+n)/O(1)"
+      ]
+    },
+    "first_principle": {
+      "problem": "nums1有m个有效元素+n个空位，nums2有n个元素，如何O(1)空间合并？",
+      "axioms": [
+        "从前往后会覆盖未处理数据",
+        "从后往前不会覆盖",
+        "nums1剩余天然有序"
+      ],
+      "rebuild": "三指针从后往前→每次较大放目标位置→nums2有剩余则拷贝。"
+    }
   }
 ]

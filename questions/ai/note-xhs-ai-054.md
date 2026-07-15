@@ -1,0 +1,243 @@
+---
+id: note-xhs-ai-054
+difficulty: L3
+category: ai
+subcategory: RAG
+tags:
+- RAG
+- 幻觉
+- 模型幻觉
+- 检索阈值
+- 安全兜底
+- 知识库
+source: 高德AI大模型应用开发面试
+feynman:
+  essence: 知识库无覆盖时绝不能让模型自由生成，应通过三步处理：验证是否真的无数据（调阈值+多路召回重试）→ 明确告知用户暂无信息 → 记录高频问题扩充知识库形成闭环。
+  analogy: 知识库就像客服的参考手册。如果手册里没有答案，绝对不能让客服自己编（幻觉），而应该：先仔细查查是不是翻漏了（调阈值重试），实在没有就诚实说"这个问题我暂时回答不了"（安全兜底），然后把这个记下来告诉主管补充进手册（闭环迭代）。
+  key_points:
+  - 绝对禁止模型在无知识支撑时自由生成——尤其涉及报价/规则/政策场景
+  - 第一步：区分是真无数据还是检索失败（调阈值+多路召回验证）
+  - 第二步：确认无匹配后明确告知用户，引导官方渠道
+  - 第三步：记录高频无答案问题，同步运营扩充知识库
+  - 技术手段：相似度阈值过滤 + 溯源标注 + Prompt约束 + 兜底回复模板
+first_principle:
+  problem: LLM本质是概率生成模型——给任何输入都会"生成"看似合理的输出。当知识库检索不到相关内容时，如果不加约束，模型会基于训练数据编造答案，产生严重幻觉。
+  axioms:
+  - LLM无法区分"知道"和"不知道"——它永远会生成回答
+  - 涉及报价/政策/规则的幻觉会造成直接经济损失
+  - 检索不到可能是真无数据，也可能是检索策略不当
+  - 诚实说"不知道"比编造答案的业务价值更高
+  rebuild: 检索结果加阈值过滤 → 低于阈值的视为"无匹配" → Prompt明确约束"以下文为准，找不到就说不知道" → 兜底模板引导 → 记录反馈闭环。
+follow_up:
+  - 相似度阈值怎么设定？太高会误杀正常答案，太低会放过不相关内容
+  - 多路召回重试具体怎么做？增加哪几路？
+  - 怎么让模型"知道"它不知道？除了Prompt约束还有什么方法？
+  - 高频无答案问题怎么自动发现？需要人工分析还是可以自动化？
+  - 模型生成时如何强制标注引用来源？如果模型编造引用怎么办？
+memory_points:
+  - 三步处理：验证无数据 → 安全兜底告知 → 记录闭环迭代
+  - 核心原则：绝不让模型在无知识时自由生成
+  - 技术组合：阈值过滤 + Prompt约束 + 溯源标注 + 兜底模板
+  - 闭环：记录无答案问题 → 运营补充知识库 → 重新索引
+---
+
+# 【高德AI面试】用户提问内容知识库完全没有覆盖，怎么处理？能让模型自由生成吗？
+
+## 🎯 一句话本质
+
+**绝对不能让模型自由生成。** 应分三步处理：(1) 区分真无数据还是检索失败（调整阈值+多路召回验证），(2) 确认无匹配后明确告知用户暂无信息并引导官方渠道，(3) 记录高频无答案问题，同步运营扩充知识库，形成闭环迭代。
+
+## 🧒 费曼类比
+
+```
+错误做法（让模型自由生成）：
+  用户: "高德地图如何申请成为合作伙伴？"
+  知识库: 无相关内容
+  模型: "您可以通过高德开放平台注册账号，提交申请..." ← 编造了流程！
+  结果：用户按照编造的流程操作 → 找不到入口 → 投诉
+
+正确做法（三步处理）：
+  用户: "高德地图如何申请成为合作伙伴？"
+  Step 1: 多路召回验证
+    向量检索: score=0.31 (低于阈值0.75) → 无匹配
+    BM25检索: 0条结果
+    结论: 确实无数据
+  
+  Step 2: 安全兜底
+    模型输出: "抱歉，我暂时没有找到关于'合作伙伴申请'的相关信息。
+              建议您通过以下渠道获取帮助：
+              1. 拨打客服热线 400-xxx
+              2. 发送邮件至 business@amap.com
+              我已记录您的问题并反馈给团队。"
+  
+  Step 3: 闭环记录
+    写入 feedback 表: {query, timestamp, category: "合作伙伴"}
+    如果该问题出现 ≥10 次 → 自动通知运营补充知识库
+```
+
+## 📊 处理流程图
+
+```
+                    用户提问
+                       │
+                       ▼
+              ┌────────────────┐
+              │  向量检索 + BM25 │
+              │  (多路召回)      │
+              └───────┬────────┘
+                      │
+              ┌───────▼────────┐
+              │ Top-1 score    │
+              │ ≥ 阈值(0.75)?  │
+              └──┬─────────┬───┘
+              是 │         │ 否
+                 ▼         ▼
+        ┌──────────┐  ┌───────────────┐
+        │ 正常生成  │  │ 降低阈值重试?  │
+        │ 带引用标注│  │ score>0.6?    │
+        └──────────┘  └──┬────────┬───┘
+                      是 │        │ 否
+                        ▼        ▼
+                 ┌──────────┐ ┌──────────────┐
+                 │ 低置信度  │ │  确认无匹配   │
+                 │ 降级回复  │ │  触发兜底     │
+                 │ +提示用户 │ │              │
+                 └──────────┘ └──────┬───────┘
+                                     │
+                              ┌──────▼───────┐
+                              │ 兜底模板回复   │
+                              │ 引导官方渠道   │
+                              └──────┬───────┘
+                                     │
+                              ┌──────▼───────┐
+                              │ 记录到反馈表   │
+                              │ 高频→通知运营  │
+                              └──────────────┘
+```
+
+## 🔧 核心实现
+
+### 1. 检索阈值 + 多路验证
+
+```python
+def retrieve_with_validation(query, top_k=5):
+    """多路召回 + 阈值过滤"""
+    HIGH_THRESHOLD = 0.75  # 高置信度
+    LOW_THRESHOLD = 0.55   # 低置信度
+    
+    # 多路召回
+    vec_results = vector_store.search(embed(query), top_k=top_k)
+    bm25_results = bm25_store.search(query, top_k=top_k)
+    
+    # 融合排序
+    merged = reciprocal_rank_fusion(vec_results, bm25_results)
+    
+    if not merged:
+        return {"status": "no_match", "reason": "all_sources_empty"}
+    
+    top_score = merged[0]['score']
+    
+    if top_score >= HIGH_THRESHOLD:
+        return {"status": "matched", "context": merged[:3]}
+    elif top_score >= LOW_THRESHOLD:
+        return {"status": "low_confidence", "context": merged[:3], "score": top_score}
+    else:
+        return {"status": "no_match", "reason": "below_threshold", "best_score": top_score}
+```
+
+### 2. Prompt约束（防幻觉核心）
+
+```python
+SYSTEM_PROMPT = """你是高德地图智能助手。请严格遵循以下规则：
+
+1. 只能基于下方检索到的知识回答问题，不得使用自身训练知识编造内容。
+2. 如果检索到的知识与问题无关，或检索结果为空，必须回答："抱歉，我暂时没有找到相关信息。"
+3. 每个回答必须标注引用来源：[来源：文档名，章节]
+4. 涉及价格、政策、规则时，必须引用原文，禁止改写或概括。
+5. 绝对禁止猜测、推断或编造任何不在知识中的具体数字、流程或规则。
+
+检索到的知识：
+{retrieved_context}
+"""
+```
+
+### 3. 兜底回复模板
+
+```python
+FALLBACK_TEMPLATE = """抱歉，我暂时没有找到关于"{query}"的相关信息。
+
+建议您通过以下方式获取帮助：
+1. 拨打高德客服热线：400-810-0080
+2. 发送邮件至：support@amap.com
+3. 访问高德开放平台：https://lbs.amap.com
+
+我已记录您的问题并反馈给团队，我们会尽快补充相关内容。"""
+
+def generate_response(query, retrieval_result):
+    if retrieval_result["status"] == "matched":
+        response = llm.chat(
+            system=SYSTEM_PROMPT.format(retrieved_context=retrieval_result["context"]),
+            user=query
+        )
+        return response
+    elif retrieval_result["status"] == "low_confidence":
+        response = llm.chat(...)
+        return response + f"\n\n⚠️ 此回答置信度较低（{retrieval_result['score']:.0%}），建议通过官方渠道核实。"
+    else:
+        # 记录无答案问题
+        log_unanswered(query, retrieval_result)
+        return FALLBACK_TEMPLATE.format(query=query)
+```
+
+### 4. 闭环反馈系统
+
+```python
+def log_unanswered(query, retrieval_info):
+    """记录无答案问题，高频自动通知运营"""
+    feedback = {
+        "query": query,
+        "timestamp": datetime.now(),
+        "best_score": retrieval_info.get("best_score", 0),
+        "category": classify_query(query),  # LLM分类
+    }
+    db.feedback.insert(feedback)
+    
+    # 检查是否为高频问题
+    count = db.feedback.count_documents({
+        "category": feedback["category"],
+        "timestamp": {"$gte": datetime.now() - timedelta(days=7)}
+    })
+    
+    if count >= 10:  # 一周内出现10次以上
+        notify_operations(
+            f"高频无答案问题告警",
+            f"类别: {feedback['category']}, 近7天出现{count}次, 代表性问题: {query}"
+        )
+```
+
+## 📋 幻觉防护层次
+
+| 层次 | 手段 | 说明 |
+|------|------|------|
+| L1: 检索层 | 阈值过滤 | score低于阈值不送给LLM |
+| L2: Prompt层 | 严格约束 | "只能基于知识回答，找不到就说不知道" |
+| L3: 生成层 | 引用溯源 | 每句话标注来源，无来源的不输出 |
+| L4: 后置层 | 事实校验 | 生成答案与检索内容做NLI矛盾检测 |
+| L5: 兜底层 | 安全模板 | 无匹配时返回固定兜底文案 |
+
+## ❓ 苏格拉底式面试追问
+
+1. **"你说阈值0.75，这个值怎么来的？不同领域是不是要不同？"**
+   → 通过标注数据集计算PR曲线选F1最优点。法律/医疗场景阈值更高(0.85+)，闲聊场景更低
+
+2. **"模型生成时标注引用来源，但如果模型编造了一个看起来合理的引用怎么办？"**
+   → 后置校验：生成引用的chunk_id必须在检索返回集合中，否则截断
+
+3. **"多路召回会增加延迟，高德的核心链路对延迟敏感（用户在导航中），怎么平衡？"**
+   → 并行召回 + 超时降级（超时只走向量检索一路）+ 缓存高频query
+
+4. **"如果用户连续追问同一个知识库没有的问题，每次都说'不知道'体验很差怎么办？"**
+   → 对话记忆+主动推荐相关问题："这个问题我暂时回答不了，但以下问题可能对你有帮助：..."
+
+5. **"在出行报价场景中，幻觉可能导致用户拿到错误的价格，有没有更严格的防护？"**
+   → 报价类场景走规则引擎而非LLM生成，LLM只负责自然语言包装

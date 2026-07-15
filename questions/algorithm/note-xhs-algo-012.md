@@ -1,0 +1,227 @@
+---
+id: note-xhs-algo-012
+difficulty: L1
+category: algorithm
+subcategory: 数组
+tags:
+- 数组
+- 双指针
+- 合并
+- 从后往前填充
+- 手撕代码
+source: 拼多多Java三轮技术面二面
+feynman:
+  essence: 合并两个有序数组的关键是用双指针从后往前填充——利用nums1尾部预留的空间，从最大的元素开始放，避免从前遍历时覆盖未处理的元素。
+  analogy: 就像合并两排已经按身高排好的队伍——如果从前往后排（最小的先），矮的要插到前面会挤走后面的。但从后往前排（最高的先放最后），直接放到空位上，不会挤到任何人。
+  key_points:
+  - 双指针从后往前填充：p1指向nums1有效数据末尾，p2指向nums2末尾，p指向合并后末尾
+  - 每次取较大的放到p位置，对应指针左移
+  - nums2剩余元素需要拷贝，nums1剩余不需要动（已经在正确位置）
+  - 时间O(m+n)，空间O(1)
+  - 前提：nums1有足够空间（长度≥m+n）
+first_principle:
+  problem: nums1有m个有效元素+末尾n个空位，nums2有n个元素。如何在O(1)额外空间内合并为有序数组？
+  axioms:
+  - 如果从前往后合并，放入元素会覆盖nums1中尚未处理的元素
+  - 如果从后往前填充，不会覆盖任何有用数据
+  - 每次比较两个指针指向的元素，大的放最后
+  - nums1剩余元素天然有序，无需移动
+  rebuild: 三指针 p1=m-1, p2=n-1, p=m+n-1 → 比较 nums1[p1] 和 nums2[p2]，大的放nums1[p]，p和对应指针左移 → nums2有剩余则拷贝，nums1有剩余无需处理。
+follow_up:
+  - 为什么要从后往前？从前往前不行吗？
+  - 如果nums1没有预留空间（长度正好是m），怎么合并？
+  - 合并K个有序数组怎么做？用什么数据结构？
+  - 合并两个有序链表和合并两个有序数组有什么区别？
+  - 如果两个数组非常大（内存放不下），怎么合并？（外部排序）
+memory_points:
+  - 从后往前三指针：p1=m-1, p2=n-1, p=m+n-1
+  - 每次取较大的放p位置，对应指针左移
+  - nums2剩余需拷贝，nums1剩余不动
+  - 时空复杂度：O(m+n) / O(1)
+  - 前提：nums1长度≥m+n
+---
+
+# 【拼多多二面】手撕算法：合并两个有序数组
+
+## 🎯 一句话本质
+
+合并两个有序数组的核心是**从后往前双指针填充**：利用nums1尾部预留空间，每次取两个数组末尾中较大的放到目标位置，避免覆盖未处理数据。时间O(m+n)，空间O(1)。
+
+## 🧒 费曼类比
+
+```
+nums1: [1, 3, 5, _, _, _]    ← 3个有效元素 + 3个空位
+nums2: [2, 4, 6]             ← 3个元素
+
+从后往前合并（像排队，从最高的开始放最后面）：
+
+比较 nums1[2]=5 和 nums2[2]=6 → 6大 → 放最后
+  [1, 3, 5, _, _, 6]   p2左移
+
+比较 nums1[2]=5 和 nums2[1]=4 → 5大 → 放倒数第二
+  [1, 3, 5, _, 5, 6]   p1左移
+
+比较 nums1[1]=3 和 nums2[1]=4 → 4大
+  [1, 3, 5, 4, 5, 6]   p2左移
+
+比较 nums1[1]=3 和 nums2[0]=2 → 3大
+  [1, 3, 3, 4, 5, 6]   p1左移
+
+比较 nums1[0]=1 和 nums2[0]=2 → 2大
+  [1, 2, 3, 4, 5, 6]   p2左移
+
+p2 < 0，结束！nums1剩余的1已经在正确位置，不用动。
+结果: [1, 2, 3, 4, 5, 6] ✅
+```
+
+## 📊 从后往前填充图解
+
+```
+初始状态：
+  nums1:  [1, 3, 5, _, _, _]
+                   ↑           ↑
+                  p1=m-1=2     p=m+n-1=5
+  nums2:  [2, 4, 6]
+               ↑
+              p2=n-1=2
+
+Step 1: nums1[2]=5 vs nums2[2]=6 → 6大
+  nums1: [1, 3, 5, _, _, 6]     p2→1, p→4
+  
+Step 2: nums1[2]=5 vs nums2[1]=4 → 5大
+  nums1: [1, 3, 5, _, 5, 6]     p1→1, p→3
+  
+Step 3: nums1[1]=3 vs nums2[1]=4 → 4大
+  nums1: [1, 3, 5, 4, 5, 6]     p2→0, p→2
+  
+Step 4: nums1[1]=3 vs nums2[0]=2 → 3大
+  nums1: [1, 3, 3, 4, 5, 6]     p1→0, p→1
+  
+Step 5: nums1[0]=1 vs nums2[0]=2 → 2大
+  nums1: [1, 2, 3, 4, 5, 6]     p2→-1, p→0
+  
+p2 < 0 → 循环结束！
+nums1前半部分的1天然有序，无需移动。
+
+最终: [1, 2, 3, 4, 5, 6] ✅
+```
+
+## 💻 代码实现
+
+### 方法一：从后往前双指针（最优解）
+
+```java
+public void merge(int[] nums1, int m, int[] nums2, int n) {
+    int p1 = m - 1;      // nums1有效数据末尾
+    int p2 = n - 1;      // nums2末尾
+    int p = m + n - 1;   // 合并后末尾
+    
+    while (p1 >= 0 && p2 >= 0) {
+        if (nums1[p1] > nums2[p2]) {
+            nums1[p] = nums1[p1];
+            p1--;
+        } else {
+            nums1[p] = nums2[p2];
+            p2--;
+        }
+        p--;
+    }
+    
+    // nums2还有剩余 → 拷贝到nums1前面
+    // nums1剩余的不用动（已经在正确位置）
+    while (p2 >= 0) {
+        nums1[p] = nums2[p2];
+        p2--;
+        p--;
+    }
+    
+    // ⚠️ 不需要处理p1>=0的情况！
+    // 因为nums1剩余的元素本来就在正确的位置上
+}
+```
+
+**为什么不用处理nums1剩余？**
+```
+nums1: [1, 2, 3, 5, 6, 7]  ← p1=2，nums2已经全放完了
+              ↑
+             p1
+
+此时 [1,2,3] 已经在nums1的正确起始位置，不需要移动。
+```
+
+### 方法二：辅助数组（从前往后，简单但空间O(n)）
+
+```java
+public void merge(int[] nums1, int m, int[] nums2, int n) {
+    int[] temp = Arrays.copyOf(nums1, m);  // 拷贝nums1有效部分
+    
+    int i = 0, j = 0, k = 0;
+    while (i < m && j < n) {
+        if (temp[i] <= nums2[j]) {
+            nums1[k++] = temp[i++];
+        } else {
+            nums1[k++] = nums2[j++];
+        }
+    }
+    while (i < m) nums1[k++] = temp[i++];
+    while (j < n) nums1[k++] = nums2[j++];
+}
+```
+
+### 方法三：合并K个有序数组（扩展）
+
+```java
+// 用小顶堆，每次取K个数组中最小的元素
+public int[] mergeKSortedArrays(int[][] arrays) {
+    // 小顶堆：存储(值, 数组索引, 元素索引)
+    PriorityQueue<int[]> minHeap = new PriorityQueue<>((a, b) -> a[0] - b[0]);
+    
+    // 每个数组的第一个元素入堆
+    for (int i = 0; i < arrays.length; i++) {
+        if (arrays[i].length > 0) {
+            minHeap.offer(new int[]{arrays[i][0], i, 0});
+        }
+    }
+    
+    List<Integer> result = new ArrayList<>();
+    while (!minHeap.isEmpty()) {
+        int[] curr = minHeap.poll();
+        result.add(curr[0]);
+        
+        int arrIdx = curr[1];
+        int elemIdx = curr[2] + 1;
+        if (elemIdx < arrays[arrIdx].length) {
+            minHeap.offer(new int[]{arrays[arrIdx][elemIdx], arrIdx, elemIdx});
+        }
+    }
+    
+    return result.stream().mapToInt(Integer::intValue).toArray();
+}
+// 时间: O(N*logK)，N=总元素数，K=数组个数
+// 空间: O(K) 堆空间 + O(N) 结果
+```
+
+## 📋 复杂度对比
+
+| 方法 | 时间 | 空间 | 适用场景 |
+|------|------|------|---------|
+| 从后往前双指针 | O(m+n) | O(1) | 面试首选 |
+| 辅助数组 | O(m+n) | O(m) | 理解思路用 |
+| 小顶堆(K个) | O(N·logK) | O(K) | 合并K个数组 |
+
+## ❓ 苏格拉底式面试追问
+
+1. **"如果nums1没有预留空间，怎么合并？"**
+   → 新建一个m+n的数组，或者用ArrayList动态扩展。不能用原地方法
+
+2. **"从前往后双指针为什么不行？能举个例子说明覆盖问题吗？"**
+   → nums1=[2,0], nums2=[1]，如果从前往后，把nums2[0]=1放到nums1[0]位置，原来的2就被覆盖了
+
+3. **"合并K个有序数组，除了小顶堆还有什么方法？"**
+   → 分治法：两两合并（类似归并排序），时间O(N·logK)
+
+4. **"如果两个数组特别大（各10GB），内存只有2GB，怎么合并？"**
+   → 外部排序：每个数组分块读入内存排序 → 归并合并 → 写磁盘。类似归并排序的merge阶段
+
+5. **"合并两个有序链表和合并数组的核心区别是什么？"**
+   → 链表不需要预留空间，直接改指针即可（穿针引线）。数组需要考虑空间和覆盖

@@ -774,5 +774,49 @@
       "derivation": "磁盘按页(16KB)读取 → 一个页存更多键 → 树更矮 → IO次数更少 → B+树非叶子不存数据 → 扇出更大 → 3层可存约2000万行数据(3次IO)",
       "conclusion": "B+树 = 高扇出+矮树高+叶子链表 = 最少磁盘IO + 高效范围查询"
     }
+  },
+  {
+    "id": "note-xhs-db-017",
+    "category": "database",
+    "subcategory": "Redis",
+    "difficulty": "L2",
+    "tags": [
+      "Redis",
+      "RDB",
+      "AOF",
+      "持久化",
+      "混合持久化",
+      "拼多多"
+    ],
+    "question": "【拼多多一面】Redis持久化方式(RDB/AOF)及优缺点？",
+    "answer": "## RDB vs AOF\n\n| 对比维度 | RDB | AOF |\n|---------|-----|-----|\n| 文件格式 | 二进制压缩 | 文本命令 |\n| 文件体积 | 小 | 大 |\n| 恢复速度 | 快 | 慢 |\n| 数据安全性 | 低（可能丢快照间隔） | 高（最多丢1秒） |\n\n## AOF三种刷盘策略\n\n| 策略 | 含义 | 性能 | 安全性 |\n|------|------|------|--------|\n| always | 每条fsync | 最差 | 最高 |\n| everysec | 每秒fsync | 好 | 高（推荐） |\n| no | OS决定 | 最好 | 最低 |\n\n## 混合持久化（Redis 4.0+）\n\nRDB全量快照（前半，恢复快）+ AOF增量命令（后半，数据安全）。`aof-use-rdb-preamble yes`。\n\n## 生产推荐\n\n混合持久化 + everysec刷盘 + min.insync.replicas≥2",
+    "follow_up": [
+      "bgsave过程中有写请求怎么保证一致性？（COW机制）",
+      "AOF文件越来越大怎么办？（重写原理）",
+      "AOF文件损坏了怎么恢复？（redis-check-aof --fix）",
+      "主从架构中持久化怎么配置？（主关从开）",
+      "Redis 7.0 multi-part AOF解决了什么问题？"
+    ],
+    "feynman": {
+      "essence": "Redis持久化有RDB（内存快照）和AOF（命令日志），4.0+支持混合持久化，兼顾恢复速度和数据安全。",
+      "analogy": "RDB像拍照——定期拍全貌，恢复快但可能丢最近变更；AOF像记账本——记每笔交易，不丢数据但文件大恢复慢。",
+      "key_points": [
+        "RDB体积小恢复快但可能丢数据",
+        "AOF数据安全性高但文件大恢复慢",
+        "三种刷盘：always/everysec(推荐)/no",
+        "混合持久化=RDB全量+AOF增量",
+        "生产推荐：混合+everysec"
+      ]
+    },
+    "first_principle": {
+      "problem": "Redis内存数据库断电即丢失，如何在性能和可靠性间找平衡？",
+      "axioms": [
+        "内存比磁盘快10万倍",
+        "全量快照恢复快但有数据窗口",
+        "增量日志数据完整但膨胀",
+        "不存在完美方案只有权衡"
+      ],
+      "rebuild": "RDB定期全量作为底座+AOF每秒增量作为补充→恢复时先加载RDB（快），再重放AOF（补齐）。"
+    }
   }
 ]

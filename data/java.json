@@ -1723,5 +1723,94 @@
       "derivation": "方法调用频繁且短暂 → 每个线程独立栈，快速分配回收; 对象生命周期不确定 → 共享堆，由GC管理; 类信息稳定 → 方法区/元空间; 本地方法调用 → 本地方法栈",
       "conclusion": "JVM内存分区 = 按数据生命周期和共享性分类管理，不同区域用不同策略回收"
     }
+  },
+  {
+    "id": "note-xhs-java-017",
+    "category": "java",
+    "subcategory": "并发",
+    "difficulty": "L2",
+    "tags": [
+      "线程",
+      "Thread",
+      "生命周期",
+      "状态流转",
+      "并发",
+      "拼多多"
+    ],
+    "question": "【拼多多一面】Java 线程生命周期及状态流转？",
+    "answer": "## 线程六种状态\n\nJava线程有6种状态，定义在`Thread.State`枚举中：\n\n| 状态 | 说明 | 触发方式 |\n|------|------|---------|\n| NEW | 已创建未启动 | `new Thread()` |\n| RUNNABLE | 可运行（就绪+运行） | `start()` |\n| BLOCKED | 阻塞等待锁 | 竞争`synchronized`失败 |\n| WAITING | 无限等待 | `wait()`/`join()`/`LockSupport.park()` |\n| TIMED_WAITING | 限期等待 | `sleep(ms)`/`wait(ms)`/`join(ms)` |\n| TERMINATED | 终止 | `run()`结束 |\n\n## 关键区别\n\n1. **BLOCKED只认synchronized**：`ReentrantLock.lock()`对应的是WAITING（通过LockSupport.park）\n2. **sleep不释放锁，wait释放锁**\n3. **start()只能调一次**：源码检查threadStatus，非0抛异常\n4. **Java RUNNABLE = OS的Ready + Running**\n\n## 状态流转\n\n```\nNEW --start()--> RUNNABLE\nRUNNABLE --wait()--> WAITING --notify()--> RUNNABLE\nRUNNABLE --sleep(ms)--> TIMED_WAITING --超时--> RUNNABLE\nRUNNABLE --竞争synchronized失败--> BLOCKED --获取锁--> RUNNABLE\nRUNNABLE --run()结束--> TERMINATED\n```",
+    "follow_up": [
+      "BLOCKED和WAITING的本质区别是什么？",
+      "sleep(1000)后，其他线程能获取它持有的synchronized锁吗？",
+      "为什么start()方法不能调用两次？",
+      "线程在RUNNABLE状态时一定在消耗CPU吗？",
+      "如何用jstack诊断线程长时间BLOCKED？"
+    ],
+    "feynman": {
+      "essence": "Java线程有6种状态（NEW、RUNNABLE、BLOCKED、WAITING、TIMED_WAITING、TERMINATED），状态流转由JVM调度器和同步机制驱动。",
+      "analogy": "线程就像餐厅服务员——刚入职是NEW，正在服务是RUNNABLE，等厨师出菜是BLOCKED，休息室等叫号是WAITING，定闹钟休息是TIMED_WAITING，下班是TERMINATED。",
+      "key_points": [
+        "6种状态定义在Thread.State枚举中",
+        "BLOCKED只发生在竞争synchronized锁时",
+        "WAITING需要被其他线程notify唤醒",
+        "TIMED_WAITING到时间自动唤醒",
+        "start()从NEW→RUNNABLE，只能调一次"
+      ]
+    },
+    "first_principle": {
+      "problem": "操作系统线程有就绪/运行/阻塞三态，为什么Java定义6种？",
+      "axioms": [
+        "OS三态是底层真相",
+        "Java需要区分不同等待原因",
+        "BLOCKED和WAITING的唤醒机制不同",
+        "区分原因有助于调试监控"
+      ],
+      "rebuild": "从OS三态出发，Java额外区分'为什么等待'——等锁是BLOCKED，等通知是WAITING，等超时是TIMED_WAITING。"
+    }
+  },
+  {
+    "id": "note-xhs-java-018",
+    "category": "java",
+    "subcategory": "并发",
+    "difficulty": "L3",
+    "tags": [
+      "volatile",
+      "可见性",
+      "有序性",
+      "内存屏障",
+      "JMM",
+      "并发",
+      "拼多多"
+    ],
+    "question": "【拼多多一面】volatile关键字的作用和底层实现？",
+    "answer": "## volatile三大特性\n\n1. **保证可见性**：修改后立即刷新到主内存，读取时强制从主内存加载\n2. **保证有序性**：通过内存屏障禁止指令重排序\n3. **不保证原子性**：volatile int的i++不是原子操作\n\n## 底层原理：内存屏障\n\n| 屏障类型 | 作用 |\n|---------|------|\n| StoreStore | 前面的写不能重排到volatile写之后 |\n| StoreLoad | volatile写后，后面的读写不能重排到写之前 |\n| LoadLoad | volatile读后，后面的读不能重排到读之前 |\n| LoadStore | volatile读后，后面的写不能重排到读之前 |\n\nx86架构上volatile写生成`lock addl`指令，触发MESI缓存一致性协议。\n\n## DCL单例必须用volatile\n\n`instance = new Singleton()`分三步：分配内存→初始化→赋值引用。步骤2和3可能被重排序，导致其他线程拿到未初始化的对象。volatile禁止重排序。",
+    "follow_up": [
+      "volatile能替代synchronized吗？为什么？",
+      "volatile的i++为什么不是原子操作？",
+      "DCL单例中volatile的作用是什么？",
+      "volatile和final有什么关系？",
+      "什么是伪共享（False Sharing）？"
+    ],
+    "feynman": {
+      "essence": "volatile保证变量的可见性（修改立刻可见）和有序性（禁止重排序），但不保证原子性。",
+      "analogy": "volatile就像办公室的白板——写上去所有人立刻能看到（可见性），写的时候必须按顺序（有序性），但两人同时抢着写就会乱（不保证原子性）。",
+      "key_points": [
+        "保证可见性：强制主内存读写",
+        "保证有序性：内存屏障禁止重排",
+        "不保证原子性：i++非原子",
+        "底层靠Store/Load Barrier",
+        "DCL单例必须用volatile"
+      ]
+    },
+    "first_principle": {
+      "problem": "多核CPU各有缓存，如何用最小代价保证数据可见性？",
+      "axioms": [
+        "CPU核心各有L1/L2缓存",
+        "MESI协议保证缓存行同步",
+        "编译器和CPU会重排序",
+        "synchronized太重"
+      ],
+      "rebuild": "volatile修饰→编译器插入内存屏障→CPU触发MESI使其他核心缓存失效→修改对所有核心可见。同时屏障阻止重排序。"
+    }
   }
 ]
