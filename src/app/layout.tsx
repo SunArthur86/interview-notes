@@ -5,7 +5,7 @@ import type { Metadata, Viewport } from 'next';
 export const metadata: Metadata = {
   title: '面试随手记',
   description: '随手记录网上搜索的面试题，涵盖 Java、AI、算法、系统设计等全方向，含费曼快学、第一性原理、遗忘曲线智能复习。',
-  manifest: '/manifest.json',
+  manifest: '/interview-notes/manifest.json',
 };
 
 export const viewport: Viewport = {
