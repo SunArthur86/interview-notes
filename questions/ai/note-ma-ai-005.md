@@ -15,11 +15,11 @@ feynman:
   essence: "多Agent并行开发用三层保障代码一致性: Task Lock(锁住公共模块)、自动校验(编译/测试/Lint)、语义冲突检测(AST差异分析)。防止'代码冲突可Merge但语义冲突导致Bug'"
   analogy: "多Agent并行开发就像多人协作装修——Task Lock是'先到先得锁定房间'，自动校验是'装修完验收(水电/墙面)'，语义冲突检测是'检查两个人的装修方案在功能上是否冲突(比如都改了同一根水管)'"
   key_points:
-  - Task Lock(逻辑锁): 防止多Agent同时修改同一公共模块
-  - 代码层面校验: TypeScript编译、ESLint、单元测试、E2E
-  - 语义冲突: Git Merge能通过但语义矛盾(如两个Agent对同一接口定义不一致)
-  - 冲突检测: AST差异分析 + 依赖关系图 + 影响范围分析
-  - 审计溯源: 记录每次变更的Agent/Prompt/版本/Commit
+  - "Task Lock(逻辑锁): 防止多Agent同时修改同一公共模块"
+  - "代码层面校验: TypeScript编译、ESLint、单元测试、E2E"
+  - "语义冲突: Git Merge能通过但语义矛盾(如两个Agent对同一接口定义不一致)"
+  - "冲突检测: AST差异分析 + 依赖关系图 + 影响范围分析"
+  - "审计溯源: 记录每次变更的Agent/Prompt/版本/Commit"
 first_principle:
   essence: "Git解决文本冲突，但无法解决语义冲突。两个Agent的代码可以文本Merge成功，但逻辑上矛盾。需要额外层面的检查"
   derivation: "多Agent并行 → 修改不同文件 → Git Merge成功(文本无冲突) → 但语义矛盾(Agent A修改了接口签名，Agent B用了旧签名) → 运行时报错 → 需要语义冲突检测"
@@ -31,10 +31,10 @@ follow_up:
 - 如何做到完整溯源(Traceability)？
 - 多人协同开发和Multi-Agent协同有什么本质区别？
 memory_points:
-- Task Lock: 锁住公共模块，一个Agent修改时其他等待
-- 三层校验: 编译(TypeScript) → Lint(ESLint) → 测试(E2E)
-- 语义冲突: 文本可Merge但逻辑矛盾，Git检测不到
-- 溯源: Prompt + Agent + Version + Commit + 输入输出 完整记录
+- "Task Lock: 锁住公共模块，一个Agent修改时其他等待"
+- "三层校验: 编译(TypeScript) → Lint(ESLint) → 测试(E2E)"
+- "语义冲突: 文本可Merge但逻辑矛盾，Git检测不到"
+- "溯源: Prompt + Agent + Version + Commit + 输入输出 完整记录"
 ---
 
 # 【后端开发二面】多个Agent并行开发如何保证代码一致性？

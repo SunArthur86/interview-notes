@@ -31,9 +31,9 @@ follow_up:
 - 长连接场景下，负载均衡策略需要怎么调整？
 - 负载均衡和限流的关系是什么？
 memory_points:
-- 服务端LB: Nginx(七层)/LVS(四层) — 集中式、有额外跳转开销
-- 客户端LB: Ribbon/Spring Cloud LoadBalancer — 去中心化、直接调用、无额外跳转
-- 核心策略: 轮询 > 加权轮询 > 最少连接 > 一致性哈希
+- "服务端LB: Nginx(七层)/LVS(四层) — 集中式、有额外跳转开销"
+- "客户端LB: Ribbon/Spring Cloud LoadBalancer — 去中心化、直接调用、无额外跳转"
+- "核心策略: 轮询 > 加权轮询 > 最少连接 > 一致性哈希"
 - 一致性哈希+虚拟节点 = 会话保持 + 均匀分布
 ---
 

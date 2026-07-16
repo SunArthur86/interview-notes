@@ -14,12 +14,12 @@ feynman:
   essence: "降低幻觉的链路: 限制范围(Prompt约束)→外部验证(RAG/规则)→自动测试(Playwright)→自动修复(Auto Fix)→人工兜底。不是靠一个手段，而是多层防御"
   analogy: "降低幻觉就像防漏水——水龙头拧紧(Prompt约束减少幻觉)、接水盆兜底(RAG提供事实)、湿度报警器(自动测试检测错误)、自动修补(Auto Fix修复)、最后人工检查(Human-in-the-loop)"
   key_points:
-  - 幻觉来源: 训练数据不足、Prompt模糊、Context缺失、温度过高
-  - Prompt层: 明确约束、few-shot示例、思维链(CoT)
-  - 验证层: RAG提供事实、规则引擎校验、类型检查
-  - 测试层: Playwright E2E测试、TypeScript编译、ESLint
-  - 修复层: Test Agent反馈→Code Agent修复→限制循环次数
-  - 兜底层: 人工确认、高风险转人工
+  - "幻觉来源: 训练数据不足、Prompt模糊、Context缺失、温度过高"
+  - "Prompt层: 明确约束、few-shot示例、思维链(CoT)"
+  - "验证层: RAG提供事实、规则引擎校验、类型检查"
+  - "测试层: Playwright E2E测试、TypeScript编译、ESLint"
+  - "修复层: Test Agent反馈→Code Agent修复→限制循环次数"
+  - "兜底层: 人工确认、高风险转人工"
 first_principle:
   essence: "大模型本质是概率生成模型，无法保证100%正确。必须从'预防'和'检测修复'两个维度构建防御链"
   derivation: "模型预测=概率采样→必然有错误率→不能信任单次输出→需要外部验证→测试发现错误→自动修复→修复失败转人工→多层防御降低错误率到可接受水平"
@@ -31,10 +31,10 @@ follow_up:
 - 温度参数和幻觉的关系？设多少合适？
 - 如何区分'创造性幻觉'和'事实性幻觉'？
 memory_points:
-- 多层防御: Prompt→RAG→编译检查→E2E测试→Auto Fix→人工兜底
-- Auto Fix限制: 最多3轮，避免无限循环
-- 温度: 编码场景设0.1-0.3（低创造性=低幻觉）
-- 核心原则: 不信任单次输出，必须有外部验证
+- "多层防御: Prompt→RAG→编译检查→E2E测试→Auto Fix→人工兜底"
+- "Auto Fix限制: 最多3轮，避免无限循环"
+- "温度: 编码场景设0.1-0.3（低创造性=低幻觉）"
+- "核心原则: 不信任单次输出，必须有外部验证"
 ---
 
 # 【后端开发二面】如何降低大模型幻觉导致的错误代码？

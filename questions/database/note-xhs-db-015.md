@@ -17,8 +17,8 @@ feynman:
   key_points:
   - 4种隔离级别：读未提交(RU)、读已提交(RC)、可重复读(RR)、串行化(S)
   - MVCC = Undo Log版本链 + ReadView可见性判断
-  - RC级别: 每次SELECT生成新ReadView → 不可重复读
-  - RR级别: 第一次SELECT生成ReadView，之后复用 → 可重复读
+  - "RC级别: 每次SELECT生成新ReadView → 不可重复读"
+  - "RR级别: 第一次SELECT生成ReadView，之后复用 → 可重复读"
   - 当前读用Next-Key Lock(Record Lock + Gap Lock)防止幻读
 first_principle:
   essence: "并发事务相互影响产生3类问题(脏读/不可重复读/幻读)，隔离级别是'一致性vs并发性'的权衡"
@@ -31,10 +31,10 @@ follow_up:
 - 为什么MySQL默认RR而不是RC？
 - MVCC如何解决幻读？还有没有漏洞？
 memory_points:
-- 4级别: RU< RC < RR < Serializable (隔离性递增，并发性递减)
-- MVCC核心: Undo Log版本链 + ReadView(创建者事务ID、活跃事务列表)
-- RC vs RR关键: RC每次SELECT新建ReadView；RR复用第一次的ReadView
-- 当前读: SELECT...FOR UPDATE / UPDATE / DELETE 加Next-Key Lock
+- "4级别: RU< RC < RR < Serializable (隔离性递增，并发性递减)"
+- "MVCC核心: Undo Log版本链 + ReadView(创建者事务ID、活跃事务列表)"
+- "RC vs RR关键: RC每次SELECT新建ReadView；RR复用第一次的ReadView"
+- "当前读: SELECT...FOR UPDATE / UPDATE / DELETE 加Next-Key Lock"
 ---
 
 # 【拼多多 Java服务端】MySQL事务隔离等级有了解吗？是如何实现的？

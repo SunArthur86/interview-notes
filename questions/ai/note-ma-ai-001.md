@@ -13,10 +13,10 @@ feynman:
   essence: "Multi-Agent将复杂任务拆分给多个专职Agent协作完成（如PRD→Design→Task→Code→Test），而非一个全能Agent包揽。用Markdown中间产物传递上下文，每个Agent职责单一"
   analogy: "Multi-Agent就像软件开发团队——产品经理写PRD，架构师写设计文档，开发写代码，测试写测试用例。每个人只做自己的部分，通过文档(中间产物)传递信息。单Agent就像一个人从需求到上线全包了，容易出错"
   key_points:
-  - 单Agent瓶颈: Prompt过长、上下文丢失、职责混乱、难以并行
-  - Multi-Agent优势: 职责分离、并行执行、上下文隔离、可独立调试
-  - 中间产物传递: PRD→Design→Task→Code→Test，用Markdown而非聊天记录
-  - 工作流编排: AutoRun调度层负责任务分发、状态流转、失败重试
+  - "单Agent瓶颈: Prompt过长、上下文丢失、职责混乱、难以并行"
+  - "Multi-Agent优势: 职责分离、并行执行、上下文隔离、可独立调试"
+  - "中间产物传递: PRD→Design→Task→Code→Test，用Markdown而非聊天记录"
+  - "工作流编排: AutoRun调度层负责任务分发、状态流转、失败重试"
   - 每个Agent只处理一种任务，输入输出都是结构化文档
 first_principle:
   essence: "大模型有Context Window限制和注意力衰减。任务越复杂，Prompt越长，模型表现越差。拆分为多个小任务，每个Agent只关注自己的领域"
@@ -29,10 +29,10 @@ follow_up:
 - 多个Agent并行修改同一文件怎么处理冲突？
 - 如何评估Multi-Agent系统的成功率？
 memory_points:
-- 单Agent痛点: Context爆炸、注意力衰减、职责混乱
-- Multi-Agent流水线: PRD→Design→Task→Code→Test
-- 传递方式: Markdown中间产物（非聊天记录）
-- 调度层: AutoRun负责任务分发、状态流转、失败重试
+- "单Agent痛点: Context爆炸、注意力衰减、职责混乱"
+- "Multi-Agent流水线: PRD→Design→Task→Code→Test"
+- "传递方式: Markdown中间产物（非聊天记录）"
+- "调度层: AutoRun负责任务分发、状态流转、失败重试"
 ---
 
 # 【后端开发二面】为什么采用Multi-Agent而不是单Agent？架构如何编排？
