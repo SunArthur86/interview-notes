@@ -4,3 +4,4 @@ node_modules
 out
 *.tsbuildinfo
 .env*.local
+__pycache__/
