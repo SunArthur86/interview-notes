@@ -251,16 +251,17 @@ class SSEManager {
 4. **端云协同成本意识**：提到"100万DAU全走云端API一年几千万，简单意图放端侧WebGPU跑1B量化模型"
 5. **不只是SSE**：能延伸到ReadableStream、WebGPU端侧推理等前沿方案
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 就像流水线包饺子——你一个人又接面又包又煮（主线程做所有事），手忙脚乱。优化是分工：一个人专门接面（Worker接收数据），一个人按节奏包（RAF节流渲染），一个人煮（主线程绘制）。
+**30 秒电梯演讲：** AI对话产品的SSE流式渲染如果在前端主线程处理，每个token到达都触发DOM更新，会导致Long Task和FPS骤降。
 
 **展开框架：**
-1. **问题根因** — 每来一个token就setState→重渲染→Long Task→掉帧
-2. **Web Worker接收数据流** — 主线程不阻塞
-3. **RAF(Requ** — estAnimationFrame)做节流，不满一帧不刷
+1. **核心矛盾** — SSE高频推送 + DOM逐次渲染 = Long Task + FPS骤降
+2. **三招优化** — Web Worker接收 → RAF节流渲染 → ReadableStream Buffer批量更新
+3. **每个token触发一次** — 每个token触发一次setState是性能杀手 → 改为Buffer累积+RAF按帧刷新
 
-**收尾：** Web Worker能否直接操作DOM？
+**收尾：** 这块我踩过坑——要不要深入聊：Web Worker能否直接操作DOM？（不能，需要postMessage通信）？
 
 ## 视频脚本
 
@@ -268,8 +269,8 @@ class SSEManager {
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【前端面试】AI 对话产品中 SSE 流式渲染如何优化？前端 | "就像流水线包饺子——你一个人又接面又包又煮（主线程做所有事），手忙脚乱。优化是分工：一个人专门接面（" | 引入 |
-| 0:20 | 概念图解 | "每来一个token就setState→重渲染→Long Task→掉帧" | 问题根因 |
-| 0:45 | 对比表格 | "主线程不阻塞" | Web Worker接收数据流 |
-| 1:15 | 代码截图 | "estAnimationFrame)做节流，不满一帧不刷" | RAF(Requ |
-| 1:45 | 总结卡 | "记住三个词：问题根因、Web Worker接收数据流、RAF(Requ" | 收尾 |
+| 0:00 | 标题卡 | "性能一句话：AI对话产品的SSE流式渲染如果在前端主线程处理，每个token到达都触发DOM更新…。" | 开场钩子 |
+| 0:15 | 浏览器渲染流程图 | "核心矛盾：SSE高频推送 + DOM逐次渲染 就是 Long Task + FPS骤降" | 核心矛盾 |
+| 1:06 | 浏览器渲染流程图分步演示 | "三招优化：Web Worker接收 到 RAF节流渲染 到 ReadableStream Buffer批量更新" | 三招优化 |
+| 1:57 | 关键代码/伪代码片段 | "每个token触发一次setState是性能杀手 到 改为Buffer累积+RAF按帧刷新" | 每个token触发一次 |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：Web Worker能否直接操作DOM？（不能，需要postMessage通信）。" | 收尾 |

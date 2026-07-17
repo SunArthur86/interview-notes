@@ -442,23 +442,26 @@ Thought（推理过程）和 Action（工具调用参数）的学习难度和重
 
 ## 结构化回答
 
-**30 秒电梯演讲：** 像训练实习生用计算器算账——他按计算器（生成调用）、看屏幕数字（observation）、继续算。考核时只看他"按对按钮的决策"（生成的token），不能因为他看到了屏幕数字就给分（否则他会变成背数字而不是学算账）。
+**30 秒电梯演讲：** Agentic RL训练Agent用工具解决问题。Agent loop是"模型生成→解析工具调用→执行工具→拼接结果→继续生成"的循环。Token mask的关键：只有模型自己生成的token参与loss。
 
 **展开框架：**
 1. **Agent loop** — generate → parse → execute → append → repeat
-2. **Loss只算模型** — 生成的token（含tool_call指令）
-3. **observat** — ion/tool_result的token全部mask（不参与loss）
+2. **Loss** — Loss只算模型生成的token（含tool_call指令）
+3. **observation** — observation/tool_result的token全部mask（不参与loss）
 
-**收尾：** 如果工具返回的observation也参与loss会怎样？
+**收尾：** 您想深入聊：如果工具返回的observation也参与loss会怎样？
+
 
 ## 视频脚本
 
-> 预计时长：4 分钟 | 由浅入深
+> 预计时长：5 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【八股总结】Agentic RL 的 Agent loop  | "像训练实习生用计算器算账——他按计算器（生成调用）、看屏幕数字（observation）、继续算。考" | 引入 |
-| 0:20 | 概念图解 | "generate → parse → execute → append → repeat" | Agent loop |
-| 0:45 | 对比表格 | "生成的token（含tool_call指令）" | Loss只算模型 |
-| 1:15 | 代码截图 | "ion/tool_result的token全部mask（不参与loss）" | observat |
-| 2:15 | 总结卡 | "记住三个词：Agent loop、Loss只算模型、observat" | 收尾 |
+| 0:00 | 标题卡：Agentic RL 的 Agent loop… | "像训练实习生用计算器算账——他按计算器（生成调用）、看屏幕数字（observation）…" | 开场钩子 |
+| 0:20 | 核心概念图 | "Agentic RL训练Agent用工具解决问题。Agent loop是"模型生成→解析工具调用→执行工具→拼接结果→继…" | 核心定义 |
+| 0:50 | Agent loop示意图 | "Agent loop——generate → parse → execute → append → repeat" | 要点拆解1 |
+| 1:30 | Loss示意图 | "Loss——Loss只算模型生成的token（含tool_call指令）" | 要点拆解2 |
+| 2:20 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 3:10 | 总结卡 | "记住核心要点。下期我们追问：如果工具返回的observation也参与loss会怎样？" | 收尾与钩子 |

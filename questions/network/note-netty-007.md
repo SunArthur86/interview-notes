@@ -215,16 +215,19 @@ JDK Future（如 FutureTask）设计为"轮询模型"——`future.isDone()` 检
 
 五条经验：一、用 addListener 不用 await——await 阻塞线程且可能死锁，addListener 异步回调；二、检查 isSuccess 和 cause——listener 内先判断成功失败，分别处理；三、EventLoop 内绝不 await——会死锁，Netty 会抛异常但代码要避免写这种逻辑；四、Future 链式——addListener 内调下一个异步操作，避免"回调地狱"用 Promise 协调多个 Future；五、Promise 不可滥用——开发者通常只读 ChannelFuture，Promise 是 Netty 内部用的，除非自定义异步操作（如把外部回调包装成 Netty Future）才用 Promise。核心："异步回调 + isSuccess 检查 + EventLoop 不阻塞 + 链式组合"是 Netty 异步编程的四要素。
 
+
 ## 结构化回答
+
 
 **30 秒电梯演讲：** JDK Future 像"查快递单号"——你只能主动去网站查"发货了吗？发货了吗？"，要么死等要么反复刷。ChannelFuture 像"快递签收短信"——你留个手机号（Listener），送达瞬间系统自动给你发短信，你完全不用主动查。
 
 **展开框架：**
-1. **JDK** — Future=只能手动检查是否完成或阻塞等待(繁琐)
-2. **ChannelF** — uture=可注册多个Listener,完成时自动回调operateComplete()
-3. **ChannelF** — uture是操作结果的占位符,何时执行不可精确预测但必定执行
+1. **JDK Futu** — JDK Future=只能手动检查是否完成或阻塞等待(繁琐)
+2. **ChannelF** — ChannelFuture=可注册多个Listener,完成时自动回调operateComplete()
+3. **ChannelF** — ChannelFuture是操作结果的占位符,何时执行不可精确预测但必定执行
 
 **收尾：** ChannelFutureListener 和 GenericFutureListener 的关系？
+
 
 ## 视频脚本
 
@@ -232,8 +235,8 @@ JDK Future（如 FutureTask）设计为"轮询模型"——`future.isDone()` 检
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：ChannelFuture 与 JDK Future 的区别 | "JDK Future 像"查快递单号"——你只能主动去网站查"发货了吗？发货了吗？"，要么死等要么反" | 引入 |
-| 0:20 | 概念图解 | "Future=只能手动检查是否完成或阻塞等待(繁琐)" | JDK |
-| 0:45 | 对比表格 | "uture=可注册多个Listener,完成时自动回调operateComplete()" | ChannelF |
-| 1:15 | 代码截图 | "uture是操作结果的占位符,何时执行不可精确预测但必定执行" | ChannelF |
-| 1:45 | 总结卡 | "记住三个词：JDK、ChannelF、ChannelF" | 收尾 |
+| 0:00 | 标题卡 | "Netty一句话：JDK 的 Future 只能'主动去问'操作完没完（get() 阻塞死等或循环 isDone）…。" | 开场钩子 |
+| 0:15 | Netty Reactor 线程模型图 | "JDK Future 痛点：只允许手动检查或阻塞等待，非常繁琐" | JDK Future 痛 |
+| 1:06 | Netty Reactor 线程模型图分步演示 | "Netty ChannelFuture 改进：addListener 注册监听器，完成时回调 operateComp…" | Netty |
+| 1:57 | 关键代码/伪代码片段 | "消除手动检查操作是否完成的必要" | 消除手动检查操作是否完成 |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：ChannelFutureListener 和 GenericFutureListener 的关系。" | 收尾 |

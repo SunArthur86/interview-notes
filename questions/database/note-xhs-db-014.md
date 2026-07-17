@@ -203,16 +203,17 @@ sync_binlog = 1  -- 每次提交都fsync binlog (推荐)
 4. **MySQL 8.0改进**：redo log改为双buffer+并行写入，减少临界区竞争，提升并发提交性能
 5. **分布式事务2PC vs MySQL内部2PC**：MySQL内部的2PC是InnoDB和Server层之间的协调，而分布式XA是多个资源管理器之间的协调，但原理类似
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 两阶段提交就像签合同：第一步双方各签一份草稿（prepare），第二步互换确认无误后盖章生效（commit）。如果中途一方反悔（崩溃），根据草稿状态决定是作废还是继续
+**30 秒电梯演讲：** 两阶段提交是MySQL保证redo log和binlog一致性的协议：先写redo log(prepare)→再写binlog→最后提交redo log(commit)。
 
 **展开框架：**
-1. **Phase 1** — 写redo log(prepare状态)
-2. **Phase 2** — 写binlog → 写redo log(commit状态)
-3. **崩溃恢复规则** — 有binlog+prepare → 提交；无binlog+prepare → 回滚
+1. **2PC三步** — redo prepare → binlog write → redo commit
+2. **崩溃恢复** — binlog有记录→提交；binlog无记录→回滚
+3. **redo log** — redo log和binlog不一致的后果：主从数据不一致
 
-**收尾：** 如果redo log写完了，binlog写完了，但commit标志没写就崩溃了，怎么恢复？
+**收尾：** 这块我踩过坑——要不要深入聊：如果redo log写完了，binlog写完了，但commit标志没写就崩溃了，怎么恢复？
 
 ## 视频脚本
 
@@ -220,8 +221,9 @@ sync_binlog = 1  -- 每次提交都fsync binlog (推荐)
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】两阶段提交（2PC）讲一下。崩溃恢 | "两阶段提交就像签合同：第一步双方各签一份草稿（prepare），第二步互换确认无误后盖章生效（com" | 引入 |
-| 0:20 | 概念图解 | "写redo log(prepare状态)" | Phase 1 |
-| 0:45 | 对比表格 | "写binlog → 写redo log(commit状态)" | Phase 2 |
-| 1:15 | 代码截图 | "有binlog+prepare → 提交；无binlog+prepare → 回滚" | 崩溃恢复规则 |
-| 2:15 | 总结卡 | "记住三个词：Phase 1、Phase 2、崩溃恢复规则" | 收尾 |
+| 0:00 | 标题卡 | "MySQL一句话：两阶段提交是MySQL保证redo log和binlog一致性的协议：先写redo log(pr…。" | 开场钩子 |
+| 0:15 | MySQL EXPLAIN 执行计划截图 | "2PC三步：redo prepare 到 binlog write 到 redo commit" | 2PC三步 |
+| 1:08 | MySQL EXPLAIN 执行计划截图分步演示 | "崩溃恢复：binlog有记录到提交；binlog无记录到回滚" | 崩溃恢复 |
+| 2:01 | 关键代码/伪代码片段 | "redo log和binlog不一致的后果：主从数据不一致" | redo log |
+| 2:54 | 对比表格 | "commit标志在redo log中，用XA ID关联binlog" | commit标志在 |
+| 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：如果redo log写完了，binlog写完了，但commit标志没写就崩溃了，怎么恢复。" | 收尾 |

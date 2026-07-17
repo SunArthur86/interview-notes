@@ -193,16 +193,17 @@ native transport 的局限：一、平台特定——Epoll 只在 Linux、KQueue
 
 三条经验：一、默认 NIO——跨平台、稳定、文档全，新项目首选；二、Linux 生产上 Epoll——性能提升 10-30% 且支持 TCP_FASTOPEN 等特性，通过 `<dependency>` 加 netty-transport-native-epoll 切换；三、EventLoop 不阻塞——无论 NIO 还是 Epoll，handler 都不能阻塞，否则整个 EventLoop 卡住。核心原则："按平台和性能需求选 transport，但编程模型一致（EventLoop + ChannelHandler），代码可平滑迁移。" 这套经验也适用于其他 native 加速场景（如 RocksDB 的 JNI、TensorRT 的 native 推理），核心是"在热点路径用 native，在通用路径用 Java"。
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** AIO 像是"代驾服务"——你把车钥匙交给代驾（OS），它开完通知你。但 Linux 这个代驾公司其实没有真正的代驾，它是临时雇了个会开车的 epoll 司机来冒充（用 epoll 模拟 AIO）。既然最后都是同一个司机在开，你还不如...
+**30 秒电梯演讲：** Netty 选 NIO 而非 AIO，本质是因为在 Linux（服务端主流 OS）上，AIO 是用 epoll 强行模拟出来的，并不比直接用 NIO(epoll) 快，反而带来额外复杂度和回调地狱。既然底层是同一个东西，不如直接用更简单可控的 NIO。
 
 **展开框架：**
-1. **Netty官方结论** — AIO在Unix系统上不比NIO(epoll)快
-2. **Linux没有真正的异步IO** — AIO是用epoll模拟的
-3. **NIO更简单可控** — (主动轮询)vs AIO回调复杂(回调地狱+线程模型难)
+1. **一句话** — Not faster than NIO(epoll) on unix systems —— Netty 官方原话
+2. **根因** — Linux 没有真正的 AIO，AIO 是用 epoll 模拟的，底层和 NIO 一样
+3. **权衡** — AIO 回调复杂（回调地狱、线程模型难），NIO 主动轮询更简单可控
 
-**收尾：** Linux AIO (io_uring) 出现后，Netty 会转向 AIO 吗？
+**收尾：** 这块我踩过坑——要不要深入聊：Linux AIO (io_uring) 出现后，Netty 会转向 AIO 吗？
 
 ## 视频脚本
 
@@ -210,8 +211,9 @@ native transport 的局限：一、平台特定——Epoll 只在 Linux、KQueue
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：为什么 Netty 使用 NIO 而不是 AIO？ | "AIO 像是"代驾服务"——你把车钥匙交给代驾（OS），它开完通知你。但 Linux 这个代驾公司其" | 引入 |
-| 0:20 | 概念图解 | "AIO在Unix系统上不比NIO(epoll)快" | Netty官方结论 |
-| 0:45 | 对比表格 | "AIO是用epoll模拟的" | Linux没有真正的异步IO |
-| 1:15 | 代码截图 | "(主动轮询)vs AIO回调复杂(回调地狱+线程模型难)" | NIO更简单可控 |
-| 2:15 | 总结卡 | "记住三个词：Netty官方结论、Linux没有真正的异步IO、NIO更简单可控" | 收尾 |
+| 0:00 | 标题卡 | "Netty一句话：Netty 选 NIO 而非 AIO，本质是因为在 Linux（服务端主流 OS）上…。" | 开场钩子 |
+| 0:15 | Netty Reactor 线程模型图 | "一句话：Not faster than NIO(epoll) on unix systems —— Netty 官方原话" | 一句话 |
+| 1:08 | Netty Reactor 线程模型图分步演示 | "根因：Linux 没有真正的 AIO，AIO 是用 epoll 模拟的，底层和 NIO 一样" | 根因 |
+| 2:01 | 关键代码/伪代码片段 | "权衡：AIO 回调复杂（回调地狱、线程模型难），NIO 主动轮询更简单可控" | 权衡 |
+| 2:54 | 对比表格 | "历史：Netty 曾有 AIO 支持，后因收益不足移除" | 历史 |
+| 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：Linux AIO (io_uring) 出现后，Netty 会转向 AIO 吗。" | 收尾 |

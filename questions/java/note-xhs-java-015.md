@@ -211,16 +211,17 @@ private static ThreadLocal<SimpleDateFormat> dateFormat =
 4. **对比Synchronized** — 展示对两种并发控制思路的理解
 5. **提到TTL** — 线程池场景的ThreadLocal传递，展示实际项目经验
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** ThreadLocal就像酒店房间里的保险箱——每个客人（线程）有自己的保险箱（ThreadLocalMap），存放自己的物品（变量副本），互不干扰。你不需要锁，因为根本没有共享
+**30 秒电梯演讲：** ThreadLocal为每个线程提供独立的变量副本，实现线程隔离。数据存在每个线程自己的ThreadLocalMap中，不存在共享竞争。
 
 **展开框架：**
-1. **每个Thread** — 对象内部有一个ThreadLocalMap，存储该线程的所有ThreadLocal变量
-2. **ThreadLo** — calMap的Key是ThreadLocal对象的弱引用，Value是强引用
-3. **核心方法** — set()/get()/remove()
+1. **存储位置** — Thread.threadLocals（ThreadLocalMap），不是存在ThreadLocal对象中
+2. **Key是弱引用** — Key是弱引用(WeakReference<ThreadLocal>)，Value是强引用
+3. **内存泄漏** — 线程池中线程复用，ThreadLocal不remove会导致Value泄漏
 
-**收尾：** ThreadLocal和Synchronized有什么区别？
+**收尾：** 这块我踩过坑——要不要深入聊：ThreadLocal和Synchronized有什么区别？
 
 ## 视频脚本
 
@@ -228,8 +229,8 @@ private static ThreadLocal<SimpleDateFormat> dateFormat =
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】ThreadLocal有了解吗？ | "ThreadLocal就像酒店房间里的保险箱——每个客人（线程）有自己的保险箱（ThreadLoca" | 引入 |
-| 0:20 | 概念图解 | "对象内部有一个ThreadLocalMap，存储该线程的所有ThreadLocal变量" | 每个Thread |
-| 0:45 | 对比表格 | "calMap的Key是ThreadLocal对象的弱引用，Value是强引用" | ThreadLo |
-| 1:15 | 代码截图 | "set()/get()/remove()" | 核心方法 |
-| 1:45 | 总结卡 | "记住三个词：每个Thread、ThreadLo、核心方法" | 收尾 |
+| 0:00 | 标题卡 | "并发/ThreadLocal一句话：ThreadLocal为每个线程提供独立的变量副本，实现线程隔离。数据存在每个线程自己的ThreadLocalMap中…。" | 开场钩子 |
+| 0:15 | JVM 内存结构图 | "存储位置：Thread.threadLocals（ThreadLocalMap），不是存在ThreadLocal对象中" | 存储位置 |
+| 1:06 | JVM 内存结构图分步演示 | "Key是弱引用(WeakReference<ThreadLocal>)，Value是强引用" | Key是弱引用 |
+| 1:57 | 关键代码/伪代码片段 | "内存泄漏：线程池中线程复用，ThreadLocal不remove会导致Value泄漏" | 内存泄漏 |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：ThreadLocal和Synchronized有什么区别。" | 收尾 |

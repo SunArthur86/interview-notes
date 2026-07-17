@@ -276,16 +276,17 @@ Kafka Consumer Lag = LogEndOffset - ConsumerOffset
 2. 消费能力压测——定期压测消费端的吞吐，确保"消费速率 > 生产峰值速率"有余量。
 3. 应急 SOP——"积压发生 → 扩消费者 → 优先消化关键消息 → 监控 Lag 归零 → 事后优化消费逻辑"写成 runbook。
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** Kafka积压就像快递站爆仓——100万个包裹堆积。应急三步：(1)临时多招快递员(增加Consumer实例)并行送货；(2)先送加急件(跳过非关键消息，优先处理核心业务)；(3)送完后看监控(ConsumerLag)确认仓库清空。
+**30 秒电梯演讲：** Kafka积压100万消息的三步应急：(1)扩容消费者实例并行处理；(2)跳过非关键数据优先处理核心业务消息；(3)修复后通过Lag监控确保积压完全消费。
 
 **展开框架：**
-1. **消费者宕机→消息** — 积压→快速恢复需要增加消费能力
-2. **扩容消费者** — 增加Consumer实例，注意分区数限制（Consumer数≤Partition数才有意义）
-3. **跳过非关键数据** — 设置过滤条件，优先消费核心业务topic/partition
+1. **核心限制** — Consumer实例数 ≤ Partition数（否则多余的Consumer空闲）
+2. **三步应急** — 扩容Consumer→跳过非关键消息→ConsumerLag监控确认
+3. **ConsumerLag** — ConsumerLag = LogEndOffset - ConsumerOffset = 还没消费的消息数
 
-**收尾：** Kafka的Consumer数量为什么不能超过Partition数量？
+**收尾：** 这块我踩过坑——要不要深入聊：Kafka的Consumer数量为什么不能超过Partition数量？
 
 ## 视频脚本
 
@@ -293,8 +294,8 @@ Kafka Consumer Lag = LogEndOffset - ConsumerOffset
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【快手Java一面】Kafka消费者宕机后，积压100万消息 | "Kafka积压就像快递站爆仓——100万个包裹堆积。应急三步：(1)临时多招快递员(增加Consum" | 引入 |
-| 0:20 | 概念图解 | "积压→快速恢复需要增加消费能力" | 消费者宕机→消息 |
-| 0:45 | 对比表格 | "增加Consumer实例，注意分区数限制（Consumer数≤Partition数才有意义）" | 扩容消费者 |
-| 1:15 | 代码截图 | "设置过滤条件，优先消费核心业务topic/partition" | 跳过非关键数据 |
-| 1:45 | 总结卡 | "记住三个词：消费者宕机→消息、扩容消费者、跳过非关键数据" | 收尾 |
+| 0:00 | 标题卡 | "消息队列一句话：Kafka积压100万消息的三步应急：(1)扩容消费者实例并行处理；(2)跳过非关键数据优先处理核心业务消息…。" | 开场钩子 |
+| 0:15 | 消息队列架构图 | "核心限制：Consumer实例数 ≤ Partition数（否则多余的Consumer空闲）" | 核心限制 |
+| 1:06 | 消息队列架构图分步演示 | "三步应急：扩容Consumer到跳过非关键消息到ConsumerLag监控确认" | 三步应急 |
+| 1:57 | 关键代码/伪代码片段 | "ConsumerLag 就是 LogEndOffset - ConsumerOffset 就是 还没消费的消息数" | ConsumerLag |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：Kafka的Consumer数量为什么不能超过Partition数量。" | 收尾 |

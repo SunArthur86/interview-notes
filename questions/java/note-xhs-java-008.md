@@ -193,16 +193,17 @@ public class ContextInterceptor implements HandlerInterceptor {
 4. **TransmittableThreadLocal (阿里开源)**：解决线程池场景下ThreadLocal值传递问题，通过装饰线程池实现
 5. **Netty FastThreadLocal**：用固定数组索引替代ThreadLocalMap的哈希探测，O(1)性能且无哈希冲突
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 想象酒店房间（线程）里有个私人储物柜（ThreadLocalMap）。退房时Key（房卡，弱引用）被回收，但Value（行李）还在柜子里。如果房间不退（线程池复用），行李永远拿不走——这就是内存泄漏
+**30 秒电梯演讲：** ThreadLocal内存泄漏的根因是线程池中线程长期存活，其ThreadLocalMap持有Value的强引用导致Value无法被GC回收。
 
 **展开框架：**
-1. **ThreadLo** — calMap的Key是弱引用（WeakReference），Value是强引用
-2. **Key被GC后变成null** — —形成null→Value的泄漏链
-3. **线程池场景下线程不销毁** — 泄漏的Value永远无法回收
+1. **Key=弱引用** — Key=弱引用（WeakReference），Value=强引用——泄漏的根源
+2. **线程池场景必须try** — 线程池场景必须try-finally + remove()
+3. **Key设弱引用是为了** — Key设弱引用是为了ThreadLocal对象本身能被GC
 
-**收尾：** 为什么不把Value也设为弱引用？
+**收尾：** 这块我踩过坑——要不要深入聊：为什么不把Value也设为弱引用？（提示：Value被回收后get返回null，破坏语义）？
 
 ## 视频脚本
 
@@ -210,8 +211,8 @@ public class ContextInterceptor implements HandlerInterceptor {
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】ThreadLocal内存泄漏，K | "想象酒店房间（线程）里有个私人储物柜（ThreadLocalMap）。退房时Key（房卡，弱引用）被" | 引入 |
-| 0:20 | 概念图解 | "calMap的Key是弱引用（WeakReference），Value是强引用" | ThreadLo |
-| 0:45 | 对比表格 | "—形成null→Value的泄漏链" | Key被GC后变成null |
-| 1:15 | 代码截图 | "泄漏的Value永远无法回收" | 线程池场景下线程不销毁 |
-| 1:45 | 总结卡 | "记住三个词：ThreadLo、Key被GC后变成null、线程池场景下线程不销毁" | 收尾 |
+| 0:00 | 标题卡 | "并发一句话：ThreadLocal内存泄漏的根因是线程池中线程长期存活，其ThreadLocalMap持有V…。" | 开场钩子 |
+| 0:15 | JVM 内存模型与 GC 流程图 | "Key就是弱引用（WeakReference），Value就是强引用——泄漏的根源" | Key=弱引用 |
+| 1:06 | JVM 内存模型与 GC 流程图分步演示 | "线程池场景必须try-finally + remove()" | 线程池场景必须try |
+| 1:57 | 关键代码/伪代码片段 | "Key设弱引用是为了ThreadLocal对象本身能被GC" | Key设弱引用是为了 |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：为什么不把Value也设为弱引用？（提示：Value被回收后get返回null，破坏语义）。" | 收尾 |

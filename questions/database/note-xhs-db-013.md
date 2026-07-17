@@ -158,16 +158,17 @@ memory_points:
 4. **undo log版本链**：每行数据有隐藏字段roll_ptr指向上一版本，形成版本链。MVCC通过ReadView + 版本链实现RC和RR隔离级别
 5. **binlog和redo log的区别本质**：redo log是"物理日志"（哪个页哪个偏移改成什么），binlog是"逻辑日志"（执行了什么操作）。物理日志恢复更快，逻辑日志跨引擎兼容
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 三种日志就像三种不同的记录员：redo log是'黑匣子'——记录已经做了什么，飞机坠毁了也能恢复；undo log是'后悔药'——记录怎么撤销，事务失败时回退；binlog是'广播员'——把操作告诉所有从库
+**30 秒电梯演讲：** 三种日志分别解决三个问题：redo log保证崩溃恢复（持久性），undo log保证回滚和MVCC（原子性+隔离性），binlog保证主从复制和数据归档。
 
 **展开框架：**
-1. **redo log** — InnoDB引擎层，物理日志，记录'页X偏移Y改了什么'，保证崩溃恢复
-2. **undo log** — InnoDB引擎层，逻辑日志，记录'反向操作'，保证回滚+MVCC
-3. **binlog** — Server层，逻辑日志，记录'SQL语句/行变更'，保证主从复制
+1. **redo log** — redo log = InnoDB物理日志 → 崩溃恢复 → 循环写 → WAL机制
+2. **undo log** — undo log = InnoDB逻辑日志 → 回滚+MVCC → 随事务产生
+3. **binlog** — binlog = Server层逻辑日志 → 主从复制+归档 → 追加写
 
-**收尾：** redo log和binlog的两阶段提交是怎么保证一致性的？
+**收尾：** 这块我踩过坑——要不要深入聊：redo log和binlog的两阶段提交是怎么保证一致性的？（见note-xhs-db-014）？
 
 ## 视频脚本
 
@@ -175,8 +176,8 @@ memory_points:
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】binlog、redo log、u | "三种日志就像三种不同的记录员：redo log是'黑匣子'——记录已经做了什么，飞机坠毁了也能恢复；" | 引入 |
-| 0:20 | 概念图解 | "InnoDB引擎层，物理日志，记录'页X偏移Y改了什么'，保证崩溃恢复" | redo log |
-| 0:45 | 对比表格 | "InnoDB引擎层，逻辑日志，记录'反向操作'，保证回滚+MVCC" | undo log |
-| 1:15 | 代码截图 | "Server层，逻辑日志，记录'SQL语句/行变更'，保证主从复制" | binlog |
-| 1:45 | 总结卡 | "记住三个词：redo log、undo log、binlog" | 收尾 |
+| 0:00 | 标题卡 | "MySQL一句话：三种日志分别解决三个问题：redo log保证崩溃恢复（持久性），undo log保证回滚和MVCC（原子性+隔离性）…。" | 开场钩子 |
+| 0:15 | MySQL EXPLAIN 执行计划截图 | "redo log 就是 InnoDB物理日志 到 崩溃恢复 到 循环写 到 WAL机制" | redo log |
+| 1:06 | MySQL EXPLAIN 执行计划截图分步演示 | "undo log 就是 InnoDB逻辑日志 到 回滚+MVCC 到 随事务产生" | undo log |
+| 1:57 | 关键代码/伪代码片段 | "binlog 就是 Server层逻辑日志 到 主从复制+归档 到 追加写" | binlog |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：redo log和binlog的两阶段提交是怎么保证一致性的？（见note-xhs-db-014）。" | 收尾 |

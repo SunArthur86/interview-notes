@@ -291,16 +291,17 @@ async function streamChat(prompt, lastEventId = 0) {
 2. 监控指标——SSE 连接数、平均连接时长、断线重连率、重连成功率，重连失败告警。
 3. Nginx 配置规范——`proxy_buffering off`、`proxy_read_timeout 300s`、`proxy_http_version 1.1`，写入运维规范，避免 Nginx 默认配置导致 SSE 失效。
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** SSE像打电话时对方给你念文章（你只能听不能说）。如果电话断了，你重拨时说「我上次听到第3段了，从第4段继续念」（Last-Event-ID）。如果AI还在生成后面的内容，正好接着念。
+**30 秒电梯演讲：** SSE是服务器单向推送的HTTP长连接协议，浏览器原生支持自动重连。断线重连的关键是Last-Event-ID机制——客户端记住最后收到的消息序号，重连时告诉服务端从哪里继续。
 
 **展开框架：**
-1. **SSE=HTTP** — 长连接+单向推送，浏览器EventSource自动重连
-2. **每个事件带id字段** — 重连时浏览器自动发Last-Event-ID头
-3. **服务端用SseE** — mitter(Spring)/text/event-stream实现
+1. **SSE=HTTP长连接** — SSE=HTTP长连接+单向推送，浏览器EventSource自动重连
+2. **每个事件带id字段** — 每个事件带id字段，重连时浏览器自动发Last-Event-ID头
+3. **服务端用** — 服务端用SseEmitter(Spring)/text/event-stream实现
 
-**收尾：** SSE 在 Nginx 反向代理时需要注意什么配置？
+**收尾：** 这块我踩过坑——要不要深入聊：SSE 在 Nginx 反向代理时需要注意什么配置？
 
 ## 视频脚本
 
@@ -308,8 +309,9 @@ async function streamChat(prompt, lastEventId = 0) {
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：AI应用中 SSE 流式响应如何设计断线重连？（入职Java | "SSE像打电话时对方给你念文章（你只能听不能说）。如果电话断了，你重拨时说「我上次听到第3段了，从第" | 引入 |
-| 0:20 | 概念图解 | "长连接+单向推送，浏览器EventSource自动重连" | SSE=HTTP |
-| 0:45 | 对比表格 | "重连时浏览器自动发Last-Event-ID头" | 每个事件带id字段 |
-| 1:15 | 代码截图 | "mitter(Spring)/text/event-stream实现" | 服务端用SseE |
-| 2:15 | 总结卡 | "记住三个词：SSE=HTTP、每个事件带id字段、服务端用SseE" | 收尾 |
+| 0:00 | 标题卡 | "高并发一句话：SSE是服务器单向推送的HTTP长连接协议，浏览器原生支持自动重连。断线重连的关键是Last-Event-ID机制——客户端记住最后收到的消息序号…。" | 开场钩子 |
+| 0:15 | Redis Lua 脚本执行截图 | "SSE就是HTTP长连接+单向推送，浏览器EventSource自动重连" | SSE=HTTP长连接 |
+| 1:08 | Redis Lua 脚本执行截图分步演示 | "每个事件带id字段，重连时浏览器自动发Last-Event-ID头" | 每个事件带id字段 |
+| 2:01 | 关键代码/伪代码片段 | "服务端用SseEmitter(Spring)/text/event-stream实现" | 服务端用 |
+| 2:54 | 对比表格 | "断线重连核心：Redis缓存事件+seq序号+从断点重放" | 断线重连核心 |
+| 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：SSE 在 Nginx 反向代理时需要注意什么配置。" | 收尾 |

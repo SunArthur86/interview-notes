@@ -320,23 +320,25 @@ ReAct 更灵活适应"动态环境"。Plan-and-Execute 是"先规划完整步骤
 
 ## 结构化回答
 
-**30 秒电梯演讲：** Agent像一个有手有脚的员工——LLM是大脑（思考），Planning是日程表（分解任务），Memory是笔记本（记住历史），Tools是工具箱（搜索/计算/API），Action是执行（真正动手干活）
+**30 秒电梯演讲：** LLM Agent = LLM(大脑) + Planning(规划) + Memory(记忆) + Tools(工具) + Action(执行)，让LLM从"只会说"变成"能做事"。
 
 **展开框架：**
 1. **Planning** — 任务分解、反思、自我修正
 2. **Memory** — 短期(对话历史) + 长期(向量检索/知识库)
 3. **Tools** — Function Calling、代码执行、API调用
 
-**收尾：** Agent的ReAct和Plan-and-Execute有什么区别？
+**收尾：** 您想深入聊：Agent的ReAct和Plan-and-Execute有什么区别？
+
 
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：一个完整的LLM Agent系统通常由哪些核心模块组成？ | "Agent像一个有手有脚的员工——LLM是大脑（思考），Planning是日程表（分解任务），Mem" | 引入 |
-| 0:20 | 概念图解 | "任务分解、反思、自我修正" | Planning |
-| 0:45 | 对比表格 | "短期(对话历史) + 长期(向量检索/知识库)" | Memory |
-| 1:15 | 代码截图 | "Function Calling、代码执行、API调用" | Tools |
-| 1:45 | 总结卡 | "记住三个词：Planning、Memory、Tools" | 收尾 |
+| 0:00 | 标题卡：一个完整的LLM Agent系统通常由哪些核心模… | "Agent像一个有手有脚的员工——LLM是大脑（思考），Planning是日程表（分解任务…" | 开场钩子 |
+| 0:20 | 核心概念图 | "LLM Agent = LLM(大脑) + Planning(规划) + Memory(记忆) + Tools(工具)…" | 核心定义 |
+| 0:50 | Planning示意图 | "Planning——任务分解、反思、自我修正" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：Agent的ReAct和Plan-and-Execute有什？" | 收尾与钩子 |

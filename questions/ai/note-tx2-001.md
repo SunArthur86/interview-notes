@@ -221,23 +221,25 @@ Planning 拆解：
 
 ## 结构化回答
 
-**30 秒电梯演讲：** 像一个厨师——Planning 是菜谱步骤（先切后炒），Memory 是尝过的味道记事本，Tool 是锅碗刀灶，Action 是真正动手切菜/开火。大脑（LLM）指挥，但没手脚（Tool/Action）做不出菜，没记事本（Memory...
+**30 秒电梯演讲：** Agent 四大核心组件——Planning(规划)把复杂任务拆成步骤，Memory(记忆)存历史上下文，Tool(工具)扩展与外部世界交互，Action(行动)执行具体操作。
 
 **展开框架：**
 1. **Planning** — 把复杂任务拆解成步骤（CoT/ReAct/ToT/Plan&Execute）
 2. **Memory** — 短期会话+长期向量记忆，存历史供检索
 3. **Tool** — 扩展能力边界，调API/DB/代码/搜索引擎
 
-**收尾：** Planning 的四种范式（CoT/ReAct/ToT/Plan&Execute）怎么选？
+**收尾：** 您想深入聊：Planning 的四种范式（CoT/ReAct/ToT/Plan&Execute）怎么选？
+
 
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【某讯面经】什么是 Agent？核心组件（Planning、 | "像一个厨师——Planning 是菜谱步骤（先切后炒），Memory 是尝过的味道记事本，Tool " | 引入 |
-| 0:20 | 概念图解 | "把复杂任务拆解成步骤（CoT/ReAct/ToT/Plan&Execute）" | Planning |
-| 0:45 | 对比表格 | "短期会话+长期向量记忆，存历史供检索" | Memory |
-| 1:15 | 代码截图 | "扩展能力边界，调API/DB/代码/搜索引擎" | Tool |
-| 1:45 | 总结卡 | "记住三个词：Planning、Memory、Tool" | 收尾 |
+| 0:00 | 标题卡：什么是 Agent？核心组件（Planning… | "像一个厨师——Planning 是菜谱步骤（先切后炒），Memory 是尝过的味道记事本…" | 开场钩子 |
+| 0:20 | 核心概念图 | "Agent 四大核心组件——Planning(规划)把复杂任务拆成步骤，Memory(记忆)存历史上下文，Tool(工具…" | 核心定义 |
+| 0:50 | Planning示意图 | "Planning——把复杂任务拆解成步骤（CoT/ReAct/ToT/Plan&Execute）" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：Planning 的四种范式（CoT/ReAct/ToT/P？" | 收尾与钩子 |

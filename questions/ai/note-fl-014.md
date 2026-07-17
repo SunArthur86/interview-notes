@@ -152,23 +152,25 @@ h 的选择是"子空间表达力"和"每头维度足够"的权衡。每个 head
 
 ## 结构化回答
 
-**30 秒电梯演讲：** Self-Attention 像开会时每个人同时听所有人说话并决定关注谁（Q=我想问什么，K=别人能答什么，V=别人实际说的）。Multi-Head 像派多个分身同时关注不同方面（一个听内容、一个听语气、一个看位置）。GPT 像只能听...
+**30 秒电梯演讲：** Self-Attention 每个 token 算 Q/K/V 三向量，注意力分数 = softmax(Q·K^T/√d_k)·V，除√d_k 防止大 d_k 下梯度消失。
 
 **展开框架：**
 1. **Self-Attention** — softmax(Q·K^T/√d_k)·V，除√d_k 防梯度消失
 2. **Multi-Head** — 切h份并行注意力，不同子空间关注不同信息，concat+线性融合
 3. **GPT** — Decoder-only+因果mask，next token prediction，适合生成
 
-**收尾：** 为什么除√d_k 不除d_k？
+**收尾：** 您想深入聊：为什么除√d_k 不除d_k？方差推导？
+
 
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【字节飞连面经】Transformer 基础：Self-At | "Self-Attention 像开会时每个人同时听所有人说话并决定关注谁（Q=我想问什么，K=别人能" | 引入 |
-| 0:20 | 概念图解 | "softmax(Q·K^T/√d_k)·V，除√d_k 防梯度消失" | Self-Attention |
-| 0:45 | 对比表格 | "切h份并行注意力，不同子空间关注不同信息，concat+线性融合" | Multi-Head |
-| 1:15 | 代码截图 | "Decoder-only+因果mask，next token prediction，适合生成" | GPT |
-| 1:45 | 总结卡 | "记住三个词：Self-Attention、Multi-Head、GPT" | 收尾 |
+| 0:00 | 标题卡：Transformer 基础：Self… | "Self-Attention 像开会时每个人同时听所有人说话并决定关注谁（Q=我想问什么…" | 开场钩子 |
+| 0:20 | 核心概念图 | "Self-Attention 每个 token 算 Q/K/V 三向量，注意力分数 = softmax(Q·K^T/√d…" | 核心定义 |
+| 0:50 | Self-Attention示意图 | "Self-Attention——softmax(Q·K^T/√d_k)·V，除√d_k 防梯度消失" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：为什么除√d_k 不除d_k？方差推导？" | 收尾与钩子 |

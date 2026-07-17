@@ -264,23 +264,25 @@ GAIA 通用但有参考价值。GAIA 是学术界公认的多步推理 benchmark
 
 ## 结构化回答
 
-**30 秒电梯演讲：** 就像高考——同一套卷子、同一个评分标准，用分数横向比较不同学生的水平。Benchmark就是AI的"高考"
+**30 秒电梯演讲：** Benchmark通过标准化的任务集和评分规则，量化衡量Agent/模型的生成质量和综合能力——就像高考。
 
 **展开框架：**
 1. **UTBench** — 针对工具使用能力的Benchmark，测试Agent调用工具的准确性和效率
 2. **通用Benchmark** — MMLU(知识), HumanEval(编码), GSM8K(数学), MATH(高级数学)
-3. **Agent Benchmark** — AgentBench, GAIA, ToolBench, WebArena
+3. **Agent** — AgentBench, GAIA, ToolBench, WebArena
 
-**收尾：** UTBench和AgentBench有什么区别？
+**收尾：** 您想深入聊：UTBench和AgentBench有什么区别？
+
 
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：UTBench等Benchmark如何衡量模型生成效果？ | "就像高考——同一套卷子、同一个评分标准，用分数横向比较不同学生的水平。Benchmark就是AI的"" | 引入 |
-| 0:20 | 概念图解 | "针对工具使用能力的Benchmark，测试Agent调用工具的准确性和效率" | UTBench |
-| 0:45 | 对比表格 | "MMLU(知识), HumanEval(编码), GSM8K(数学), MATH(高级数学)" | 通用Benchmark |
-| 1:15 | 代码截图 | "AgentBench, GAIA, ToolBench, WebArena" | Agent Benchmark |
-| 1:45 | 总结卡 | "记住三个词：UTBench、通用Benchmark、Agent Benchmark" | 收尾 |
+| 0:00 | 标题卡：UTBench等Benchmark如何衡量模型生… | "就像高考——同一套卷子、同一个评分标准，用分数横向比较不同学生的水平。Benchmark就…" | 开场钩子 |
+| 0:20 | 核心概念图 | "Benchmark通过标准化的任务集和评分规则，量化衡量Agent/模型的生成质量和综合能力" | 核心定义 |
+| 0:50 | UTBench示意图 | "UTBench——针对工具使用能力的Benchmark，测试Agent调用工具的准确性和效率" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：UTBench和AgentBench有什么区别？" | 收尾与钩子 |

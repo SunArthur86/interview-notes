@@ -126,16 +126,17 @@ done
 4. **容器环境**：K8s中配 `livenessProbe` + `ExitOnOutOfMemoryError` 让Pod自动重启；Dump文件需挂载持久卷
 5. **APM工具集成**：SkyWalking/Pinpoint等APM工具可配置OOM自动Dump并上传到对象存储（OSS/S3），避免本地磁盘不足
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 就像出门忘带手机拍照——事故发生了但没有照片证据。解决方法很简单：设置'自动拍照'参数，下次事故自动留证
+**30 秒电梯演讲：** OOM时没有Dump文件，是因为JVM启动参数没配置自动Dump。解决方法是添加-XX:+HeapDumpOnOutOfMemoryError参数，或手动用jmap/jcmd触发。打个比方，就像出门忘带手机拍照——事故发生了但没有照片证据。解决方法很简单：设置'自动拍照'参数，下次事故自动留证。
 
 **展开框架：**
-1. **根因** — JVM默认不自动生成Heap Dump
-2. **启动参数** — -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/path
-3. **手动触发** — jmap -dump 或 jcmd GC.heap_dump
+1. **JVM参数** — -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/dumps/
+2. **手动触发** — jmap -dump:format=b,file=heap.hprof <pid>
+3. **JDK11** — jcmd <pid> GC.heap_dump /path/heap.hprof
 
-**收尾：** Dump文件很大（几个GB），如何高效分析？
+**收尾：** 这块我踩过坑——要不要深入聊：Dump文件很大（几个GB），如何高效分析？（MAT可以分析>2GB的Dump，需要调大MAT内存）？
 
 ## 视频脚本
 
@@ -143,7 +144,7 @@ done
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】OOM时JVM没自动生成Dump文 | "就像出门忘带手机拍照——事故发生了但没有照片证据。解决方法很简单：设置'自动拍照'参数，下次事故自动" | 引入 |
-| 0:20 | 概念图解 | "JVM默认不自动生成Heap Dump" | 根因 |
-| 0:45 | 对比表格 | "-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/path" | 启动参数 |
-| 1:15 | 总结卡 | "记住三个词：根因、启动参数、手动触发" | 收尾 |
+| 0:00 | 标题卡 | "JVM一句话：OOM时没有Dump文件，是因为JVM启动参数没配置自动Dump。解决方法是添加-XX:+HeapDumpOnOutOfMemoryError参数…。" | 开场钩子 |
+| 0:15 | JVM 内存模型与 GC 流程图 | "JVM参数: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath就是/…" | JVM参数 |
+| 1:02 | JVM 内存模型与 GC 流程图分步演示 | "手动触发: jmap -dump:format就是b,file就是heap.hprof <pid>" | 手动触发 |
+| 1:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：Dump文件很大（几个GB），如何高效分析？（MAT可以分析>2GB的Dump，需要调大MAT内存）。" | 收尾 |

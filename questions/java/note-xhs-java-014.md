@@ -215,16 +215,17 @@ ThreadPoolExecutor inferencePool = new ThreadPoolExecutor(
 4. **能区分CPU密集型和IO密集型的线程数设置** — 展示实际调优经验
 5. **推荐CallerRunsPolicy** — 说明反压机制，体现系统设计思维
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 线程池就像一家餐厅——corePoolSize是常驻厨师，maxPoolSize是高峰期最多雇佣的厨师，workQueue是候餐区，rejectHandler是客人太多时的处理方式（拒绝/叫外卖/等位）
+**30 秒电梯演讲：** 线程池 就是 预创建的线程集合 + 任务队列 + 拒绝策略。7个核心参数控制线程创建、排队和拒绝行为。
 
 **展开框架：**
-1. **7个参数** — corePoolSize、maxPoolSize、keepAliveTime、unit、workQueue、threadFactory、handler
-2. **任务处理流程** — 核心线程→队列→非核心线程→拒绝策略
-3. **4种拒绝策略** — AbortPolicy(抛异常)、CallerRunsPolicy(调用者执行)、DiscardPolicy(丢弃)、DiscardOldestPolic...
+1. **7参数** — core、max、keepAlive、unit、queue、factory、handler
+2. **流程口诀** — 核心满→入队列→队列满→开到max→都满→拒绝
+3. **CPU密集型** — 线程数 ≈ CPU核数+1；IO密集型：线程数 ≈ CPU核数×2或更多
 
-**收尾：** 线程池是如何区分核心线程和非核心线程的？
+**收尾：** 这块我踩过坑——要不要深入聊：线程池是如何区分核心线程和非核心线程的？
 
 ## 视频脚本
 
@@ -232,8 +233,8 @@ ThreadPoolExecutor inferencePool = new ThreadPoolExecutor(
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】Java线程池有哪些参数？提交任务 | "线程池就像一家餐厅——corePoolSize是常驻厨师，maxPoolSize是高峰期最多雇佣的厨" | 引入 |
-| 0:20 | 概念图解 | "corePoolSize、maxPoolSize、keepAliveTime、unit、workQueue、thr..." | 7个参数 |
-| 0:45 | 对比表格 | "核心线程→队列→非核心线程→拒绝策略" | 任务处理流程 |
-| 1:15 | 代码截图 | "AbortPolicy(抛异常)、CallerRunsPolicy(调用者执行)、DiscardPolicy(丢弃..." | 4种拒绝策略 |
-| 1:45 | 总结卡 | "记住三个词：7个参数、任务处理流程、4种拒绝策略" | 收尾 |
+| 0:00 | 标题卡 | "并发/线程池一句话：线程池 就是 预创建的线程集合 + 任务队列 + 拒绝策略。7个核心参数控制线程创建、排队和拒绝行为。" | 开场钩子 |
+| 0:15 | 线程状态转换图 | "7参数：core、max、keepAlive、unit、queue、factory、handler" | 7参数 |
+| 1:06 | 线程状态转换图分步演示 | "流程口诀：核心满到入队列到队列满到开到max到都满到拒绝" | 流程口诀 |
+| 1:57 | 关键代码/伪代码片段 | "CPU密集型：线程数 ≈ CPU核数+1；IO密集型：线程数 ≈ CPU核数×2或更多" | CPU密集型 |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：线程池是如何区分核心线程和非核心线程的。" | 收尾 |

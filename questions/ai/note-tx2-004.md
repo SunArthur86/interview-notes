@@ -281,23 +281,25 @@ def parse_model_output(raw: str) -> OrderInfo:
 
 ## 结构化回答
 
-**30 秒电梯演讲：** 像让小学生写规范作文——先讲清楚要求(Prompt)，给范文(Schema+few-shot)，用作文格子纸(Structured Output API)，写错字涂改(Constrained Decoding)，最后老师检查批改(后处理)。
+**30 秒电梯演讲：** 让模型稳定输出标准 JSON Schema 的五层手段：①Prompt 层明确要求+给few-shot ②Schema 设计精简(字段少/命名直观/加description) ③模型层用支持 Structured Ou…
 
 **展开框架：**
 1. **Prompt层** — 明确要求+给few-shot示范
 2. **Schema设计** — 字段少/命名直观/加description/必填标required
 3. **Structured** — response_format json_schema 服务端约束
 
-**收尾：** Constrained Decoding 的 FSM 怎么构造？
+**收尾：** 您想深入聊：Constrained Decoding 的 FSM 怎么构造？
+
 
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【某讯面经】如何稳定让模型输出标准 JSON Schema？ | "像让小学生写规范作文——先讲清楚要求(Prompt)，给范文(Schema+few-shot)，用作" | 引入 |
-| 0:20 | 概念图解 | "明确要求+给few-shot示范" | Prompt层 |
-| 0:45 | 对比表格 | "字段少/命名直观/加description/必填标required" | Schema设计 |
-| 1:15 | 代码截图 | "response_format json_schema 服务端约束" | Structured |
-| 1:45 | 总结卡 | "记住三个词：Prompt层、Schema设计、Structured" | 收尾 |
+| 0:00 | 标题卡：如何稳定让模型输出标准 JSON Schema？ | "像让小学生写规范作文——先讲清楚要求(Prompt)，给范文(Schema+few…" | 开场钩子 |
+| 0:20 | 核心概念图 | "让模型稳定输出标准 JSON Schema 的五层手段：①Prompt 层明确要求+给few-shot ②Schema…" | 核心定义 |
+| 0:50 | Prompt层示意图 | "Prompt层——明确要求+给few-shot示范" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：Constrained Decoding 的 FSM 怎么构？" | 收尾与钩子 |

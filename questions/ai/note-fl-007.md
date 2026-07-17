@@ -171,23 +171,26 @@ LangGraph 的 Checkpoint 实际上是支持增量思维的——它存的是 Sta
 
 ## 结构化回答
 
-**30 秒电梯演讲：** LangChain 像流水线传送带（A→B→C 线性），LangGraph 像地铁线路图（有分叉、有环线、有换乘站）。前者简单场景快，后者复杂场景才理得清。AutoGen 像开会议——几个人各说各的，会议记录又长又乱。
+**30 秒电梯演讲：** LangChain 是早期"链式调用"抽象（封装 prompt/LLM/output_parser），LangGraph 是后来出的有状态图框架，把工作流显式建模成状态机。State 解决"上下文怎么传"。
 
 **展开框架：**
-1. **LangChain** — 链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入
+1. **LangChain** — LangChain 链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入
 2. **State** — TypedDict 定义共享上下文，每个 Node 读+改它
 3. **Node** — 纯函数（input=State, output=State partial）
 
-**收尾：** LangGraph 的 interrupt() 怎么实现 human-in-the-loop？
+**收尾：** 您想深入聊：LangGraph 的 interrupt() 怎么实现 human-in-the-loop？
+
 
 ## 视频脚本
 
-> 预计时长：4 分钟 | 由浅入深
+> 预计时长：5 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【字节飞连面经】用过哪些 Agent 框架？LangGrap | "LangChain 像流水线传送带（A→B→C 线性），LangGraph 像地铁线路图（有分叉、有" | 引入 |
-| 0:20 | 概念图解 | "链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入" | LangChain |
-| 0:45 | 对比表格 | "TypedDict 定义共享上下文，每个 Node 读+改它" | State |
-| 1:15 | 代码截图 | "纯函数（input=State, output=State partial）" | Node |
-| 2:15 | 总结卡 | "记住三个词：LangChain、State、Node" | 收尾 |
+| 0:00 | 标题卡：用过哪些 Agent 框架？LangGraph… | "LangChain 像流水线传送带（A→B→C 线性），LangGraph 像地铁线路图（…" | 开场钩子 |
+| 0:20 | 核心概念图 | "LangChain 是早期"链式调用"抽象（封装 prompt/LLM/output_parser），LangGraph…" | 核心定义 |
+| 0:50 | LangChain示意图 | "LangChain——LangChain 链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入" | 要点拆解1 |
+| 1:30 | State示意图 | "State——TypedDict 定义共享上下文，每个 Node 读+改它" | 要点拆解2 |
+| 2:20 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 3:10 | 总结卡 | "记住核心要点。下期我们追问：LangGraph 的 interrupt() 怎么实现 h？" | 收尾与钩子 |

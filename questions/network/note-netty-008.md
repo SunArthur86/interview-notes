@@ -217,16 +217,17 @@ ChannelHandlerContext  ChannelHandlerContext  ChannelHandlerContext
 
 五条经验：一、单一职责——每个 Handler 做一件事（解码、业务、编码分开），不写"上帝 Handler"；二、无状态优先——能用 @Sharable 共享的尽量无状态，有状态用非共享（默认）；三、异常处理——最后加 ExceptionHandler 统一捕获，中间 Handler 的异常要么处理要么 fireExceptionCaught 向后传；四、编解码用 FrameDecoder——处理半包粘包（LengthFieldBasedFrameDecoder 等），不要假设一次 read 是完整消息；五、资源释放——SimpleChannelInboundHandler 自动释放入站 ByteBuf，自定义传递要 retain/release 配对。核心："责任链 + 单一职责 + 无状态 + 异常处理 + 资源管理"是 Netty Handler 设计的五要素，遵守了代码清晰且不易出 bug。
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** ChannelPipeline 是"后厨流水线"，ChannelHandler 是流水线上的"工位"。一道菜（数据）从下单到上桌要经过：切菜工位（解码 Handler）→ 腌制工位（解析 Handler）→ 炒菜工位（业务 Handl...
+**30 秒电梯演讲：** ChannelHandler 是"处理一个事件的业务逻辑单元"，ChannelPipeline 是"把多个 Handler 串成处理链的容器"。
 
 **展开框架：**
-1. **ChannelH** — andler=处理入站/出站数据逻辑的容器(Netty主要组件)
-2. **ChannelP** — ipeline=ChannelHandler链的容器+事件传播API
-3. **入站事件从头→尾传播** — 出站事件从尾→头传播
+1. **ChannelHandler** — ChannelHandler 定位：接收并响应事件通知，是处理入站/出站数据的应用逻辑容器（开发者主要关注的组件）
+2. **ChannelHandler** — ChannelHandler 用途：格式转换、异常通知、活动状态通知、注册注销通知、自定义事件通知
+3. **ChannelPipeline** — 提供 ChannelHandler 链的容器，定义在该链上传播入站/出站事件流的 API
 
-**收尾：** ChannelHandlerContext 在其中起什么作用？
+**收尾：** 这块我踩过坑——要不要深入聊：ChannelHandlerContext 在其中起什么作用？
 
 ## 视频脚本
 
@@ -234,8 +235,9 @@ ChannelHandlerContext  ChannelHandlerContext  ChannelHandlerContext
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：ChannelHandler 和 ChannelPipeli | "ChannelPipeline 是"后厨流水线"，ChannelHandler 是流水线上的"工位"" | 引入 |
-| 0:20 | 概念图解 | "andler=处理入站/出站数据逻辑的容器(Netty主要组件)" | ChannelH |
-| 0:45 | 对比表格 | "ipeline=ChannelHandler链的容器+事件传播API" | ChannelP |
-| 1:15 | 代码截图 | "出站事件从尾→头传播" | 入站事件从头→尾传播 |
-| 2:15 | 总结卡 | "记住三个词：ChannelH、ChannelP、入站事件从头→尾传播" | 收尾 |
+| 0:00 | 标题卡 | "Netty一句话：ChannelHandler 是'处理一个事件的业务逻辑单元'，ChannelPipeline 是'把多个 Handler 串成处理链的容器'…。" | 开场钩子 |
+| 0:15 | Netty Reactor 线程模型图 | "ChannelHandler 定位：接收并响应事件通知，是处理入站/出站数据的应用逻辑容器（开发者主要关注的组件）" | ChannelHandler |
+| 1:08 | Netty Reactor 线程模型图分步演示 | "ChannelHandler 用途：格式转换、异常通知、活动状态通知、注册注销通知、自定义事件通知" | ChannelHandler |
+| 2:01 | 关键代码/伪代码片段 | "ChannelPipeline：提供 ChannelHandler 链的容器，定义在该链上传播入站/出站事件流的 API" | ChannelPipeline |
+| 2:54 | 对比表格 | "核心：ChannelPipeline 的关键是这些 ChannelHandler 的编排顺序" | 核心 |
+| 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：ChannelHandlerContext 在其中起什么作用。" | 收尾 |

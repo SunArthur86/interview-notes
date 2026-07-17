@@ -263,16 +263,17 @@ CPU×2 是"IO 等待 + CPU 计算"的平衡。EventLoop 既要处理 IO（含等
 
 五条经验：一、EventLoop 不阻塞——handler 内只做轻量处理，耗时任务丢业务线程池；二、Channel 绑定 EventLoop——理解绑定关系，同一 Channel 的操作在同一线程（无锁）；三、ioRatio 默认 50——除非明确知道负载特征（IO 重调高、业务重应丢业务线程池而非调低 ioRatio），否则不动；四、EventLoop 数量 = CPU×2——默认值适合大多数场景，按负载调；五、监控 EventLoop——pendingTasks、Channel 数、IO 吞吐，异常时排查阻塞 handler。核心："EventLoop 是单线程串行的 IO 引擎，保持其不被阻塞是 Netty 高性能的关键，所有耗时操作必须异步化或丢业务线程池。"
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** EventLoop 像银行的"专属柜员"。一位柜员（EventLoop/线程）固定服务几个客户（Channel），客户的所有业务（I/O 事件）都由这位柜员一个人按顺序办，从不串台——因为只有一个柜员在动这个客户的资料，根本不需要锁柜...
+**30 秒电梯演讲：** EventLoop 是 Netty 处理连接生命周期内所有事件的核心抽象——它本质上是一个"绑定单一线程、死循环处理任务"的执行器。
 
 **展开框架：**
-1. **EventLoo** — p=处理连接生命周期事件的执行器,每个任务是Runnable
-2. **五大关系** — EventLoopGroup含多EventLoop;EventLoop终身绑一线程;I/O在专属线程处理;Channel终身注册一EventLoop;一E...
-3. **串行无锁化** — 同Channel的I/O由同线程串行执行→消除同步需要
+1. **EventLoop 定义** — 处理连接生命周期中所发生的事件，运行任务（每个任务是个 Runnable 实例）
+2. **五大绑定关系** — ①EventLoopGroup含1+EventLoop ②EventLoop终身绑1Thread ③I/O在专属Thread处理 ④Channel终身注册1EventLoop ⑤1EventLoop可分给多Channel
+3. **王炸结论** — 给定 Channel 的 I/O 操作都由相同 Thread 执行，实际上消除了对同步的需要
 
-**收尾：** BossGroup 和 WorkerGroup 的分工？
+**收尾：** 这块我踩过坑——要不要深入聊：BossGroup 和 WorkerGroup 的分工？
 
 ## 视频脚本
 
@@ -280,8 +281,9 @@ CPU×2 是"IO 等待 + CPU 计算"的平衡。EventLoop 既要处理 IO（含等
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：EventLoop 的核心原理与线程模型？ | "EventLoop 像银行的"专属柜员"。一位柜员（EventLoop/线程）固定服务几个客户（Ch" | 引入 |
-| 0:20 | 概念图解 | "p=处理连接生命周期事件的执行器,每个任务是Runnable" | EventLoo |
-| 0:45 | 对比表格 | "EventLoopGroup含多EventLoop;EventLoop终身绑一线程;I/O在专属线程处理;Chan..." | 五大关系 |
-| 1:15 | 代码截图 | "同Channel的I/O由同线程串行执行→消除同步需要" | 串行无锁化 |
-| 2:15 | 总结卡 | "记住三个词：EventLoo、五大关系、串行无锁化" | 收尾 |
+| 0:00 | 标题卡 | "Netty一句话：EventLoop 是 Netty 处理连接生命周期内所有事件的核心抽象——它本质上是一个'绑定单一线程…。" | 开场钩子 |
+| 0:15 | 加锁/解锁时序图 | "EventLoop 定义：处理连接生命周期中所发生的事件，运行任务（每个任务是个 Runnable 实例）" | EventLoop 定义 |
+| 1:08 | 加锁/解锁时序图分步演示 | "五大绑定关系：①EventLoopGroup含1+EventLoop ②EventLoop终身绑1Thread ③I…" | 五大绑定关系 |
+| 2:01 | 关键代码/伪代码片段 | "王炸结论：给定 Channel 的 I/O 操作都由相同 Thread 执行，实际上消除了对同步的需要" | 王炸结论 |
+| 2:54 | 对比表格 | "EventLoop就是处理连接生命周期事件的执行器,每个任务是Runnable" | EventLoop=处理 |
+| 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：BossGroup 和 WorkerGroup 的分工。" | 收尾 |

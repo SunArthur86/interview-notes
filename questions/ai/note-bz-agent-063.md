@@ -223,23 +223,25 @@ os.environ["LANGCHAIN_TRACING_V2"] = "true"
 
 ## 结构化回答
 
-**30 秒电梯演讲：** 像建筑公司——LangChain是建材(砖/水泥)、LangGraph是施工方案(图纸/工序)、LangSmith是质检系统(验收/监控)。
+**30 秒电梯演讲：** LangChain家族三兄弟：LangChain(组件库/基础)、LangGraph(工作流引擎/编排复杂Agent)、LangSmith(监控平台/可观测)。三者协同覆盖开发到运维全链路。
 
 **展开框架：**
 1. **LangChain** — 组件库（Models/Prompts/Tools）
 2. **LangGraph** — 工作流引擎（图结构/循环/分支）
 3. **LangSmith** — 监控平台（Trace/Eval/Monitor）
 
-**收尾：** 三者是分开的项目吗？
+**收尾：** 您想深入聊：三者是分开的项目吗？——同属LangChain生态，可独立使用？
+
 
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：LangChain / LangGraph / LangSm | "像建筑公司——LangChain是建材(砖/水泥)、LangGraph是施工方案(图纸/工序)、La" | 引入 |
-| 0:20 | 概念图解 | "组件库（Models/Prompts/Tools）" | LangChain |
-| 0:45 | 对比表格 | "工作流引擎（图结构/循环/分支）" | LangGraph |
-| 1:15 | 代码截图 | "监控平台（Trace/Eval/Monitor）" | LangSmith |
-| 1:45 | 总结卡 | "记住三个词：LangChain、LangGraph、LangSmith" | 收尾 |
+| 0:00 | 标题卡：LangChain / LangGraph /… | "像建筑公司——LangChain是建材(砖/水泥)、LangGraph是施工方案(图纸/工…" | 开场钩子 |
+| 0:20 | 核心概念图 | "LangChain家族三兄弟：LangChain(组件库/基础)、LangGraph(工作流引擎/编排复杂Agent)…" | 核心定义 |
+| 0:50 | LangChain示意图 | "LangChain——组件库（Models/Prompts/Tools）" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：三者是分开的项目吗？——同属LangChain生态，可独立使？" | 收尾与钩子 |

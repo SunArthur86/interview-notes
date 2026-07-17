@@ -280,23 +280,25 @@ response = client.chat.completions.create(
 
 ## 结构化回答
 
-**30 秒电梯演讲：** 就像做数学题——不是直接写答案(单轮问答)，而是先写"我需要先算X"(Thought)，然后实际去算(Action)，看到结果后(Observation)再推理下一步
+**30 秒电梯演讲：** ReAct让模型交替进行"思考推理"和"行动调用"，形成Thought-Action-Observation循环，而非一次性输出答案。
 
 **展开框架：**
-1. **ReAct** — = Reasoning + Acting 的交替循环
+1. **ReAct** — ReAct = Reasoning + Acting 的交替循环
 2. **核心循环** — Thought → Action → Observation → Thought → ...
 3. **与单轮问答本质区别** — 引入了外部信息获取和迭代推理
 
-**收尾：** ReAct和Plan-and-Execute模式有什么区别？
+**收尾：** 您想深入聊：ReAct和Plan-and-Execute模式有什么区别？
+
 
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：ReAct的原理和与单轮问答的本质区别 | "就像做数学题——不是直接写答案(单轮问答)，而是先写"我需要先算X"(Thought)，然后实际去算" | 引入 |
-| 0:20 | 概念图解 | "= Reasoning + Acting 的交替循环" | ReAct |
-| 0:45 | 对比表格 | "Thought → Action → Observation → Thought → ..." | 核心循环 |
-| 1:15 | 代码截图 | "引入了外部信息获取和迭代推理" | 与单轮问答本质区别 |
-| 1:45 | 总结卡 | "记住三个词：ReAct、核心循环、与单轮问答本质区别" | 收尾 |
+| 0:00 | 标题卡：ReAct的原理和与单轮问答的本质区别 | "就像做数学题——不是直接写答案(单轮问答)，而是先写"我需要先算X"(Thought)，然…" | 开场钩子 |
+| 0:20 | 核心概念图 | "ReAct让模型交替进行"思考推理"和"行动调用"，形成Thought-Action-Observation循环，而非一…" | 核心定义 |
+| 0:50 | ReAct示意图 | "ReAct——ReAct = Reasoning + Acting 的交替循环" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：ReAct和Plan-and-Execute模式有什么区别？" | 收尾与钩子 |

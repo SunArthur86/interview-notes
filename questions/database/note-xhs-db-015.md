@@ -262,16 +262,17 @@ SELECT * FROM account WHERE id=1 FOR UPDATE;  -- balance=200 (最新版本)
 4. **能说出MySQL默认RR的历史原因** — 主从复制+STATEMENT binlog
 5. **提到MVCC幻读漏洞** — 先快照读再INSERT触发唯一键冲突的场景
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** MVCC就像'拍照'——每个事务开始时拍一张数据快照(ReadView)，之后读自己的照片，互不干扰。有人改了数据，你看到的还是老照片，不会受影响
+**30 秒电梯演讲：** MySQL用4种隔离级别平衡并发与一致性。RR级别通过MVCC(多版本并发控制)实现快照读避免幻读，通过Next-Key Lock实现当前读避免幻读。
 
 **展开框架：**
-1. **4种隔离级别** — 读未提交(RU)、读已提交(RC)、可重复读(RR)、串行化(S)
-2. **MVCC** — = Undo Log版本链 + ReadView可见性判断
-3. **RC级别** — 每次SELECT生成新ReadView → 不可重复读
+1. **4级别** — RU< RC < RR < Serializable (隔离性递增，并发性递减)
+2. **MVCC核心** — Undo Log版本链 + ReadView(创建者事务ID、活跃事务列表)
+3. **RC vs RR关键** — RC每次SELECT新建ReadView；RR复用第一次的ReadView
 
-**收尾：** MVCC的Undo Log版本链是怎么组织的？
+**收尾：** 这块我踩过坑——要不要深入聊：MVCC的Undo Log版本链是怎么组织的？
 
 ## 视频脚本
 
@@ -279,8 +280,9 @@ SELECT * FROM account WHERE id=1 FOR UPDATE;  -- balance=200 (最新版本)
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】MySQL事务隔离等级有了解吗？是 | "MVCC就像'拍照'——每个事务开始时拍一张数据快照(ReadView)，之后读自己的照片，互不干扰" | 引入 |
-| 0:20 | 概念图解 | "读未提交(RU)、读已提交(RC)、可重复读(RR)、串行化(S)" | 4种隔离级别 |
-| 0:45 | 对比表格 | "= Undo Log版本链 + ReadView可见性判断" | MVCC |
-| 1:15 | 代码截图 | "每次SELECT生成新ReadView → 不可重复读" | RC级别 |
-| 2:15 | 总结卡 | "记住三个词：4种隔离级别、MVCC、RC级别" | 收尾 |
+| 0:00 | 标题卡 | "事务/MVCC一句话：MySQL用4种隔离级别平衡并发与一致性。RR级别通过MVCC(多版本并发控制)实现快照读避免幻读…。" | 开场钩子 |
+| 0:15 | 事务隔离级别对比表 | "4级别: RU< RC < RR < Serializable (隔离性递增，并发性递减)" | 4级别 |
+| 1:08 | 事务隔离级别对比表分步演示 | "MVCC核心: Undo Log版本链 + ReadView(创建者事务ID、活跃事务列表)" | MVCC核心 |
+| 2:01 | 关键代码/伪代码片段 | "RC vs RR关键: RC每次SELECT新建ReadView；RR复用第一次的ReadView" | RC vs RR关键 |
+| 2:54 | 对比表格 | "当前读: SELECT...FOR UPDATE / UPDATE / DELETE 加Next-Key Lock" | 当前读 |
+| 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：MVCC的Undo Log版本链是怎么组织的。" | 收尾 |

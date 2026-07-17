@@ -171,16 +171,17 @@ jmap -dump:format=b,file=/data/dumps/manual.hprof <pid>
 4. **GC日志分析**：GCEasy（gceasy.io）在线分析GC日志，判断是否GC效率低下导致
 5. **容器环境注意**：Docker中Dump文件可能很大（等于堆大小），确保挂载了足够的磁盘空间
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 就像家里水管爆了——先关总阀（限流降级），然后拍照取证（Dump），最后请管道工（MAT）分析是哪个水管漏了（哪个对象泄漏了）
+**30 秒电梯演讲：** 线上OOM排查的核心是拿到Heap Dump文件，用MAT分析大对象和引用链，定位是内存泄漏还是内存溢出。打个比方，就像家里水管爆了——先关总阀（限流降级），然后拍照取证（Dump），最后请管道工（MAT）分析是哪个水管漏了（哪个对象泄漏了）。
 
 **展开框架：**
-1. **OOM类型** — 堆溢出、元空间溢出、GC开销超限、直接内存溢出
-2. **排查核心** — Heap Dump → MAT分析 → 找到GC Root引用链
-3. **关键参数** — -XX:+HeapDumpOnOutOfMemoryError 自动生成Dump
+1. **OOM排查三步** — Dump → MAT → 定位引用链
+2. **Heap Dump参数** — -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/path
+3. **MAT两大视图** — Dominator Tree看谁占内存大，Leak Suspects自动分析
 
-**收尾：** 如果OOM发生时没有生成Dump文件怎么办？
+**收尾：** 这块我踩过坑——要不要深入聊：如果OOM发生时没有生成Dump文件怎么办？（见note-xhs-java-012）？
 
 ## 视频脚本
 
@@ -188,8 +189,8 @@ jmap -dump:format=b,file=/data/dumps/manual.hprof <pid>
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【拼多多 Java服务端】线上系统突然OOM了，怎么排查？ | "就像家里水管爆了——先关总阀（限流降级），然后拍照取证（Dump），最后请管道工（MAT）分析是哪个" | 引入 |
-| 0:20 | 概念图解 | "堆溢出、元空间溢出、GC开销超限、直接内存溢出" | OOM类型 |
-| 0:45 | 对比表格 | "Heap Dump → MAT分析 → 找到GC Root引用链" | 排查核心 |
-| 1:15 | 代码截图 | "-XX:+HeapDumpOnOutOfMemoryError 自动生成Dump" | 关键参数 |
-| 1:45 | 总结卡 | "记住三个词：OOM类型、排查核心、关键参数" | 收尾 |
+| 0:00 | 标题卡 | "JVM一句话：线上OOM排查的核心是拿到Heap Dump文件，用MAT分析大对象和引用链…。" | 开场钩子 |
+| 0:15 | 图遍历示意图 | "OOM排查三步：Dump 到 MAT 到 定位引用链" | OOM排查三步 |
+| 1:06 | 图遍历示意图分步演示 | "Heap Dump参数：-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPa…" | Heap Dump参数 |
+| 1:57 | 关键代码/伪代码片段 | "MAT两大视图：Dominator Tree看谁占内存大，Leak Suspects自动分析" | MAT两大视图 |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：如果OOM发生时没有生成Dump文件怎么办？（见note-xhs-java-012）。" | 收尾 |

@@ -267,16 +267,17 @@ GIL 保证"同一时刻只有一个线程执行字节码"，但一条 Python 语
 
 三场景模式：一、I/O 密集 + 同步库 → 多线程（threading 或 concurrent.futures.ThreadPoolExecutor）；二、I/O 密集 + async 库 → asyncio 协程（单线程高并发）；三、CPU 密集 → 多进程（multiprocessing 或 concurrent.futures.ProcessPoolExecutor）。核心原则："先看任务类型（I/O 还是 CPU），再看库生态（async 还是 sync），最后选并发模式。" 这套模式也适用于其他语言——Java 的 I/O 用线程池、CPU 用 ForkJoinPool、Go 的 goroutine 天然并发（无 GIL 限制）。理解了 GIL 的本质，遇到任何 Python 性能问题都能快速定位"是 GIL 瓶颈还是别的"。
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** 就像厨房只有一个灶台GIL可以雇多个厨师线程但同一时刻只有一个能炒菜。
+**30 秒电梯演讲：** Python用threading模块创建Thread对象传入目标函数调用start启动但GIL限制了真正并行。打个比方，就像厨房只有一个灶台GIL可以雇多个厨师线程但同一时刻只有一个能炒菜。
 
 **展开框架：**
-1. **threadin** — g.Thread创建线程
-2. **start启动j** — oin等待
-3. **GIL限制CPU** — 密集并行
+1. **核心用法** — threading.Thread传target与args，调start()启动，join()阻塞等待
+2. **避坑指南** — 因start只能调一次，所以严禁直接调run()（那仅是普通函数执行）
+3. **GIL限制** — 因GIL同一时刻只允许单线程执行，故多线程仅适合IO密集型任务
 
-**收尾：** GIL底层原理？
+**收尾：** 这块我踩过坑——要不要深入聊：GIL底层原理？
 
 ## 视频脚本
 
@@ -284,7 +285,7 @@ GIL 保证"同一时刻只有一个线程执行字节码"，但一条 Python 语
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【美团面经】Python怎么实现多线程？ | "就像厨房只有一个灶台GIL可以雇多个厨师线程但同一时刻只有一个能炒菜。" | 引入 |
-| 0:20 | 概念图解 | "g.Thread创建线程" | threadin |
-| 0:45 | 对比表格 | "oin等待" | start启动j |
-| 1:15 | 总结卡 | "记住三个词：threadin、start启动j、GIL限制CPU" | 收尾 |
+| 0:00 | 标题卡 | "并发一句话：Python用threading模块创建Thread对象传入目标函数调用start启动但GIL限…。" | 开场钩子 |
+| 0:15 | IO 模型对比图 | "核心用法：threading.Thread传target与args，调start()启动，join()阻塞等待" | 核心用法 |
+| 1:02 | IO 模型对比图分步演示 | "避坑指南：因start只能调一次，所以严禁直接调run()（那仅是普通函数执行）" | 避坑指南 |
+| 1:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：GIL底层原理。" | 收尾 |

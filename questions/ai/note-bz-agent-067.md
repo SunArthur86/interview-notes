@@ -259,23 +259,27 @@ selection_dimensions = {
 
 ## 结构化回答
 
+
 **30 秒电梯演讲：** 像选车——代步选Toyota(LangChain通用)、越野选LandRover(LangGraph可控)、赛车选F1(自研)、新手选自动挡(Dify低代码)。
 
 **展开框架：**
-1. **LangChain** — 通用，生态好
-2. **LangGraph** — 生产级，可控
-3. **LlamaIndex** — RAG专精
+1. **LangChain** — LangChain：通用，生态好
+2. **LangGraph** — LangGraph：生产级，可控
+3. **LlamaIndex** — LlamaIndex：RAG专精
 
 **收尾：** 字节内部用什么？
 
+
+
 ## 视频脚本
 
-> 预计时长：3 分钟 | 由浅入深
+> 预计时长：4 分钟 | 由浅入深
+
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：字节 AI 二面：对主流 Agent 框架有什么看法？怎么选 | "像选车——代步选Toyota(LangChain通用)、越野选LandRover(LangGraph" | 引入 |
-| 0:20 | 概念图解 | "通用，生态好" | LangChain |
-| 0:45 | 对比表格 | "生产级，可控" | LangGraph |
-| 1:15 | 代码截图 | "RAG专精" | LlamaIndex |
-| 1:45 | 总结卡 | "记住三个词：LangChain、LangGraph、LlamaIndex" | 收尾 |
+| 0:00 | 标题卡：字节 AI 二面：对主流 Agent 框架有什么… | "像选车——代步选Toyota(LangChain通用)、越野选LandRover(…" | 开场钩子 |
+| 0:20 | 核心概念图 | "主流Agent框架各有侧重：LangChain生态全(通用)、LangGraph可控(生产)、LlamaIndex精…" | 核心定义 |
+| 0:50 | LangChain示意图 | "LangChain——通用，生态好" | 要点拆解1 |
+| 1:30 | 对比/实战案例图 | "对比一下常见误区和工程实践，看真实场景里怎么取舍。" | 实战与对比 |
+| 2:20 | 总结卡 | "记住核心要点。下期我们追问：字节内部用什么？——自研为主（有特殊需求和能力）？" | 收尾与钩子 |

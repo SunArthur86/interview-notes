@@ -287,16 +287,17 @@ MAT中如何确认ThreadLocal泄漏：
 2. ThreadLocal 检测工具——集成静态分析工具（如 SonarQube 规则），检测"set 后没有 remove"的代码，编译期拦截。
 3. 线程池包装器——所有线程池用 TTL 包装（`TtlExecutors.getTtlExecutor`），在框架层解决串号，业务代码无感知。
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** ThreadLocal就像酒店房间的储物柜——每个线程(客人)有自己的柜子(ThreadLocalMap)。问题是：客人退房(ThreadLocal引用没了)但柜子里的东西(value)还在，因为酒店(线程池)不退房，柜子就一直占着空...
+**30 秒电梯演讲：** ThreadLocal内存泄漏的根因是线程池中线程存活时间长，ThreadLocalMap中的Entry虽然WeakReference引用ThreadLocal key，但value是强引用。如果用完不remove()，Entry和value不会被回收。解决方案：每次用完必须调用remove()，用try-finally保证。
 
 **展开框架：**
-1. **ThreadLo** — calMap的Entry是WeakReference(ThreadLocal) + StrongReference(value)
-2. **ThreadLo** — cal引用被回收后key变null，但value仍被Entry强引用 → 泄漏
-3. **线程池中线程长生不老** — → ThreadLocalMap永不清理 → 泄漏持续累积
+1. **ThreadLocal泄** — Entry.key=WeakReference(可被GC) + Entry.value=StrongReference(不会被GC)
+2. **线程池场景下线程长生不死** — 线程池场景下线程长生不死→ThreadLocalMap永不清理→10万个Entry泄漏
+3. **铁律** — ThreadLocal用完必须remove()，标准写法try{...}finally{tl.remove();}
 
-**收尾：** ThreadLocal和Synchronized有什么区别？
+**收尾：** 这块我踩过坑——要不要深入聊：ThreadLocal和Synchronized有什么区别？各自的适用场景？
 
 ## 视频脚本
 
@@ -304,8 +305,8 @@ MAT中如何确认ThreadLocal泄漏：
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：【快手Java一面】MAT显示10万个ThreadLocal | "ThreadLocal就像酒店房间的储物柜——每个线程(客人)有自己的柜子(ThreadLocalM" | 引入 |
-| 0:20 | 概念图解 | "calMap的Entry是WeakReference(ThreadLocal) + StrongReference..." | ThreadLo |
-| 0:45 | 对比表格 | "cal引用被回收后key变null，但value仍被Entry强引用 → 泄漏" | ThreadLo |
-| 1:15 | 代码截图 | "→ ThreadLocalMap永不清理 → 泄漏持续累积" | 线程池中线程长生不老 |
-| 1:45 | 总结卡 | "记住三个词：ThreadLo、ThreadLo、线程池中线程长生不老" | 收尾 |
+| 0:00 | 标题卡 | "并发编程一句话：ThreadLocal内存泄漏的根因是线程池中线程存活时间长，ThreadLocalMap中的E…。" | 开场钩子 |
+| 0:15 | 线程状态转换图 | "ThreadLocal泄漏根因：Entry.key就是WeakReference(可被GC) + Entry.val…" | ThreadLocal泄 |
+| 1:06 | 线程状态转换图分步演示 | "线程池场景下线程长生不死到ThreadLocalMap永不清理到10万个Entry泄漏" | 线程池场景下线程长生不死 |
+| 1:57 | 关键代码/伪代码片段 | "铁律：ThreadLocal用完必须remove()，标准写法try{...}finally{tl.remove();}" | 铁律 |
+| 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：ThreadLocal和Synchronized有什么区别？各自的适用场景。" | 收尾 |

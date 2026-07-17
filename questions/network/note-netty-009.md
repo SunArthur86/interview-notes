@@ -200,16 +200,17 @@ ctx 持有 Channel 引用，Channel 持有 EventLoop 引用（注册时绑定）
 
 四条经验：一、ctx 是 Handler 的"交互接口"——所有 Pipeline 交互（fire*、write、executor、alloc）都通过 ctx，不直接操作 channel；二、ctx vs channel.write——ctx.write 从当前点出发（跳过之前的 Outbound），channel.write 从 tail 出发（经过全部），按需选；三、fire* 不忘——Decoder 解码后要 ctx.fireChannelRead 传给下一个，漏了消息丢失；四、executor 跨线程——非 EventLoop 线程操作用 ctx.executor().execute 提交到 EventLoop，保证线程安全。核心："ctx 是 Handler 与 Pipeline 的胶水，正确使用 ctx 保证事件传递和线程安全。"
 
+
 ## 结构化回答
 
-**30 秒电梯演讲：** ChannelHandlerContext 像是流水线上某个工位的"传菜按钮"。如果你从车间广播喊话（用 Channel/Pipeline），所有人（整条链）都会听到；如果你只按自己工位的传菜按钮（用 ChannelHandlerCo...
+**30 秒电梯演讲：** ChannelHandlerContext 是"ChannelHandler 与 ChannelPipeline 之间的桥梁"，它代表了 Handler 在 Pipeline 中的位置。通过 Channel 或 ChannelPipeline 触发的事件会从整个链头/尾传播；而通过 ChannelHandlerContext 触发的事件，只会从"当前 Handler 的下一个 Handler"开始传播——这让你能精准控制事件的传播范围。
 
 **展开框架：**
-1. **ChannelH** — andlerContext=Handler与Pipeline之间的关联
-2. **Channel/** — 事件沿整个Pipeline传播
-3. **ChannelH** — 事件从当前Handler的下一个Handler开始传播
+1. **ChannelHandlerContext** — ChannelHandlerContext 定义：代表 ChannelHandler 和 ChannelPipeline 之间的关联
+2. **传播范围差异** — Channel/Pipeline 的方法沿整个 Pipeline 传播；Context 的方法从当前 Handler 的下一个开始传播
+3. **关系链** — Channel ↔ ChannelPipeline ↔ ChannelHandler ↔ ChannelHandlerContext
 
-**收尾：** 如何实现一个 Handler 只处理一次然后移除自己？
+**收尾：** 这块我踩过坑——要不要深入聊：如何实现一个 Handler 只处理一次然后移除自己？
 
 ## 视频脚本
 
@@ -217,8 +218,9 @@ ctx 持有 Channel 引用，Channel 持有 EventLoop 引用（注册时绑定）
 
 | 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
 |------|----------|----------|----------|
-| 0:00 | 标题卡：ChannelHandlerContext 的作用是什么？ | "ChannelHandlerContext 像是流水线上某个工位的"传菜按钮"。如果你从车间广播喊话" | 引入 |
-| 0:20 | 概念图解 | "andlerContext=Handler与Pipeline之间的关联" | ChannelH |
-| 0:45 | 对比表格 | "事件沿整个Pipeline传播" | Channel/ |
-| 1:15 | 代码截图 | "事件从当前Handler的下一个Handler开始传播" | ChannelH |
-| 2:15 | 总结卡 | "记住三个词：ChannelH、Channel/、ChannelH" | 收尾 |
+| 0:00 | 标题卡 | "Netty一句话：ChannelHandlerContext 是'ChannelHandler 与 ChannelPipeline 之间的桥梁'…。" | 开场钩子 |
+| 0:15 | Netty Reactor 线程模型图 | "ChannelHandlerContext 定义：代表 ChannelHandler 和 ChannelPipeli…" | ChannelHandlerContext |
+| 1:08 | Netty Reactor 线程模型图分步演示 | "传播范围差异：Channel/Pipeline 的方法沿整个 Pipeline 传播；Context 的方法从当前 …" | 传播范围差异 |
+| 2:01 | 关键代码/伪代码片段 | "关系链：Channel ↔ ChannelPipeline ↔ ChannelHandler ↔ ChannelHa…" | 关系链 |
+| 2:54 | 对比表格 | "工程价值：精准控制事件流向，避免全链广播" | 工程价值 |
+| 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：如何实现一个 Handler 只处理一次然后移除自己。" | 收尾 |
