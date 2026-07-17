@@ -266,3 +266,26 @@ class ProductionRAGAgent:
 **Q：LangChain 1.2 生产架构怎么沉淀成团队的 LLM 应用标准？**
 
 建团队标准：1）架构规范——规定生产 LLM 应用用 LCEL（编排）+LangGraph（复杂 Agent）+LangSmith（可观测），标准化技术栈；2）模板——提供生产项目模板（含 LCEL Chain/LangGraph Agent/LangSmith 集成/评估集），脚手架快速搭建；3）最佳实践——文档化各组件用法（如 LCEL 的流式/重试/LangGraph 的状态管理/LangSmith 的 trace 和评估），新人按手册；4）可观测规范——所有应用必接 LangSmith（或自部署替代），trace/评估标准化；5）案例库——真实生产案例（架构设计/踩坑/优化），经验复用。这套写入团队 LLM 开发 SOP，让"生产 LLM 应用"从"每人选型"变成"标准化架构+最佳实践"，高质量产出。
+
+## 结构化回答
+
+**30 秒电梯演讲：** 从毛坯房(LangChain早期)到精装房(1.2)——加了监控系统(LangSmith)、复杂管线(LangGraph)、标准化接口(LCEL)。
+
+**展开框架：**
+1. **LCEL** — 声明式链编排（替代旧Chain）
+2. **LangGraph** — 图结构复杂工作流
+3. **LangSmith** — 全链路监控调试
+
+**收尾：** LCEL和旧Chain什么区别？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：LangChain 1.2 生产级架构是什么样？ | "从毛坯房(LangChain早期)到精装房(1.2)——加了监控系统(LangSmith)、复杂管线" | 引入 |
+| 0:20 | 概念图解 | "声明式链编排（替代旧Chain）" | LCEL |
+| 0:45 | 对比表格 | "图结构复杂工作流" | LangGraph |
+| 1:15 | 代码截图 | "全链路监控调试" | LangSmith |
+| 1:45 | 总结卡 | "记住三个词：LCEL、LangGraph、LangSmith" | 收尾 |

@@ -150,3 +150,25 @@ h 的选择是"子空间表达力"和"每头维度足够"的权衡。每个 head
 
 沉淀基准测试和决策矩阵。一是建立 benchmark 套件：团队固定的一组测试场景（短/中/长序列、batch=1/batch=64），每次引入新优化（Flash Attention、GQA、量化）跑 benchmark，记录延迟/显存/精度三指标到知识库。二是决策矩阵：按场景给推荐配置——短序列（< 512）用标准 attention 够（Flash 优势小）、长序列用 Flash、显存紧张用 GQA、延迟极敏感用 KV Cache + PagedAttention。新项目按矩阵选默认配置，偏离要 review 说明理由。三是回归验证：优化配置变更后跑模型评测集，精度掉点超阈值（如 2%）不能上线。让优化决策靠 benchmark 数据和场景矩阵，不靠"论文说好就用"或"感觉快了"。
 
+## 结构化回答
+
+**30 秒电梯演讲：** Self-Attention 像开会时每个人同时听所有人说话并决定关注谁（Q=我想问什么，K=别人能答什么，V=别人实际说的）。Multi-Head 像派多个分身同时关注不同方面（一个听内容、一个听语气、一个看位置）。GPT 像只能听...
+
+**展开框架：**
+1. **Self-Attention** — softmax(Q·K^T/√d_k)·V，除√d_k 防梯度消失
+2. **Multi-Head** — 切h份并行注意力，不同子空间关注不同信息，concat+线性融合
+3. **GPT** — Decoder-only+因果mask，next token prediction，适合生成
+
+**收尾：** 为什么除√d_k 不除d_k？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【字节飞连面经】Transformer 基础：Self-At | "Self-Attention 像开会时每个人同时听所有人说话并决定关注谁（Q=我想问什么，K=别人能" | 引入 |
+| 0:20 | 概念图解 | "softmax(Q·K^T/√d_k)·V，除√d_k 防梯度消失" | Self-Attention |
+| 0:45 | 对比表格 | "切h份并行注意力，不同子空间关注不同信息，concat+线性融合" | Multi-Head |
+| 1:15 | 代码截图 | "Decoder-only+因果mask，next token prediction，适合生成" | GPT |
+| 1:45 | 总结卡 | "记住三个词：Self-Attention、Multi-Head、GPT" | 收尾 |

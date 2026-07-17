@@ -318,3 +318,25 @@ ReAct 更灵活适应"动态环境"。Plan-and-Execute 是"先规划完整步骤
 
 固化成"Agent 框架"：统一的核心循环（Plan → Act → Observe → Reflect）、可插拔的组件（Planning 策略可选 ReAct/Plan-Execute/Mixed、Memory 可选短期/长期/实体、Tools 可注册任意工具）、全链路 trace（每步的输入/输出/耗时）。沉淀"各场景的 Agent 配置"（客服用 ReAct + 短期记忆 + 查询工具、研究助手用 Plan-Execute + 长期记忆 + 搜索工具）、"组件选型指南"（何时用 ReAct vs Plan-Execute、何时用短期 vs 长期）。配套监控（task_success_rate、tool_call_accuracy、平均步数、成本），异常告警。把"四组件架构"作为 Agent 的默认设计，新 Agent 按场景选配置，快速搭建。积累"各组件的最佳实践"（如 Planning 的 prompt 模板、Memory 的压缩策略、Tools 的 Schema 设计）。
 
+## 结构化回答
+
+**30 秒电梯演讲：** Agent像一个有手有脚的员工——LLM是大脑（思考），Planning是日程表（分解任务），Memory是笔记本（记住历史），Tools是工具箱（搜索/计算/API），Action是执行（真正动手干活）
+
+**展开框架：**
+1. **Planning** — 任务分解、反思、自我修正
+2. **Memory** — 短期(对话历史) + 长期(向量检索/知识库)
+3. **Tools** — Function Calling、代码执行、API调用
+
+**收尾：** Agent的ReAct和Plan-and-Execute有什么区别？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：一个完整的LLM Agent系统通常由哪些核心模块组成？ | "Agent像一个有手有脚的员工——LLM是大脑（思考），Planning是日程表（分解任务），Mem" | 引入 |
+| 0:20 | 概念图解 | "任务分解、反思、自我修正" | Planning |
+| 0:45 | 对比表格 | "短期(对话历史) + 长期(向量检索/知识库)" | Memory |
+| 1:15 | 代码截图 | "Function Calling、代码执行、API调用" | Tools |
+| 1:45 | 总结卡 | "记住三个词：Planning、Memory、Tools" | 收尾 |

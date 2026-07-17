@@ -439,3 +439,26 @@ Thought（推理过程）和 Action（工具调用参数）的学习难度和重
 **Q：Agent loop 的 mask 设计和 reward 设计怎么沉淀成团队框架的默认能力，避免每个项目重新踩坑？**
 
 封装成训练框架的标准组件：1）mask 自动生成——数据预处理时根据 `<tool_call>...</tool_call>` 和 `<observation>...</observation>` 标记自动生成 mask，开发者不用手写；2）Action/Thought loss 权重可配置——默认 Action:Thought=2:1，提供 knob 调整；3）reward 模板——内置常见 reward（tool_call_success_rate、final_answer_accuracy、format_validity）的组合模板，按场景选；4）泛化测试集——框架自带新工具/反例/工具选择测试用例，训练完自动跑一遍出报告。这套能力写入 Agent RL 训练 SOP，新项目一键复用。
+
+## 结构化回答
+
+**30 秒电梯演讲：** 像训练实习生用计算器算账——他按计算器（生成调用）、看屏幕数字（observation）、继续算。考核时只看他"按对按钮的决策"（生成的token），不能因为他看到了屏幕数字就给分（否则他会变成背数字而不是学算账）。
+
+**展开框架：**
+1. **Agent loop** — generate → parse → execute → append → repeat
+2. **Loss只算模型** — 生成的token（含tool_call指令）
+3. **observat** — ion/tool_result的token全部mask（不参与loss）
+
+**收尾：** 如果工具返回的observation也参与loss会怎样？
+
+## 视频脚本
+
+> 预计时长：4 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【八股总结】Agentic RL 的 Agent loop  | "像训练实习生用计算器算账——他按计算器（生成调用）、看屏幕数字（observation）、继续算。考" | 引入 |
+| 0:20 | 概念图解 | "generate → parse → execute → append → repeat" | Agent loop |
+| 0:45 | 对比表格 | "生成的token（含tool_call指令）" | Loss只算模型 |
+| 1:15 | 代码截图 | "ion/tool_result的token全部mask（不参与loss）" | observat |
+| 2:15 | 总结卡 | "记住三个词：Agent loop、Loss只算模型、observat" | 收尾 |

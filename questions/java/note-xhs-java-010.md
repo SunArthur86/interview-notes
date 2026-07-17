@@ -220,3 +220,25 @@ public void safeMethodWithTimeout() {
 3. **JVM参数自动Dump**：`-XX:+HeapDumpOnOutOfMemoryError` 在OOM时自动生成堆转储，配合jstack做线程分析
 4. **死锁检测API**：`ManagementFactory.getThreadMXBean().findDeadlockedThreads()` 可在代码中编程式检测死锁
 5. **线上CPU飙高排查**：如果无法用top（容器环境），可用 `jstat -gc <pid> 1000` 查看GC频率判断是否频繁GC导致
+
+## 结构化回答
+
+**30 秒电梯演讲：** 死锁就像两个人过独木桥：A拿了桥这端的通行证，B拿了桥那端的通行证，A要B的通行证才肯让路，B要A的通行证才肯让路——谁也不让，永远僵持
+
+**展开框架：**
+1. **死锁四条件** — 互斥、持有等待、不可剥夺、循环等待
+2. **jstack可直接检测死锁** — 自动打印"Found one Java-level deadlock"
+3. **CPU飙高排查** — top找进程 → top -Hp找线程 → printf线程ID转16进制 → jstack过滤
+
+**收尾：** 如何用代码层面预防死锁？
+
+## 视频脚本
+
+> 预计时长：2 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【拼多多 Java服务端】手写死锁代码，如何排查？CPU飙高 | "死锁就像两个人过独木桥：A拿了桥这端的通行证，B拿了桥那端的通行证，A要B的通行证才肯让路，B要A的" | 引入 |
+| 0:20 | 概念图解 | "互斥、持有等待、不可剥夺、循环等待" | 死锁四条件 |
+| 0:45 | 对比表格 | "自动打印"Found one Java-level deadlock"" | jstack可直接检测死锁 |
+| 1:15 | 总结卡 | "记住三个词：死锁四条件、jstack可直接检测死锁、CPU飙高排查" | 收尾 |

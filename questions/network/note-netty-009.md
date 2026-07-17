@@ -199,3 +199,26 @@ ctx 持有 Channel 引用，Channel 持有 EventLoop 引用（注册时绑定）
 **Q：这道题做完，你沉淀出了什么可复用的 ChannelHandlerContext 使用经验？**
 
 四条经验：一、ctx 是 Handler 的"交互接口"——所有 Pipeline 交互（fire*、write、executor、alloc）都通过 ctx，不直接操作 channel；二、ctx vs channel.write——ctx.write 从当前点出发（跳过之前的 Outbound），channel.write 从 tail 出发（经过全部），按需选；三、fire* 不忘——Decoder 解码后要 ctx.fireChannelRead 传给下一个，漏了消息丢失；四、executor 跨线程——非 EventLoop 线程操作用 ctx.executor().execute 提交到 EventLoop，保证线程安全。核心："ctx 是 Handler 与 Pipeline 的胶水，正确使用 ctx 保证事件传递和线程安全。"
+
+## 结构化回答
+
+**30 秒电梯演讲：** ChannelHandlerContext 像是流水线上某个工位的"传菜按钮"。如果你从车间广播喊话（用 Channel/Pipeline），所有人（整条链）都会听到；如果你只按自己工位的传菜按钮（用 ChannelHandlerCo...
+
+**展开框架：**
+1. **ChannelH** — andlerContext=Handler与Pipeline之间的关联
+2. **Channel/** — 事件沿整个Pipeline传播
+3. **ChannelH** — 事件从当前Handler的下一个Handler开始传播
+
+**收尾：** 如何实现一个 Handler 只处理一次然后移除自己？
+
+## 视频脚本
+
+> 预计时长：4 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：ChannelHandlerContext 的作用是什么？ | "ChannelHandlerContext 像是流水线上某个工位的"传菜按钮"。如果你从车间广播喊话" | 引入 |
+| 0:20 | 概念图解 | "andlerContext=Handler与Pipeline之间的关联" | ChannelH |
+| 0:45 | 对比表格 | "事件沿整个Pipeline传播" | Channel/ |
+| 1:15 | 代码截图 | "事件从当前Handler的下一个Handler开始传播" | ChannelH |
+| 2:15 | 总结卡 | "记住三个词：ChannelH、Channel/、ChannelH" | 收尾 |

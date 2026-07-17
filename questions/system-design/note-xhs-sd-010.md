@@ -369,3 +369,26 @@ Trace: user_id=1001 request_id=abc123
 1. 配置管理规范——"敏感信息用 Secret、普通配置用 ConfigMap、动态配置用 Nacos"的分层规范，团队统一执行。
 2. 可观测性模板——Prometheus 指标命名规范（如 `http_server_requests_seconds`）、日志结构化格式（JSON + traceId）、Trace 采样率策略，新服务接入即用。
 3. 故障排查 SOP——"告警 → 看指标定方向 → 看 trace 定位置 → 看日志定原因"的标准流程，新人值班按 SOP 执行。
+
+## 结构化回答
+
+**30 秒电梯演讲：** 配置管理像公司的文件柜：ConfigMap是公开的操作手册（谁都能看），Secret是保险柜（只有授权人能看密码）。可观测性像医院的监护系统：Metrics是体温血压(实时数值)，Logging是病历(详细记录)，Tracing是转诊...
+
+**展开框架：**
+1. **配置管理** — ConfigMap+Secret，支持envFrom和volumeMount
+2. **动态配置** — @RefreshScope热更新或Nacos/Apollo
+3. **可观测三支柱** — Metrics+Logging+Tracing
+
+**收尾：** K8s 中如何做滚动更新和优雅停机？
+
+## 视频脚本
+
+> 预计时长：5 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：K8s 环境下的配置管理与可观测性方案如何设计？（入职Jav | "配置管理像公司的文件柜：ConfigMap是公开的操作手册（谁都能看），Secret是保险柜（只有授" | 引入 |
+| 0:20 | 概念图解 | "ConfigMap+Secret，支持envFrom和volumeMount" | 配置管理 |
+| 0:45 | 对比表格 | "@RefreshScope热更新或Nacos/Apollo" | 动态配置 |
+| 1:15 | 代码截图 | "Metrics+Logging+Tracing" | 可观测三支柱 |
+| 2:15 | 总结卡 | "记住三个词：配置管理、动态配置、可观测三支柱" | 收尾 |

@@ -169,3 +169,25 @@ LangGraph 的 Checkpoint 实际上是支持增量思维的——它存的是 Sta
 
 沉淀模板和约束而非靠个人摸索。一是固定 State schema 模板：定义好 `control` 区（messages、step_count、next_node）和 `data` 区的标准字段，新成员填业务字段即可；二是 Node 单元测试规范：每个 Node 是纯函数，要求配单元测试（input State → output State），新成员写的 Node 必须过测才能合入；三是图可视化：用 LangGraph 的 `draw_graph` 把流程图导出存档，新成员看图就能理解流程结构，不用读代码；四是禁用复杂模式作为起步：新成员先用静态 Edge + 简单 Conditional Edge，Subgraph 和并行等高级模式在熟悉后再引入。把心智模型固化成工程模板，降低对个人悟性的依赖。
 
+## 结构化回答
+
+**30 秒电梯演讲：** LangChain 像流水线传送带（A→B→C 线性），LangGraph 像地铁线路图（有分叉、有环线、有换乘站）。前者简单场景快，后者复杂场景才理得清。AutoGen 像开会议——几个人各说各的，会议记录又长又乱。
+
+**展开框架：**
+1. **LangChain** — 链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入
+2. **State** — TypedDict 定义共享上下文，每个 Node 读+改它
+3. **Node** — 纯函数（input=State, output=State partial）
+
+**收尾：** LangGraph 的 interrupt() 怎么实现 human-in-the-loop？
+
+## 视频脚本
+
+> 预计时长：4 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【字节飞连面经】用过哪些 Agent 框架？LangGrap | "LangChain 像流水线传送带（A→B→C 线性），LangGraph 像地铁线路图（有分叉、有" | 引入 |
+| 0:20 | 概念图解 | "链式（LCEL）适合线性流；LangGraph 图式支持循环/分支/并行/人工介入" | LangChain |
+| 0:45 | 对比表格 | "TypedDict 定义共享上下文，每个 Node 读+改它" | State |
+| 1:15 | 代码截图 | "纯函数（input=State, output=State partial）" | Node |
+| 2:15 | 总结卡 | "记住三个词：LangChain、State、Node" | 收尾 |

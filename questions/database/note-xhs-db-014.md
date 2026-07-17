@@ -202,3 +202,26 @@ sync_binlog = 1  -- 每次提交都fsync binlog (推荐)
 3. **XA ID关联机制**：binlog中的XID事件与redo log中的XA ID对应，恢复时通过这个ID匹配两个日志
 4. **MySQL 8.0改进**：redo log改为双buffer+并行写入，减少临界区竞争，提升并发提交性能
 5. **分布式事务2PC vs MySQL内部2PC**：MySQL内部的2PC是InnoDB和Server层之间的协调，而分布式XA是多个资源管理器之间的协调，但原理类似
+
+## 结构化回答
+
+**30 秒电梯演讲：** 两阶段提交就像签合同：第一步双方各签一份草稿（prepare），第二步互换确认无误后盖章生效（commit）。如果中途一方反悔（崩溃），根据草稿状态决定是作废还是继续
+
+**展开框架：**
+1. **Phase 1** — 写redo log(prepare状态)
+2. **Phase 2** — 写binlog → 写redo log(commit状态)
+3. **崩溃恢复规则** — 有binlog+prepare → 提交；无binlog+prepare → 回滚
+
+**收尾：** 如果redo log写完了，binlog写完了，但commit标志没写就崩溃了，怎么恢复？
+
+## 视频脚本
+
+> 预计时长：4 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【拼多多 Java服务端】两阶段提交（2PC）讲一下。崩溃恢 | "两阶段提交就像签合同：第一步双方各签一份草稿（prepare），第二步互换确认无误后盖章生效（com" | 引入 |
+| 0:20 | 概念图解 | "写redo log(prepare状态)" | Phase 1 |
+| 0:45 | 对比表格 | "写binlog → 写redo log(commit状态)" | Phase 2 |
+| 1:15 | 代码截图 | "有binlog+prepare → 提交；无binlog+prepare → 回滚" | 崩溃恢复规则 |
+| 2:15 | 总结卡 | "记住三个词：Phase 1、Phase 2、崩溃恢复规则" | 收尾 |

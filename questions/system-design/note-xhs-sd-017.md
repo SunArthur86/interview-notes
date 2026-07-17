@@ -265,3 +265,26 @@ public void processOrder(String message) {
 
 5. **"和RocketMQ相比，Kafka在消息可靠性上有什么优势和劣势？"**
    → Kafka: 高吞吐、多副本ISR、事务API完善。RocketMQ: 事务消息机制更轻量、同步刷盘更可控、支持延迟消息
+
+## 结构化回答
+
+**30 秒电梯演讲：** 不丢消息就像寄快递要签收——寄出后要确认对方收到（ACK），对方要妥善保管（副本备份），收件人要确认签收（手动Offset）。不重复消费就像快递公司给每个包裹唯一编号，即使重复投递，收件人也只拆一次（幂等消费）。
+
+**展开框架：**
+1. **不丢失三环节** — Producer（acks=all+重试）、Broker（副本ISR机制）、Consumer（手动提交offset）
+2. **不丢失核心** — min.insync.replicas ≥ 2，acks=all，unclean.leader.election.enable=false
+3. **不重复Producer端** — enable.idempotence=true（幂等生产者，Kafka 0.11+）
+
+**收尾：** Kafka的ISR机制是什么？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【拼多多二面 + XHS视频帖】Kafka 如何保证消息不丢 | "不丢消息就像寄快递要签收——寄出后要确认对方收到（ACK），对方要妥善保管（副本备份），收件人要确认" | 引入 |
+| 0:20 | 概念图解 | "Producer（acks=all+重试）、Broker（副本ISR机制）、Consumer（手动提交offset）" | 不丢失三环节 |
+| 0:45 | 对比表格 | "min.insync.replicas ≥ 2，acks=all，unclean.leader.election...." | 不丢失核心 |
+| 1:15 | 代码截图 | "enable.idempotence=true（幂等生产者，Kafka 0.11+）" | 不重复Producer端 |
+| 1:45 | 总结卡 | "记住三个词：不丢失三环节、不丢失核心、不重复Producer端" | 收尾 |

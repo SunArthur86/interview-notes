@@ -236,3 +236,26 @@ GRPO 的 token 级 IS 和 PPO 一致，区别在于：
 **Q：GRPO/PPO 的 token 级重要性采样实现经验怎么沉淀成团队 RL 框架的标准模块？**
 
 封装成框架的 ImportanceSampling 模块：1）token-level ratio 计算——内置 log-prob 的数值稳定实现（log-sum-exp + fp32），开发者不用手写；2）clip 策略可配置——默认 PPO clip（[1-ε,1+ε]），可切换 GRPO 的组内归一化模式；3）ratio 监控——自动上报 ratio 分布（mean/std/max/clip 率）到 dashboard，clip 率（被裁剪的 token 比例）超 30% 告警（说明策略更新太激进）；4）数值安全——自动检测 nan/inf 并 fallback 到上一个稳定 checkpoint。这套写入团队 RL 框架，新算法（PPO/GRPO/DAPO）共享同一个 ratio 计算模块，避免每个算法重写踩数值坑。
+
+## 结构化回答
+
+**30 秒电梯演讲：** 像用旧地图（旧策略）采样的路况数据规划新路线（新策略）——新路线和旧路线偏离的地方（分布差异），数据要按"新旧路况匹配度"加权（重要性权重）。token 级就是每个路口单独算匹配度，比整条路一起算更精确。
+
+**展开框架：**
+1. **token级ra** — tio = π_new(token|context) / π_old(token|context)
+2. **作用** — 修正off-policy偏差（采样用π_old，训练用π_new）
+3. **数学** — E_old[ratio·f] = E_new[f]（重要性采样无偏）
+
+**收尾：** token 级 ratio 和序列级 ratio 的关系？
+
+## 视频脚本
+
+> 预计时长：5 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【字节面经】GRPO 中 Token 级别重要性采样的实现逻 | "像用旧地图（旧策略）采样的路况数据规划新路线（新策略）——新路线和旧路线偏离的地方（分布差异），数据" | 引入 |
+| 0:20 | 概念图解 | "tio = π_new(token|context) / π_old(token|context)" | token级ra |
+| 0:45 | 对比表格 | "修正off-policy偏差（采样用π_old，训练用π_new）" | 作用 |
+| 1:15 | 代码截图 | "E_old[ratio·f] = E_new[f]（重要性采样无偏）" | 数学 |
+| 2:15 | 总结卡 | "记住三个词：token级ra、作用、数学" | 收尾 |

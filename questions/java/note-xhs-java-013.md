@@ -177,3 +177,26 @@ memory_points:
 3. **Evacuation Failure**：Mixed GC时没有足够的Free Region存放存活对象 → 触发Full GC（串行，非常慢，需极力避免）
 4. **G1 vs ZGC**：ZGC（JDK15+）使用染色指针+读屏障，实现<1ms停顿，但吞吐量低于G1
 5. **G1调优核心**：不要手动设太小的Region和太短的停顿目标——目标停顿时间越短，Mixed GC每轮回收的Old Region越少，总周期越长
+
+## 结构化回答
+
+**30 秒电梯演讲：** G1就像城市环卫系统——把城市分成若干街区（Region），每个街区可以是住宅区（Eden）、商业区（Old）或空地（Free）。Mixed GC就是大扫除时，不仅清理住宅区，还挑选商业区里最脏的几个一起打扫
+
+**展开框架：**
+1. **G1堆被划分为2** — 048个左右的Region（等大，1-32MB）
+2. **Region角色可变** — Eden/Survivor/Old/Humongous
+3. **Mixed** — GC = Young GC + 部分Old Region回收
+
+**收尾：** G1和CMS有什么区别？
+
+## 视频脚本
+
+> 预计时长：4 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【拼多多 Java服务端】G1收集器的Mixed GC触发条 | "G1就像城市环卫系统——把城市分成若干街区（Region），每个街区可以是住宅区（Eden）、商业区" | 引入 |
+| 0:20 | 概念图解 | "048个左右的Region（等大，1-32MB）" | G1堆被划分为2 |
+| 0:45 | 对比表格 | "Eden/Survivor/Old/Humongous" | Region角色可变 |
+| 1:15 | 代码截图 | "GC = Young GC + 部分Old Region回收" | Mixed |
+| 2:15 | 总结卡 | "记住三个词：G1堆被划分为2、Region角色可变、Mixed" | 收尾 |

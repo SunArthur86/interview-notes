@@ -214,3 +214,26 @@ ThreadPoolExecutor inferencePool = new ThreadPoolExecutor(
 3. **知道Executors的OOM风险** — 阿里规约的核心原因
 4. **能区分CPU密集型和IO密集型的线程数设置** — 展示实际调优经验
 5. **推荐CallerRunsPolicy** — 说明反压机制，体现系统设计思维
+
+## 结构化回答
+
+**30 秒电梯演讲：** 线程池就像一家餐厅——corePoolSize是常驻厨师，maxPoolSize是高峰期最多雇佣的厨师，workQueue是候餐区，rejectHandler是客人太多时的处理方式（拒绝/叫外卖/等位）
+
+**展开框架：**
+1. **7个参数** — corePoolSize、maxPoolSize、keepAliveTime、unit、workQueue、threadFactory、handler
+2. **任务处理流程** — 核心线程→队列→非核心线程→拒绝策略
+3. **4种拒绝策略** — AbortPolicy(抛异常)、CallerRunsPolicy(调用者执行)、DiscardPolicy(丢弃)、DiscardOldestPolic...
+
+**收尾：** 线程池是如何区分核心线程和非核心线程的？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【拼多多 Java服务端】Java线程池有哪些参数？提交任务 | "线程池就像一家餐厅——corePoolSize是常驻厨师，maxPoolSize是高峰期最多雇佣的厨" | 引入 |
+| 0:20 | 概念图解 | "corePoolSize、maxPoolSize、keepAliveTime、unit、workQueue、thr..." | 7个参数 |
+| 0:45 | 对比表格 | "核心线程→队列→非核心线程→拒绝策略" | 任务处理流程 |
+| 1:15 | 代码截图 | "AbortPolicy(抛异常)、CallerRunsPolicy(调用者执行)、DiscardPolicy(丢弃..." | 4种拒绝策略 |
+| 1:45 | 总结卡 | "记住三个词：7个参数、任务处理流程、4种拒绝策略" | 收尾 |

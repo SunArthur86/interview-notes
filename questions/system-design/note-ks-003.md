@@ -286,3 +286,26 @@ MAT中如何确认ThreadLocal泄漏：
 1. 代码规范——"所有 ThreadLocal 必须用 try-finally remove()"写入团队规范，Code Review 检查。
 2. ThreadLocal 检测工具——集成静态分析工具（如 SonarQube 规则），检测"set 后没有 remove"的代码，编译期拦截。
 3. 线程池包装器——所有线程池用 TTL 包装（`TtlExecutors.getTtlExecutor`），在框架层解决串号，业务代码无感知。
+
+## 结构化回答
+
+**30 秒电梯演讲：** ThreadLocal就像酒店房间的储物柜——每个线程(客人)有自己的柜子(ThreadLocalMap)。问题是：客人退房(ThreadLocal引用没了)但柜子里的东西(value)还在，因为酒店(线程池)不退房，柜子就一直占着空...
+
+**展开框架：**
+1. **ThreadLo** — calMap的Entry是WeakReference(ThreadLocal) + StrongReference(value)
+2. **ThreadLo** — cal引用被回收后key变null，但value仍被Entry强引用 → 泄漏
+3. **线程池中线程长生不老** — → ThreadLocalMap永不清理 → 泄漏持续累积
+
+**收尾：** ThreadLocal和Synchronized有什么区别？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【快手Java一面】MAT显示10万个ThreadLocal | "ThreadLocal就像酒店房间的储物柜——每个线程(客人)有自己的柜子(ThreadLocalM" | 引入 |
+| 0:20 | 概念图解 | "calMap的Entry是WeakReference(ThreadLocal) + StrongReference..." | ThreadLo |
+| 0:45 | 对比表格 | "cal引用被回收后key变null，但value仍被Entry强引用 → 泄漏" | ThreadLo |
+| 1:15 | 代码截图 | "→ ThreadLocalMap永不清理 → 泄漏持续累积" | 线程池中线程长生不老 |
+| 1:45 | 总结卡 | "记住三个词：ThreadLo、ThreadLo、线程池中线程长生不老" | 收尾 |

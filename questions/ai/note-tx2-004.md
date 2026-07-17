@@ -278,3 +278,26 @@ def parse_model_output(raw: str) -> OrderInfo:
 **Q：怎么衡量 JSON 输出稳定性的保障措施是否到位？**
 
 三个指标：1) 格式合法率——json.loads 成功率（应该 > 99.9%）；2) Schema 符合率——Pydantic 校验通过率（应该 > 99%）；3) 语义准确率——字段值是否正确（如 amount 是真实金额不是硬凑的 0）。三个指标分层看，格式好不代表语义对。沉淀为 JSON 输出保障规范：每层手段的启用条件、Schema 设计规范（字段必填/可选/nullable 约定）、校验和重试策略。
+
+## 结构化回答
+
+**30 秒电梯演讲：** 像让小学生写规范作文——先讲清楚要求(Prompt)，给范文(Schema+few-shot)，用作文格子纸(Structured Output API)，写错字涂改(Constrained Decoding)，最后老师检查批改(后处理)。
+
+**展开框架：**
+1. **Prompt层** — 明确要求+给few-shot示范
+2. **Schema设计** — 字段少/命名直观/加description/必填标required
+3. **Structured** — response_format json_schema 服务端约束
+
+**收尾：** Constrained Decoding 的 FSM 怎么构造？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【某讯面经】如何稳定让模型输出标准 JSON Schema？ | "像让小学生写规范作文——先讲清楚要求(Prompt)，给范文(Schema+few-shot)，用作" | 引入 |
+| 0:20 | 概念图解 | "明确要求+给few-shot示范" | Prompt层 |
+| 0:45 | 对比表格 | "字段少/命名直观/加description/必填标required" | Schema设计 |
+| 1:15 | 代码截图 | "response_format json_schema 服务端约束" | Structured |
+| 1:45 | 总结卡 | "记住三个词：Prompt层、Schema设计、Structured" | 收尾 |

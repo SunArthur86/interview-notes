@@ -220,3 +220,26 @@ os.environ["LANGCHAIN_TRACING_V2"] = "true"
 **Q：三兄弟的使用怎么沉淀成团队的 LLM 应用标准技术栈？**
 
 建团队技术栈规范：1）标准化——规定生产 LLM 应用用三兄弟（Chain 组件+Graph 编排+Smith 监控），统一技术栈，降低团队内碎片化；2）模板——提供三兄弟项目模板（含 Chain 组件/Graph 工作流/Smith 集成/评估），脚手架搭建；3）最佳实践——文档化各工具用法（如 Chain 的组件设计/Graph 的状态管理/Smith 的 trace 和评估），新人按手册；4）监控规范——所有应用必接 Smith（或 Langfuse 自部署），trace/评估标准化；5）案例库——真实应用案例（架构/踩坑/优化），经验复用。这套写入团队 LLM 开发 SOP，让"用三兄弟搭应用"从"每人选型"变成"标准技术栈+最佳实践"，高质量统一产出。
+
+## 结构化回答
+
+**30 秒电梯演讲：** 像建筑公司——LangChain是建材(砖/水泥)、LangGraph是施工方案(图纸/工序)、LangSmith是质检系统(验收/监控)。
+
+**展开框架：**
+1. **LangChain** — 组件库（Models/Prompts/Tools）
+2. **LangGraph** — 工作流引擎（图结构/循环/分支）
+3. **LangSmith** — 监控平台（Trace/Eval/Monitor）
+
+**收尾：** 三者是分开的项目吗？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：LangChain / LangGraph / LangSm | "像建筑公司——LangChain是建材(砖/水泥)、LangGraph是施工方案(图纸/工序)、La" | 引入 |
+| 0:20 | 概念图解 | "组件库（Models/Prompts/Tools）" | LangChain |
+| 0:45 | 对比表格 | "工作流引擎（图结构/循环/分支）" | LangGraph |
+| 1:15 | 代码截图 | "监控平台（Trace/Eval/Monitor）" | LangSmith |
+| 1:45 | 总结卡 | "记住三个词：LangChain、LangGraph、LangSmith" | 收尾 |

@@ -218,3 +218,26 @@ Planning 拆解：
 **Q：怎么衡量 Agent 各组件的协作是否有效？**
 
 端到端 + 组件级双层指标。1) 端到端——task_success_rate、平均步数、用户满意度；2) 组件级——Planning 的规划准确率（是否符合预期步骤）、Memory 的召回精确率、Tool 的 tool_call_success_rate、Action 的执行成功率。如果端到端成功率低但各组件指标都高，说明组件间衔接有问题（如 Memory 召回了但没拼进 Planning 的 context）。沉淀为组件协作诊断手册：每层指标的基线和异常排查路径。
+
+## 结构化回答
+
+**30 秒电梯演讲：** 像一个厨师——Planning 是菜谱步骤（先切后炒），Memory 是尝过的味道记事本，Tool 是锅碗刀灶，Action 是真正动手切菜/开火。大脑（LLM）指挥，但没手脚（Tool/Action）做不出菜，没记事本（Memory...
+
+**展开框架：**
+1. **Planning** — 把复杂任务拆解成步骤（CoT/ReAct/ToT/Plan&Execute）
+2. **Memory** — 短期会话+长期向量记忆，存历史供检索
+3. **Tool** — 扩展能力边界，调API/DB/代码/搜索引擎
+
+**收尾：** Planning 的四种范式（CoT/ReAct/ToT/Plan&Execute）怎么选？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【某讯面经】什么是 Agent？核心组件（Planning、 | "像一个厨师——Planning 是菜谱步骤（先切后炒），Memory 是尝过的味道记事本，Tool " | 引入 |
+| 0:20 | 概念图解 | "把复杂任务拆解成步骤（CoT/ReAct/ToT/Plan&Execute）" | Planning |
+| 0:45 | 对比表格 | "短期会话+长期向量记忆，存历史供检索" | Memory |
+| 1:15 | 代码截图 | "扩展能力边界，调API/DB/代码/搜索引擎" | Tool |
+| 1:45 | 总结卡 | "记住三个词：Planning、Memory、Tool" | 收尾 |

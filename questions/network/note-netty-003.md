@@ -192,3 +192,26 @@ native transport 的局限：一、平台特定——Epoll 只在 Linux、KQueue
 **Q：这道题做完，你沉淀出了什么可复用的 Netty transport 选型经验？**
 
 三条经验：一、默认 NIO——跨平台、稳定、文档全，新项目首选；二、Linux 生产上 Epoll——性能提升 10-30% 且支持 TCP_FASTOPEN 等特性，通过 `<dependency>` 加 netty-transport-native-epoll 切换；三、EventLoop 不阻塞——无论 NIO 还是 Epoll，handler 都不能阻塞，否则整个 EventLoop 卡住。核心原则："按平台和性能需求选 transport，但编程模型一致（EventLoop + ChannelHandler），代码可平滑迁移。" 这套经验也适用于其他 native 加速场景（如 RocksDB 的 JNI、TensorRT 的 native 推理），核心是"在热点路径用 native，在通用路径用 Java"。
+
+## 结构化回答
+
+**30 秒电梯演讲：** AIO 像是"代驾服务"——你把车钥匙交给代驾（OS），它开完通知你。但 Linux 这个代驾公司其实没有真正的代驾，它是临时雇了个会开车的 epoll 司机来冒充（用 epoll 模拟 AIO）。既然最后都是同一个司机在开，你还不如...
+
+**展开框架：**
+1. **Netty官方结论** — AIO在Unix系统上不比NIO(epoll)快
+2. **Linux没有真正的异步IO** — AIO是用epoll模拟的
+3. **NIO更简单可控** — (主动轮询)vs AIO回调复杂(回调地狱+线程模型难)
+
+**收尾：** Linux AIO (io_uring) 出现后，Netty 会转向 AIO 吗？
+
+## 视频脚本
+
+> 预计时长：4 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：为什么 Netty 使用 NIO 而不是 AIO？ | "AIO 像是"代驾服务"——你把车钥匙交给代驾（OS），它开完通知你。但 Linux 这个代驾公司其" | 引入 |
+| 0:20 | 概念图解 | "AIO在Unix系统上不比NIO(epoll)快" | Netty官方结论 |
+| 0:45 | 对比表格 | "AIO是用epoll模拟的" | Linux没有真正的异步IO |
+| 1:15 | 代码截图 | "(主动轮询)vs AIO回调复杂(回调地狱+线程模型难)" | NIO更简单可控 |
+| 2:15 | 总结卡 | "记住三个词：Netty官方结论、Linux没有真正的异步IO、NIO更简单可控" | 收尾 |

@@ -276,3 +276,26 @@ TCP 层面，channelInactive 触发时 TCP 可能还没完全关闭（处于 FIN
 **Q：这道题做完，你沉淀出了什么可复用的 Channel 生命周期管理经验？**
 
 五条经验：一、在 channelActive 做上线处理（记录、发握手）、channelInactive 做下线清理（释放资源、通知）；二、channelReadComplete 合并 flush——避免每条消息 flush 一次，批量 flush 提升吞吐；三、IdleStateHandler 做心跳超时——配置读空闲时间，userEventTriggered 里 close 无心跳的连接；四、exceptionCaught 兜底——Pipeline 末尾加 ExceptionHandler 统一处理异常，避免连接泄漏；五、自定义事件传控制信号——鉴权、限流等用 userEventTriggered，与业务数据分离。核心："理解生命周期事件序列，在正确的事件做正确的处理，是 Netty Handler 设计的基础，错误的事件处理会导致资源泄漏或业务异常。"
+
+## 结构化回答
+
+**30 秒电梯演讲：** Channel 生命周期像"一个员工从入职到离职"——入职登记(registered)、上班打卡(active)、下班(inactive)、注销工号(unregistered)。ChannelHandler 生命周期像"一个项目被分配...
+
+**展开框架：**
+1. **Channel生命周期** — unregistered→registered→active→inactive→unregistered
+2. **ChannelH** — handlerAdded→channelRegistered→...(业务事件)→handlerRemoved
+3. **ChannelI** — nboundHandler是处理入站事件的核心接口(含生命周期回调)
+
+**收尾：** channelActive 和 channelRegistered 的区别？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：Channel 和 ChannelHandler 的生命周期 | "Channel 生命周期像"一个员工从入职到离职"——入职登记(registered)、上班打卡(a" | 引入 |
+| 0:20 | 概念图解 | "unregistered→registered→active→inactive→unregistered" | Channel生命周期 |
+| 0:45 | 对比表格 | "handlerAdded→channelRegistered→...(业务事件)→handlerRemoved" | ChannelH |
+| 1:15 | 代码截图 | "nboundHandler是处理入站事件的核心接口(含生命周期回调)" | ChannelI |
+| 1:45 | 总结卡 | "记住三个词：Channel生命周期、ChannelH、ChannelI" | 收尾 |

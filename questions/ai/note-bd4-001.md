@@ -212,3 +212,25 @@ WaitGroup 是"等待完成"，context 是"主动取消"，解决不同问题。W
 
 固化成"Agent 并发安全规范"：所有 goroutine 必须接收 ctx 并响应（阻塞操作前 check `ctx.Done()`）、所有 channel 操作用 select + ctx、所有外部调用用 ctx-aware 客户端、所有 goroutine 创建点必须有对应的退出机制（ctx 取消或 channel 关闭）。沉淀"context 传递规范"（函数第一个参数是 ctx）、"超时配置经验"（工具调用 30 秒、LLM API 60 秒）、"pprof 排查 SOP"（线上开启 pprof，泄漏时抓 goroutine profile 定位）。配套监控（goroutine 数、内存、pprof endpoint），goroutine 异常增长告警。把"ctx 传递 + 超时 + pprof"作为 Agent 服务的标配，新服务上线即有泄漏防治能力。code review 检查"go func"是否有 ctx（没有则拒绝合并）。
 
+## 结构化回答
+
+**30 秒电梯演讲：** GMP就像一个出租车调度中心：G是乘客，M是出租车，P是发车牌（同时只能有GOMAXPROCS辆车在运营）。泄漏就像乘客上了车却永远到不了目的地，车就一直被占着
+
+**展开框架：**
+1. **G (Goroutine)** — 用户协程，存储栈和状态
+2. **M (Machine)** — OS线程，真正执行代码
+3. **P (Processor)** — 逻辑处理器，持有本地G队列，数量=GOMAXPROCS
+
+**收尾：** GOMAXPROCS设置过大会出现什么问题？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：Golang 的 GMP 调度模型是什么？什么情况下会造成  | "GMP就像一个出租车调度中心：G是乘客，M是出租车，P是发车牌（同时只能有GOMAXPROCS辆车在" | 引入 |
+| 0:20 | 概念图解 | "用户协程，存储栈和状态" | G (Goroutine) |
+| 0:45 | 对比表格 | "OS线程，真正执行代码" | M (Machine) |
+| 1:15 | 代码截图 | "逻辑处理器，持有本地G队列，数量=GOMAXPROCS" | P (Processor) |
+| 1:45 | 总结卡 | "记住三个词：G (Goroutine)、M (Machine)、P (Processor)" | 收尾 |

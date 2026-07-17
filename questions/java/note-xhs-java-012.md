@@ -125,3 +125,25 @@ done
 3. **Live Dump vs Full Dump**：`jmap -dump:live,format=b` 只Dump存活对象（先触发一次GC），文件更小但可能遗漏信息
 4. **容器环境**：K8s中配 `livenessProbe` + `ExitOnOutOfMemoryError` 让Pod自动重启；Dump文件需挂载持久卷
 5. **APM工具集成**：SkyWalking/Pinpoint等APM工具可配置OOM自动Dump并上传到对象存储（OSS/S3），避免本地磁盘不足
+
+## 结构化回答
+
+**30 秒电梯演讲：** 就像出门忘带手机拍照——事故发生了但没有照片证据。解决方法很简单：设置'自动拍照'参数，下次事故自动留证
+
+**展开框架：**
+1. **根因** — JVM默认不自动生成Heap Dump
+2. **启动参数** — -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/path
+3. **手动触发** — jmap -dump 或 jcmd GC.heap_dump
+
+**收尾：** Dump文件很大（几个GB），如何高效分析？
+
+## 视频脚本
+
+> 预计时长：2 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【拼多多 Java服务端】OOM时JVM没自动生成Dump文 | "就像出门忘带手机拍照——事故发生了但没有照片证据。解决方法很简单：设置'自动拍照'参数，下次事故自动" | 引入 |
+| 0:20 | 概念图解 | "JVM默认不自动生成Heap Dump" | 根因 |
+| 0:45 | 对比表格 | "-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/path" | 启动参数 |
+| 1:15 | 总结卡 | "记住三个词：根因、启动参数、手动触发" | 收尾 |

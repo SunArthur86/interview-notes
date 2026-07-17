@@ -201,3 +201,26 @@ TransactionMQProducer producer = new TransactionMQProducer("order_group");
 
 4. **"MQ的消费者怎么保证幂等？"**
    → 去重表(唯一键) / Redis SETNX / 数据库唯一约束 / 业务状态判断 → 参见note-flg-002
+
+## 结构化回答
+
+**30 秒电梯演讲：** RabbitMQ像邮政系统——信件按地址精确路由，挂号信保证送达，但处理速度有上限；RocketMQ像快递分拣中心——高并发流水线，支持定时投递和事务包裹，双十一十亿包裹验证；ActiveMQ像老式电报局——功能齐全但设备老旧。
+
+**展开框架：**
+1. **RabbitMQ** — AMQP协议, Exchange路由灵活, 消息可靠性高, 吞吐量万级TPS
+2. **RocketMQ** — 自研协议, 支持事务消息/定时消息, 吞吐量十万级TPS, 分布式原生
+3. **ActiveMQ** — JMS标准, 功能最全, 但性能最弱, 适合遗留系统
+
+**收尾：** Kafka和这三个MQ有什么区别？
+
+## 视频脚本
+
+> 预计时长：3 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：RabbitMQ、RocketMQ和ActiveMQ的主要差 | "RabbitMQ像邮政系统——信件按地址精确路由，挂号信保证送达，但处理速度有上限；RocketMQ" | 引入 |
+| 0:20 | 概念图解 | "AMQP协议, Exchange路由灵活, 消息可靠性高, 吞吐量万级TPS" | RabbitMQ |
+| 0:45 | 对比表格 | "自研协议, 支持事务消息/定时消息, 吞吐量十万级TPS, 分布式原生" | RocketMQ |
+| 1:15 | 代码截图 | "JMS标准, 功能最全, 但性能最弱, 适合遗留系统" | ActiveMQ |
+| 1:45 | 总结卡 | "记住三个词：RabbitMQ、RocketMQ、ActiveMQ" | 收尾 |

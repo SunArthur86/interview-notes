@@ -225,3 +225,25 @@ public class ThreadStateDemo {
 
 5. **"yield()方法调用后线程状态怎么变？它一定会让出CPU吗？"**
    → 提示Runnable状态内部变化，yield只是建议调度器
+
+## 结构化回答
+
+**30 秒电梯演讲：** 线程就像餐厅里的服务员——刚入职还没开始工作是NEW，正在服务客人是RUNNABLE，等厨师出菜被卡住是BLOCKED，休息室等叫号是WAITING，定了闹钟休息是TIMED_WAITING，下班走人是TERMINATED。
+
+**展开框架：**
+1. **6种状态定义在T** — hread.State枚举中
+2. **BLOCKED只** — 发生在竞争synchronized锁时
+3. **WAITING需** — 要被其他线程notify/notifyAll唤醒
+
+**收尾：** BLOCKED和WAITING的本质区别是什么？
+
+## 视频脚本
+
+> 预计时长：2 分钟 | 由浅入深
+
+| 时间 | 画面/字幕 | 口播台词 | 讲解要点 |
+|------|----------|----------|----------|
+| 0:00 | 标题卡：【拼多多一面】Java 线程生命周期及状态流转 | "线程就像餐厅里的服务员——刚入职还没开始工作是NEW，正在服务客人是RUNNABLE，等厨师出菜被卡" | 引入 |
+| 0:20 | 概念图解 | "hread.State枚举中" | 6种状态定义在T |
+| 0:45 | 对比表格 | "发生在竞争synchronized锁时" | BLOCKED只 |
+| 1:15 | 总结卡 | "记住三个词：6种状态定义在T、BLOCKED只、WAITING需" | 收尾 |
