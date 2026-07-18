@@ -216,3 +216,23 @@ public class ContextInterceptor implements HandlerInterceptor {
 | 1:06 | JVM 内存模型与 GC 流程图分步演示 | "线程池场景必须try-finally + remove()" | 线程池场景必须try |
 | 1:57 | 关键代码/伪代码片段 | "Key设弱引用是为了ThreadLocal对象本身能被GC" | Key设弱引用是为了 |
 | 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：为什么不把Value也设为弱引用？（提示：Value被回收后get返回null，破坏语义）。" | 收尾 |
+
+## 苏格拉底式面试追问
+
+| 追问层级 | 面试官可能这样问 | 高分回答方向 |
+|----------|------------------|--------------|
+| 目标追问 | ThreadLocal用弱引用做Key想解决什么问题？ | 解决ThreadLocal对象本身被回收后，Entry的Key能被GC，避免ThreadLocal对象内存泄漏；但Value泄漏是另一个问题 |
+| 证据追问 | 为什么弱引用Key不能完全防泄漏？Value还是泄漏？ | 线程池线程长期存活→ThreadLocalMap长期存活→Value强引用无法回收；Key被GC后变成null但Value还在，形成null key泄漏 |
+| 边界追问 | 什么场景下ThreadLocal泄漏最严重？什么场景几乎无泄漏？ | 线程池+大Value+不remove最严重；短生命周期线程（请求线程非池化）随线程结束自动清理，几乎无泄漏 |
+| 反例追问 | 如果把Key改成强引用能解决泄漏吗？ | 不能，反而更糟：Key强引用ThreadLocal对象本身也泄漏了；弱引用至少保证ThreadLocal对象可回收，是两害相权取其轻 |
+| 风险追问 | 线程池里ThreadLocal不remove除了泄漏还有什么风险？ | 线程复用导致脏数据——上个任务设置的ThreadLocal值被下个任务读到，造成业务串号 |
+| 验证追问 | 怎么验证ThreadLocal确实泄漏了？ | 多次dump Heap看ThreadLocalMap的Entry数量增长、MAT看Value被ThreadLocalMap引用无法回收、监控线程池线程数 |
+| 沉淀追问 | 团队怎么规范使用ThreadLocal避免这类问题？ | 规范：用try-finally保证remove、封装工具类强制remove、定时审计ThreadLocal使用、优先用局部变量或方法参数传值替代 |
+
+### 现场对话示例
+**面试官**：ThreadLocal内存泄漏，Key为什么是弱引用？
+**候选人**：弱引用Key保证ThreadLocal对象被回收后Entry的Key能被GC，避免ThreadLocal对象本身泄漏；但Value仍可能泄漏。
+**面试官**：那Value的泄漏怎么解决？
+**候选人**：Value泄漏根因是线程池线程长期存活持有ThreadLocalMap，必须手动remove；线程池场景用完必须在finally里清理。
+**面试官**：线程池里不remove还有什么风险？
+**候选人**：除了泄漏还有脏数据——线程复用会读到上个任务的ThreadLocal值造成业务串号，所以必须强制remove。

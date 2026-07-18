@@ -35,43 +35,30 @@ memory_points:
 
 ## 架构图解
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    MHA (Multi-Head Attention)           │
-│                                                         │
-│  Q:  [Q₁] [Q₂] [Q₃] [Q₄] [Q₅] [Q₆] [Q₇] [Q₈]        │
-│  K:  [K₁] [K₂] [K₃] [K₄] [K₅] [K₆] [K₇] [K₈]        │
-│  V:  [V₁] [V₂] [V₃] [V₄] [V₅] [V₆] [V₇] [V₈]        │
-│       ↓     ↓     ↓     ↓     ↓     ↓     ↓     ↓       │
-│     head₁  head₂ head₃ head₄ head₅ head₆ head₇ head₈  │
-│                                                         │
-│  特点: 每个头独立K/V → KV Cache = 2 × N_heads × d × L   │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph MHA["MHA (Multi-Head Attention) - 特点: 每个头独立K/V → KV Cache = 2 × N_heads × d × L"]
+        Q1["Q: Q₁ Q₂ Q₃ Q₄ Q₅ Q₆ Q₇ Q₈"]
+        K1["K: K₁ K₂ K₃ K₄ K₅ K₆ K₇ K₈"]
+        V1["V: V₁ V₂ V₃ V₄ V₅ V₆ V₇ V₈"]
+        H1["head₁ head₂ head₃ head₄ head₅ head₆ head₇ head₈"]
+        Q1 & K1 & V1 --> H1
+    end
 
-┌─────────────────────────────────────────────────────────┐
-│                    MQA (Multi-Query Attention)          │
-│                                                         │
-│  Q:  [Q₁] [Q₂] [Q₃] [Q₄] [Q₅] [Q₆] [Q₇] [Q₈]        │
-│  K:  [────────── K_shared ──────────]                   │
-│  V:  [────────── V_shared ──────────]                   │
-│       ↓     ↓     ↓     ↓     ↓     ↓     ↓     ↓       │
-│              全部头共享同一组K/V                         │
-│                                                         │
-│  特点: 所有头共享1组K/V → KV Cache = 2 × 1 × d × L     │
-└─────────────────────────────────────────────────────────┘
+    subgraph MQA["MQA (Multi-Query Attention) - 特点: 所有头共享1组K/V → KV Cache = 2 × 1 × d × L"]
+        Q2["Q: Q₁ Q₂ Q₃ Q₄ Q₅ Q₆ Q₇ Q₈"]
+        K2["K: K_shared (全部头共享同一组K/V)"]
+        V2["V: V_shared"]
+        Q2 & K2 & V2 --> SH["全部头共享同一组K/V"]
+    end
 
-┌─────────────────────────────────────────────────────────┐
-│                    GQA (Grouped-Query Attention)        │
-│                                                         │
-│  Q:  [Q₁] [Q₂] [Q₃] [Q₄] [Q₅] [Q₆] [Q₇] [Q₈]        │
-│  K:  [K_A] [K_A] [K_B] [K_B] [K_C] [K_C] [K_D] [K_D]  │
-│  V:  [V_A] [V_A] [V_B] [V_B] [V_C] [V_C] [V_D] [V_D]  │
-│       ↓     ↓     ↓     ↓     ↓     ↓     ↓     ↓       │
-│     grp₁──────  grp₂──────  grp₃──────  grp₄──────     │
-│                                                         │
-│  特点: G组K/V，每组服务N/G个Q头                          │
-│  KV Cache = 2 × G × d × L                              │
-└─────────────────────────────────────────────────────────┘
+    subgraph GQA["GQA (Grouped-Query Attention) - 特点: G组K/V,每组服务N/G个Q头 → KV Cache = 2 × G × d × L"]
+        Q3["Q: Q₁ Q₂ Q₃ Q₄ Q₅ Q₆ Q₇ Q₈"]
+        K3["K: K_A K_A K_B K_B K_C K_C K_D K_D"]
+        V3["V: V_A V_A V_B V_B V_C V_C V_D V_D"]
+        GRP["grp₁ ── grp₂ ── grp₃ ── grp₄"]
+        Q3 & K3 & V3 --> GRP
+    end
 ```
 
 ## Trade-off 对比

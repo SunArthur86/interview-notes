@@ -37,34 +37,21 @@ memory_points:
 
 ## 核心概念
 
-```
-┌──────────────────────────────────────────────────┐
-│              Agent Harness 层                    │
-│  (包裹在Agent核心逻辑外面的工程保障层)            │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
-│  │ 调度引擎  │ │ 超时熔断  │ │ 上下文管理    │   │
-│  │ Scheduler │ │ Circuit  │ │ Context Mgr  │   │
-│  │          │ │ Breaker  │ │              │   │
-│  └──────────┘ └──────────┘ └──────────────┘   │
-│                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
-│  │ 可观测性  │ │ 错误隔离  │ │ 成本控制     │   │
-│  │ Tracing  │ │ Fallback │ │ Cost Tracker │   │
-│  │ Metrics  │ │ Retry    │ │ Rate Limit   │   │
-│  └──────────┘ └──────────┘ └──────────────┘   │
-│                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
-│  │ 安全审计  │ │ 状态管理  │ │ 人机协同     │   │
-│  │ Security │ │ State    │ │ Human Loop   │   │
-│  │ Audit    │ │ Checkpt  │ │ Approval     │   │
-│  └──────────┘ └──────────┘ └──────────────┘   │
-│                                                  │
-├──────────────────────────────────────────────────┤
-│           Agent 核心逻辑 (Brain)                  │
-│     LLM + Prompt + Tools + Memory               │
-└──────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph H["Agent Harness 层 (包裹在Agent核心逻辑外面的工程保障层)"]
+        S1["调度引擎 Scheduler"]
+        S2["超时熔断 Circuit Breaker"]
+        S3["上下文管理 Context Mgr"]
+        O1["可观测性<br/>Tracing / Metrics"]
+        O2["错误隔离<br/>Fallback / Retry"]
+        O3["成本控制<br/>Cost Tracker / Rate Limit"]
+        SEC1["安全审计<br/>Security Audit"]
+        SEC2["状态管理<br/>State Checkpt"]
+        SEC3["人机协同<br/>Human Loop Approval"]
+    end
+    BRAIN["Agent 核心逻辑 (Brain)<br/>LLM + Prompt + Tools + Memory"]
+    H --> BRAIN
 ```
 
 ## 六大核心职责

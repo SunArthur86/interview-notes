@@ -181,3 +181,23 @@ memory_points:
 | 1:06 | MySQL EXPLAIN 执行计划截图分步演示 | "undo log 就是 InnoDB逻辑日志 到 回滚+MVCC 到 随事务产生" | undo log |
 | 1:57 | 关键代码/伪代码片段 | "binlog 就是 Server层逻辑日志 到 主从复制+归档 到 追加写" | binlog |
 | 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：redo log和binlog的两阶段提交是怎么保证一致性的？（见note-xhs-db-014）。" | 收尾 |
+
+## 苏格拉底式面试追问
+
+| 追问层级 | 面试官可能这样问 | 高分回答方向 |
+|----------|------------------|--------------|
+| 目标追问 | MySQL为什么要搞三种不同的日志，一种不行吗？ | 三种日志服务不同目标：redo保证崩溃恢复（持久性）、undo保证回滚和MVCC（原子性+隔离性）、binlog保证主从复制和归档，职责单一互不替代 |
+| 证据追问 | 你说redo log是WAL机制，怎么证明它比直接刷脏页快？ | redo是顺序写、固定大小循环写，性能远高于数据页随机写；可通过innodb_flush_log_at_trx_commit参数和benchmark对比证明 |
+| 边界追问 | redo log和binlog分别在MySQL架构的哪一层？为什么binlog在Server层？ | redo是InnoDB存储引擎层物理日志；binlog是Server层逻辑日志，所有引擎共用，所以放在Server层做主从复制 |
+| 反例追问 | 如果只保留binlog不要redo log，MySQL能正常工作吗？ | 不能。binlog是逻辑日志按语句/行记录，崩溃恢复时无法知道哪些脏页没刷盘；只有redo的物理日志能精确恢复崩溃前状态 |
+| 风险追问 | redo log写满了会怎样？对业务有什么影响？ | redo log写满会触发强制刷脏页（checkpoint推进），此时所有更新操作被阻塞，业务出现明显延迟，需监控redo使用率 |
+| 验证追问 | 怎么确认一次崩溃恢复中redo log到底做了什么？ | 看error log的recovery日志、innodb_metrics、SHOW ENGINE INNODB STATUS的LOG段，确认恢复的LSN范围 |
+| 沉淀追问 | 三种日志的配置参数你们团队是怎么定规范的？ | 沉淀为DBA规范：innodb_flush_log_at_trx_commit=1、sync_binlog=1、binlog_format=ROW，并纳入变更评审 |
+
+### 现场对话示例
+**面试官**：binlog、redo log、undo log的作用和区别讲一下。
+**候选人**：redo保证崩溃恢复的持久性、undo保证回滚和MVCC的原子性隔离性、binlog保证主从复制和归档，redo在引擎层是物理日志，另两个偏逻辑。
+**面试官**：为什么binlog不能替代redo做崩溃恢复？
+**候选人**：binlog是逻辑日志，无法记录哪些脏页未刷盘；redo是物理页级别日志，崩溃时能精确重放恢复，这是WAL的核心。
+**面试官**：redo log写满了会怎样？
+**候选人**：触发强制checkpoint推进刷脏页，期间所有写请求被阻塞，所以线上要监控redo使用率并合理设置大小。

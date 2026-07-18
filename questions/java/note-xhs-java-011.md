@@ -194,3 +194,23 @@ jmap -dump:format=b,file=/data/dumps/manual.hprof <pid>
 | 1:06 | 图遍历示意图分步演示 | "Heap Dump参数：-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPa…" | Heap Dump参数 |
 | 1:57 | 关键代码/伪代码片段 | "MAT两大视图：Dominator Tree看谁占内存大，Leak Suspects自动分析" | MAT两大视图 |
 | 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：如果OOM发生时没有生成Dump文件怎么办？（见note-xhs-java-012）。" | 收尾 |
+
+## 苏格拉底式面试追问
+
+| 追问层级 | 面试官可能这样问 | 高分回答方向 |
+|----------|------------------|--------------|
+| 目标追问 | 线上OOM排查的第一目标是什么？为什么不能直接重启？ | 第一目标是拿到Heap Dump定位根因；直接重启会丢失现场无法定位，要先保留dump再重启恢复服务 |
+| 证据追问 | 怎么知道是哪种OOM？不同OOM处置一样吗？ | 看异常类型：Java heap space是堆溢出、Metaspace是元空间、GC overhead是GC过于频繁、Direct buffer是堆外内存，处置方案不同 |
+| 边界追问 | 所有OOM都需要立即dump吗？什么情况可以缓？ | 堆OOM必须立即dump（核心现场）；Metaspace/GC overhead可适当延后；但要配-XX:+HeapDumpOnOutOfMemoryError自动dump |
+| 反例追问 | 有了Heap Dump就一定能找到根因吗？ | 不一定。如果是瞬时大对象（如加载大文件）dump时已被GC，或泄漏很缓慢dump看不出明显大对象，需要多次dump对比趋势 |
+| 风险追问 | dump文件可能很大，怎么处理不占满磁盘？ | 配-XX:HeapDumpPath指向大磁盘、设置轮转保留策略、dump后压缩传输、监控磁盘容量告警 |
+| 验证追问 | 修完之后怎么确认OOM不再发生？ | 压测复现场景验证、监控堆内存曲线平稳、设置OOM告警、定期review GC日志确认无异常 |
+| 沉淀追问 | OOM应急预案怎么沉淀成流程？ | 规范：自动dump参数必配、告警→dump→重启三步SOP、dump自动化分析、根因复盘文档 |
+
+### 现场对话示例
+**面试官**：线上系统突然OOM了，怎么排查？
+**候选人**：先保留Heap Dump别急着重启，用MAT分析大对象和引用链定位是泄漏还是大对象，看异常类型判断堆/Metaspace/GC overhead。
+**面试官**：为什么不能直接重启？
+**候选人**：重启会丢失现场，下次还会复现；必须先dump保留证据定位根因，再重启恢复服务。
+**面试官**：dump文件很大怎么处理？
+**候选人**：配-XX:+HeapDumpOnOutOfMemoryError自动dump到大磁盘、设置轮转保留、dump后压缩传输、监控磁盘避免写满。

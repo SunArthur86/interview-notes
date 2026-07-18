@@ -227,3 +227,23 @@ sync_binlog = 1  -- 每次提交都fsync binlog (推荐)
 | 2:01 | 关键代码/伪代码片段 | "redo log和binlog不一致的后果：主从数据不一致" | redo log |
 | 2:54 | 对比表格 | "commit标志在redo log中，用XA ID关联binlog" | commit标志在 |
 | 3:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：如果redo log写完了，binlog写完了，但commit标志没写就崩溃了，怎么恢复。" | 收尾 |
+
+## 苏格拉底式面试追问
+
+| 追问层级 | 面试官可能这样问 | 高分回答方向 |
+|----------|------------------|--------------|
+| 目标追问 | 两阶段提交（2PC）在MySQL里到底要保证什么一致？ | 保证redo log和binlog的一致性——避免主库崩溃恢复后redo有记录但binlog没有（或反之），导致主从数据不一致 |
+| 证据追问 | 你怎么证明MySQL确实走了2PC而不是先写一个再写另一个就完事？ | 可通过binlog的XA ID关联、SHOW ENGINE INNODB STATUS看prepare事务、源码ha_commit_trans流程证明存在prepare→binlog→commit三阶段 |
+| 边界追问 | 如果中间任意一步崩溃，恢复逻辑分别怎么走？ | redo prepare后崩溃→回滚；redo prepare+binlog写完后崩溃→提交（因为binlog已落盘，从库会用）；commit后崩溃→已提交 |
+| 反例追问 | 为什么不用一阶段提交（先redo commit再写binlog）？简单不行吗？ | 一阶段如果redo commit成功但binlog没写，主库已提交但从库没收到，主从不一致；2PC用binlog作为最终决策点避免此问题 |
+| 风险追问 | 2PC有什么性能代价？高并发下扛得住吗？ | 每次提交多一次prepare磁盘fsync、组提交优化前吞吐受限；通过binlog_group_commit_sync优化、SSD降低fsync开销缓解 |
+| 验证追问 | 怎么验证一次提交确实走了完整的2PC流程？ | 开general log看prepare/write/commit、用mysqlbinlog解析XA事件、监控Com_commit计数和组提交批次大小 |
+| 沉淀追问 | 2PC的坑你们怎么沉淀避免再次踩到？ | 把sync_binlog=1、innodb_flush_log_at_trx_commit=1写入部署规范，半同步复制+对账作为主从一致性兜底 |
+
+### 现场对话示例
+**面试官**：两阶段提交讲一下，崩溃恢复时怎么处理？
+**候选人**：2PC分redo prepare→binlog write→redo commit三步，崩溃恢复以binlog是否落盘为决策点：有binlog就提交，没有就回滚。
+**面试官**：为什么一定要2PC，一阶段不行吗？
+**候选人**：一阶段无法同时保证主库和从库一致，binlog作为决策点能避免主库提交了但从库没收到的不一致问题。
+**面试官**：2PC的性能代价你怎么应对？
+**候选人**：用binlog组提交把多个事务的fsync合并成一次，配合SSD降低fsync开销，实测高并发下吞吐能提升数倍。

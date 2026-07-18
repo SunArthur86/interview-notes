@@ -48,41 +48,15 @@ vs LangChain:
 
 ## 二、核心架构
 
-```
-┌──────────────────────────────────────────────────┐
-│              LlamaIndex 架构                         │
-├──────────────────────────────────────────────────┤
-│                                                    │
-│  数据层（Data Connections）                         │
-│    ┌──────────────────────────────────────┐       │
-│    │ Readers/Loaders: LlamaHub 200+数据源  │       │
-│    │ (PDF/Notion/Slack/GitHub/SQL/Salesforce)│    │
-│    └──────────────────────────────────────┘       │
-│    Documents → Nodes(分块) → Indexing              │
-│                                                    │
-│  索引层（Indices）                                  │
-│    ┌──────────────────────────────────────┐       │
-│    │ VectorStoreIndex  (向量索引)           │       │
-│    │ SummaryIndex      (摘要索引)           │       │
-│    │ KnowledgeGraphIndex(知识图谱索引)      │       │
-│    │ TreeIndex         (树状索引)           │       │
-│    │ KeywordTableIndex(关键词索引)          │       │
-│    └──────────────────────────────────────┘       │
-│                                                    │
-│  查询层（Query Engine）                             │
-│    ┌──────────────────────────────────────┐       │
-│    │ Retriever: 检索器（多种策略）          │       │
-│    │ Response Synthesizer: 答案合成        │       │
-│    │ Postprocessor: 后处理（重排/过滤）     │       │
-│    └──────────────────────────────────────┘       │
-│                                                    │
-│  Agent层                                           │
-│    ┌──────────────────────────────────────┐       │
-│    │ Agent: 把查询引擎作为工具              │       │
-│    │ Router: 路由到不同索引/引擎            │       │
-│    └──────────────────────────────────────┘       │
-│                                                    │
-└──────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph LI["LlamaIndex 架构"]
+        DATA["数据层 (Data Connections)<br/>Readers/Loaders: LlamaHub 200+数据源<br/>(PDF/Notion/Slack/GitHub/SQL/Salesforce)<br/>Documents → Nodes(分块) → Indexing"]
+        IDX["索引层 (Indices)<br/>VectorStoreIndex (向量索引)<br/>SummaryIndex (摘要索引)<br/>KnowledgeGraphIndex (知识图谱索引)<br/>TreeIndex (树状索引)<br/>KeywordTableIndex (关键词索引)"]
+        QE["查询层 (Query Engine)<br/>Retriever: 检索器（多种策略）<br/>Response Synthesizer: 答案合成<br/>Postprocessor: 后处理（重排/过滤）"]
+        AGENT["Agent层<br/>Agent: 把查询引擎作为工具<br/>Router: 路由到不同索引/引擎"]
+        DATA --> IDX --> QE --> AGENT
+    end
 ```
 
 ## 三、LlamaIndex 的 RAG 优势

@@ -243,3 +243,23 @@ public void safeMethodWithTimeout() {
 | 0:15 | 加锁/解锁时序图 | "死锁四条件：互斥+持有等待+不可剥夺+循环等待" | 死锁四条件 |
 | 1:02 | 加锁/解锁时序图分步演示 | "jstack自动检测死锁，CPU飙高用top -Hp + jstack组合排查" | jstack自动检测死锁 |
 | 1:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：如何用代码层面预防死锁？（锁排序、tryLock超时）。" | 收尾 |
+
+## 苏格拉底式面试追问
+
+| 追问层级 | 面试官可能这样问 | 高分回答方向 |
+|----------|------------------|--------------|
+| 目标追问 | 死锁排查和CPU飙高排查，你第一步想确认什么？ | 死锁第一步jstack看线程是否BLOCKED并找锁的循环等待环；CPU飙高第一步top -Hp找占CPU最高的线程，再jstack看它在干什么 |
+| 证据追问 | jstack里怎么识别死锁？有什么关键字？ | 找'Found one Java-level deadlock'段落、看线程状态BLOCKED和'waiting to lock <0x...>'形成环；jstack会自动检测标记死锁 |
+| 边界追问 | CPU飙高一定是死循环或GC吗？还有什么可能？ | 还可能是：正则回溯爆炸、序列化大对象、加密计算、JIT编译、线程数爆炸上下文切换、被攻击做大量计算 |
+| 反例追问 | 线程状态是RUNNABLE但CPU不高，是什么情况？ | 可能在等IO（socket read、文件读），Java层面是RUNNABLE但实际阻塞在native层；要看是否卡在socketRead0等native方法 |
+| 风险追问 | 线上抓jstack有风险吗？怎么降低影响？ | jstack本身触发safepoint会短暂STW；要避免高峰期、多次抓取间隔采样、用jcmd替代减少开销、只抓必要次数 |
+| 验证追问 | 怎么验证死锁修复后真的没有了？ | 持续jstack监控无deadlock、压测复现场景验证、加锁超时tryLock兜底告警、监控线程BLOCKED数量 |
+| 沉淀追问 | 死锁和CPU飙高的排查SOP怎么沉淀？ | 死锁SOP：jstack→找环→定位锁→改顺序/超时；CPU飙高SOP：top→线程ID→jstack→定位代码，配套监控告警 |
+
+### 现场对话示例
+**面试官**：手写一个死锁代码，然后说说怎么排查。
+**候选人**：两个线程互锁对方持有的锁即可；排查用jstack找'Found deadlock'和waiting to lock形成的环，定位锁对象调整获取顺序。
+**面试官**：CPU飙高怎么排查？
+**候选人**：top -Hp找占CPU最高的线程，nid转16进制在jstack里找对应栈，定位是死循环、频繁GC还是正则回溯等。
+**面试官**：线程RUNNABLE但CPU不高是什么情况？
+**候选人**：多半在等IO，Java层面RUNNABLE但native层阻塞在socketRead0，要看栈是否卡在IO的native方法上。

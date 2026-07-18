@@ -274,3 +274,23 @@ class SSEManager {
 | 1:06 | 浏览器渲染流程图分步演示 | "三招优化：Web Worker接收 到 RAF节流渲染 到 ReadableStream Buffer批量更新" | 三招优化 |
 | 1:57 | 关键代码/伪代码片段 | "每个token触发一次setState是性能杀手 到 改为Buffer累积+RAF按帧刷新" | 每个token触发一次 |
 | 2:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：Web Worker能否直接操作DOM？（不能，需要postMessage通信）。" | 收尾 |
+
+## 苏格拉底式面试追问
+
+| 追问层级 | 面试官可能这样问 | 高分回答方向 |
+|----------|------------------|--------------|
+| 目标追问 | SSE流式渲染优化的根本目标是什么？只是为了快吗？ | 根本目标是保证主线程不阻塞、维持60FPS流畅交互；不仅是快，而是让用户在流式输出时仍能操作页面不被卡死 |
+| 证据追问 | 你怎么证明主线程被堵塞了？用什么指标量化？ | 用Performance面板的Long Task、FPS监控、PerformanceObserver采集long task时长、Main线程火焰图定位逐token setState |
+| 边界追问 | Web Worker能解决所有场景吗？什么情况必须回到主线程？ | Web Worker不能操作DOM，最终渲染必须回主线程；Worker只适合做接收、解析、缓冲，DOM更新要用RAF批量回主线程 |
+| 反例追问 | 如果不用Web Worker，只在主线程用RAF节流，够不够？ | 不够。高频SSE回调本身在主线程解析JSON、处理string仍占CPU，长时间输出还是会卡；Worker才能把解析真正移出主线程 |
+| 风险追问 | ReadableStream Buffer批量更新有什么风险？会不会丢token？ | 批量刷新间隔太长会让用户感觉输出顿挫、首字延迟增大；要控制buffer阈值和RAF节奏，且做好背压防止内存堆积 |
+| 验证追问 | 优化前后你怎么量化效果？怎么确认真的不卡了？ | 对比优化前后的FPS曲线、Long Task数量和时长、INP指标；Chrome Performance录制流式过程看主线程占用是否下降 |
+| 沉淀追问 | 这套SSE优化方案怎么沉淀成团队通用组件？ | 封装成useSSEStream Hook：内置Worker+RAF+Buffer，暴露onChunk/onDone回调，配套性能埋点上报 |
+
+### 现场对话示例
+**面试官**：AI对话产品SSE流式渲染前端主线程被堵塞，你怎么优化？
+**候选人**：三招组合：Web Worker接收解析SSE、RAF节流按帧渲染、ReadableStream Buffer批量更新DOM，把高频回调移出主线程。
+**面试官**：为什么必须用Worker，RAF节流不够吗？
+**候选人**：RAF只控制渲染节奏，但SSE回调解析JSON仍跑在主线程会占CPU；Worker才能把解析和缓冲真正移出主线程，保证交互不卡。
+**面试官**：批量更新会不会让用户感觉输出不流畅？
+**候选人**：会，所以buffer阈值要小（几十ms），首字延迟单独走快速通道，配合FPS监控持续调参找到流畅和性能的平衡点。

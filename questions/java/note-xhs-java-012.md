@@ -148,3 +148,23 @@ done
 | 0:15 | JVM 内存模型与 GC 流程图 | "JVM参数: -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath就是/…" | JVM参数 |
 | 1:02 | JVM 内存模型与 GC 流程图分步演示 | "手动触发: jmap -dump:format就是b,file就是heap.hprof <pid>" | 手动触发 |
 | 1:50 | 总结卡 | "核心抓住这条主线，下期咱们接着聊：Dump文件很大（几个GB），如何高效分析？（MAT可以分析>2GB的Dump，需要调大MAT内存）。" | 收尾 |
+
+## 苏格拉底式面试追问
+
+| 追问层级 | 面试官可能这样问 | 高分回答方向 |
+|----------|------------------|--------------|
+| 目标追问 | OOM没自动生成Dump，你第一反应要做什么？ | 确认JVM启动参数是否配置了-XX:+HeapDumpOnOutOfMemoryError和-XX:HeapDumpPath，这是没dump的最常见原因 |
+| 证据追问 | 除了参数没配，还有什么原因会导致OOM不dump？ | OOM发生在非Heap区域（Metaspace、Direct memory）可能不触发HeapDumpOnOutOfMemoryError；被OOM Killer杀进程也来不及dump |
+| 边界追问 | 生产环境必须配自动dump吗？有什么代价？ | 强烈建议配；代价是dump时STW、磁盘占用大，但相比无法定位的代价可接受，通过磁盘监控和轮转控制 |
+| 反例追问 | 有了-XX:+HeapDumpOnOutOfMemoryError就万无一失吗？ | 不是。如果是被Linux OOM Killer杀掉（堆外内存泄漏）JVM根本没机会执行dump逻辑，需要看dmesg和系统日志 |
+| 风险追问 | 事后想主动dump但进程已经挂了怎么办？ | 已挂只能靠历史监控、GC日志、容器日志分析；所以预防胜于治疗——必须事前配好自动dump+定期jmap dump |
+| 验证追问 | 怎么确认自动dump参数真的生效了？ | jcmd pid VM.flags看启动参数、人为触发OOM测试、监控dump路径是否有文件生成 |
+| 沉淀追问 | JVM启动参数规范怎么沉淀？ | 沉淀为部署基线：必配HeapDumpOnOutOfMemoryError、HeapDumpPath、GC日志、OOM告警，纳入发布检查 |
+
+### 现场对话示例
+**面试官**：OOM时JVM没自动生成Dump文件怎么办？
+**候选人**：先jcmd看VM.flags确认是否配了-XX:+HeapDumpOnOutOfMemoryError，没配就是根因；补配并重启后下次自动dump。
+**面试官**：配了还是没dump可能是什么原因？
+**候选人**：可能是Metaspace/Direct memory等非堆OOM不触发该参数，或被Linux OOM Killer杀进程来不及dump，要看dmesg。
+**面试官**：怎么避免再次发生这种情况？
+**候选人**：JVM启动基线必配自动dump+GC日志+OOM告警，定期jmap主动dump保留趋势，纳入发布检查清单。
