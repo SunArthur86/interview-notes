@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Question, Rating } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { APP_CONFIG } from '@/lib/config';
+import { useAnswer } from '@/lib/useAnswer';
 import QuestionContent from './QuestionContent';
 import { showToast } from './Toast';
 
@@ -54,6 +55,8 @@ export default function StudyMode({ pool, mode, allQuestions, onExit }: Props) {
   }, [queue.length, mode, onExit]);
 
   const q = queue[index];
+  const { answer: fullAnswer } = useAnswer(q);
+  const fullQ = useMemo<Question | undefined>(() => q ? { ...q, answer: fullAnswer || q.answer } : undefined, [q, fullAnswer]);
 
   const next = useCallback(() => {
     setRevealed(false);
@@ -156,7 +159,7 @@ export default function StudyMode({ pool, mode, allQuestions, onExit }: Props) {
           <button onClick={() => setRevealed(true)} style={{ ...btnPrimary, width: '100%', padding: '14px' }}>👁️ 点击查看答案 (空格键)</button>
         ) : (
           <>
-            <QuestionContent q={q} showNotes={false} />
+            <QuestionContent q={fullQ || q} showNotes={false} />
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
               {RATING_META.map((m) => (
                 <button key={m.rating} onClick={() => rate(m.rating)} style={{ ...btnGhost, flex: 1, padding: '14px 8px', fontSize: '15px' }}>

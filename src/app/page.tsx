@@ -1,10 +1,15 @@
 import { getAllQuestions } from '@/lib/questions';
 import HomeClient from '@/components/HomeClient';
+import type { Question } from '@/lib/types';
 
 export default function Page() {
-  // Full questions are passed to the client so the modal can render the
-  // complete answer without a runtime fetch. This is a static page, so all
-  // answers are compiled into the HTML at build time.
-  const questions = getAllQuestions();
+  // Pass lightweight summaries to the homepage (no full answer text).
+  // Answers are lazy-loaded from per-category JSON chunks when a modal
+  // or study/review mode is opened.
+  const all = getAllQuestions();
+  const questions: Question[] = all.map((q) => ({
+    ...q,
+    answer: q.answer.slice(0, 300),
+  }));
   return <HomeClient questions={questions} />;
 }

@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Question, ReviewItem } from '@/lib/types';
 import { useStore } from '@/lib/store';
+import { useAnswer } from '@/lib/useAnswer';
 import { review, previewInterval, formatInterval, isMastered, isDue, getBoxLabel, todayISO } from '@/lib/algorithms';
 import QuestionContent from './QuestionContent';
 import { showToast } from './Toast';
@@ -55,6 +56,8 @@ export default function ReviewMode({ allQuestions, onExit }: Props) {
 
   const currentId = queue[index];
   const q = allQuestions.find((x) => x.id === currentId);
+  const { answer: fullAnswer } = useAnswer(q);
+  const fullQ = useMemo<Question | undefined>(() => q ? { ...q, answer: fullAnswer || q.answer } : undefined, [q, fullAnswer]);
   const item = currentId ? store.reviewData[currentId] : undefined;
 
   const advance = useCallback(() => {
@@ -165,7 +168,7 @@ export default function ReviewMode({ allQuestions, onExit }: Props) {
           <button onClick={() => setRevealed(true)} style={{ ...btnPrimary, width: '100%', padding: '14px' }}>👁️ 点击查看答案 (空格键)</button>
         ) : (
           <>
-            <QuestionContent q={q} showNotes={false} />
+            <QuestionContent q={fullQ || q} showNotes={false} />
             <div style={{ display: 'flex', gap: '6px', marginTop: '16px' }}>
               {QUALITY_META.map((m) => {
                 const base = item || store.ensureReview(q.id);
